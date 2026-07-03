@@ -2,6 +2,9 @@ package tools
 
 import (
 	"context"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/host"
@@ -114,4 +117,39 @@ func HandleGetSystemSnapshot(
 
 	snapshot.Errors = errs
 	return nil, snapshot, nil
+}
+
+type GetLoadAverageInput struct{}
+
+type LoadAverageOutput struct {
+	Load1  float64 `json:"load_1"`
+	Load5  float64 `json:"load_5"`
+	Load15 float64 `json:"load_15"`
+}
+
+func GatherLoadAverage() (LoadAverageOutput, error) {
+	data, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		return LoadAverageOutput{}, err
+	}
+	fields := strings.Fields(string(data))
+	if len(fields) < 3 {
+		return LoadAverageOutput{}, nil
+	}
+	load1, _ := strconv.ParseFloat(fields[0], 64)
+	load5, _ := strconv.ParseFloat(fields[1], 64)
+	load15, _ := strconv.ParseFloat(fields[2], 64)
+	return LoadAverageOutput{Load1: load1, Load5: load5, Load15: load15}, nil
+}
+
+func HandleGetLoadAverage(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetLoadAverageInput,
+) (*mcp.CallToolResult, LoadAverageOutput, error) {
+	out, err := GatherLoadAverage()
+	if err != nil {
+		return nil, LoadAverageOutput{}, err
+	}
+	return nil, out, nil
 }

@@ -105,6 +105,59 @@ func GatherFailedLogins(lines int) (FailedLoginsOutput, error) {
 	return GatherFailedLoginsJournalctl(lines)
 }
 
+type GetLoggedInUsersInput struct{}
+
+type LoggedInUser struct {
+	Username  string `json:"username"`
+	Terminal  string `json:"terminal"`
+	From      string `json:"from"`
+	LoginTime string `json:"login_time"`
+}
+
+type LoggedInUsersOutput struct {
+	Users []LoggedInUser `json:"users"`
+}
+
+func GatherLoggedInUsers() (LoggedInUsersOutput, error) {
+	out, err := exec.Command("who", "-u").Output()
+	if err != nil {
+		return LoggedInUsersOutput{}, err
+	}
+	var users []LoggedInUser
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		from := ""
+		if len(fields) > 5 {
+			from = fields[5]
+		}
+		users = append(users, LoggedInUser{
+			Username:  fields[0],
+			Terminal:  fields[1],
+			LoginTime: strings.Join(fields[2:4], " "),
+			From:      from,
+		})
+	}
+	return LoggedInUsersOutput{Users: users}, nil
+}
+
+func HandleGetLoggedInUsers(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetLoggedInUsersInput,
+) (*mcp.CallToolResult, LoggedInUsersOutput, error) {
+	out, err := GatherLoggedInUsers()
+	if err != nil {
+		return nil, LoggedInUsersOutput{}, err
+	}
+	return nil, out, nil
+}
+
 func HandleGetFailedLogins(
 	ctx context.Context,
 	req *mcp.CallToolRequest,

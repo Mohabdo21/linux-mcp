@@ -505,6 +505,89 @@ func TestGatherCheckUpdates(t *testing.T) {
 	t.Logf("Found %d available updates", out.Total)
 }
 
+func TestGatherLoadAverage(t *testing.T) {
+	out, err := GatherLoadAverage()
+	if err != nil {
+		t.Fatalf("GatherLoadAverage() error: %v", err)
+	}
+	if out.Load1 < 0 {
+		t.Errorf("Load1 should be >= 0, got %f", out.Load1)
+	}
+	if out.Load5 < 0 {
+		t.Errorf("Load5 should be >= 0, got %f", out.Load5)
+	}
+	if out.Load15 < 0 {
+		t.Errorf("Load15 should be >= 0, got %f", out.Load15)
+	}
+}
+
+func TestGatherLoggedInUsers(t *testing.T) {
+	out, err := GatherLoggedInUsers()
+	if err != nil {
+		t.Skipf("GatherLoggedInUsers() error: %v", err)
+	}
+	t.Logf("Found %d logged-in users", len(out.Users))
+}
+
+func TestGatherDNSResolve(t *testing.T) {
+	out, err := GatherDNSResolve("localhost")
+	if err != nil {
+		t.Skipf("GatherDNSResolve(\"localhost\") error: %v", err)
+	}
+	if len(out.Addresses) == 0 {
+		t.Error("Expected at least one address for localhost")
+	}
+	t.Logf("localhost resolves to: %v", out.Addresses)
+}
+
+func TestGatherMountOptions(t *testing.T) {
+	out, err := GatherMountOptions("")
+	if err != nil {
+		t.Fatalf("GatherMountOptions() error: %v", err)
+	}
+	if len(out.Mounts) == 0 {
+		t.Fatal("Mounts should not be empty")
+	}
+	for i, m := range out.Mounts {
+		if m.Target == "" {
+			t.Errorf("Mounts[%d].Target should not be empty", i)
+		}
+	}
+}
+
+func TestGatherMountOptionsWithFilter(t *testing.T) {
+	out, err := GatherMountOptions("/")
+	if err != nil {
+		t.Fatalf("GatherMountOptions(\"/\") error: %v", err)
+	}
+	if len(out.Mounts) == 0 {
+		t.Fatal("Expected at least / mount")
+	}
+	for _, m := range out.Mounts {
+		if m.Target != "/" {
+			t.Errorf("Expected target /, got %s", m.Target)
+		}
+	}
+}
+
+func TestGatherSystemdUnits(t *testing.T) {
+	out, err := GatherSystemdUnits()
+	if err != nil {
+		t.Skipf("GatherSystemdUnits() error: %v", err)
+	}
+	if len(out.Units) == 0 {
+		t.Error("Units should not be empty")
+	}
+	t.Logf("Found %d systemd units", len(out.Units))
+}
+
+func TestHandleResolveDNSEmptyHostname(t *testing.T) {
+	_, _, err := HandleResolveDNS(t.Context(), nil, ResolveDNSInput{})
+	if err == nil {
+		t.Error("Expected error for empty hostname")
+	}
+}
+
 func TestHumanSize(t *testing.T) {
 	cases := []struct {
 		bytes int64

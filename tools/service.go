@@ -53,6 +53,68 @@ func GatherServiceStatus(
 	}, err
 }
 
+type GetSystemdUnitsInput struct{}
+
+type SystemdUnit struct {
+	Unit        string `json:"unit"`
+	Load        string `json:"load"`
+	Active      string `json:"active"`
+	Sub         string `json:"sub"`
+	Description string `json:"description"`
+}
+
+type SystemdUnitsOutput struct {
+	Units []SystemdUnit `json:"units"`
+}
+
+func GatherSystemdUnits() (SystemdUnitsOutput, error) {
+	cmd := exec.Command(
+		"systemctl",
+		"list-units",
+		"--all",
+		"--no-pager",
+		"--no-legend",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return SystemdUnitsOutput{}, err
+	}
+	var units []SystemdUnit
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		desc := ""
+		if len(fields) > 4 {
+			desc = strings.Join(fields[4:], " ")
+		}
+		units = append(units, SystemdUnit{
+			Unit:        fields[0],
+			Load:        fields[1],
+			Active:      fields[2],
+			Sub:         fields[3],
+			Description: desc,
+		})
+	}
+	return SystemdUnitsOutput{Units: units}, nil
+}
+
+func HandleGetSystemdUnits(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetSystemdUnitsInput,
+) (*mcp.CallToolResult, SystemdUnitsOutput, error) {
+	out, err := GatherSystemdUnits()
+	if err != nil {
+		return nil, SystemdUnitsOutput{}, err
+	}
+	return nil, out, nil
+}
+
 func HandleGetServiceStatus(
 	ctx context.Context,
 	req *mcp.CallToolRequest,

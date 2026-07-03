@@ -4,14 +4,16 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 
 ## Features
 
-- **System info** - hostname, OS, kernel version, architecture, uptime
+- **System info** - hostname, OS, kernel version, architecture, uptime, load averages
 - **CPU** - usage percentage, model, frequency, physical/virtual core counts
 - **CPU temperature** - per-sensor temperature readings (when available)
 - **Memory** - RAM and swap usage, used/free/total with percentages
-- **Disk** - per-partition usage with mount point filtering
-- **Network** - per-interface I/O statistics (bytes, packets, errors, drops)
+- **Disk** - per-partition usage, mount options, inode usage, and largest files
+- **Network** - per-interface I/O statistics, listening ports, and DNS resolution
 - **Processes** - running processes sorted by CPU or memory, with configurable limits
 - **Docker** - container and image listing (via Docker CLI)
+- **Services** - systemd service status and full unit inventory
+- **Security** - active user sessions and failed login detection
 - **Packages** - query installed packages and check for available updates (supports pacman and dpkg)
 - **System snapshot** - all of the above in a single call, with graceful degradation on individual failures
 
@@ -91,6 +93,11 @@ Add the following to your MCP client configuration:
 | `ping_host`              | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |
 | `get_installed_packages` | Query installed packages (pacman -Q or dpkg -l), optionally filtered by name                                                      |
 | `check_updates`          | Count or list available package updates without applying them (pacman -Qu or apt list --upgradable)                               |
+| `get_load_average`       | Returns 1-, 5-, and 15-minute load averages as a universal system health check                                                    |
+| `get_logged_in_users`    | Returns active user sessions for security and workload awareness                                                                  |
+| `resolve_dns`            | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                             |
+| `get_mount_options`      | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                              |
+| `get_systemd_units`      | Returns all systemd units and their states for full service inventory                                                             |
 
 ## Project structure
 

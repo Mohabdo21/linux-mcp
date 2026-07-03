@@ -105,4 +105,29 @@ func RegisterTools(server *mcp.Server) {
 			"without applying them " +
 			"(e.g., pacman -Qu, apt list --upgradable)",
 	}, HandleCheckUpdates)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_load_average",
+		Description: "Returns 1-, 5-, and 15-minute load averages " +
+			"as a universal system health check",
+	}, HandleGetLoadAverage)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_logged_in_users",
+		Description: "Returns active user sessions for security " +
+			"and workload awareness",
+	}, HandleGetLoggedInUsers)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "resolve_dns",
+		Description: "Resolves a hostname to IP addresses to " +
+			"distinguish DNS failures from network failures",
+	}, HandleResolveDNS)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_mount_options",
+		Description: "Returns mount point options (rw/ro, etc.) " +
+			"for filesystem diagnostics",
+	}, HandleGetMountOptions)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_systemd_units",
+		Description: "Returns all systemd units and their states " +
+			"for full service inventory",
+	}, HandleGetSystemdUnits)
 }

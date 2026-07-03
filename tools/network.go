@@ -2,11 +2,12 @@ package tools
 
 import (
 	"context"
+	"net"
 	"os/exec"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/shirou/gopsutil/v4/net"
+	gnet "github.com/shirou/gopsutil/v4/net"
 )
 
 type GetNetworkInfoInput struct{}
@@ -28,7 +29,7 @@ type NetworkInfoOutput struct {
 }
 
 func GatherNetworkInfo() (NetworkInfoOutput, error) {
-	counters, err := net.IOCounters(true)
+	counters, err := gnet.IOCounters(true)
 	if err != nil {
 		return NetworkInfoOutput{}, err
 	}
@@ -110,6 +111,40 @@ func GatherListeningPorts(protocol string) (ListeningPortsOutput, error) {
 		})
 	}
 	return ListeningPortsOutput{Ports: ports}, nil
+}
+
+type ResolveDNSInput struct {
+	Hostname string `json:"hostname" jsonschema:"hostname to resolve (e.g. 'example.com')"`
+}
+
+type ResolveDNSOutput struct {
+	Hostname  string   `json:"hostname"`
+	Addresses []string `json:"addresses"`
+}
+
+func GatherDNSResolve(hostname string) (ResolveDNSOutput, error) {
+	addrs, err := net.LookupHost(hostname)
+	if err != nil {
+		return ResolveDNSOutput{Hostname: hostname}, err
+	}
+	return ResolveDNSOutput{Hostname: hostname, Addresses: addrs}, nil
+}
+
+func HandleResolveDNS(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input ResolveDNSInput,
+) (*mcp.CallToolResult, ResolveDNSOutput, error) {
+	if input.Hostname == "" {
+		return nil, ResolveDNSOutput{}, net.InvalidAddrError(
+			"hostname is required",
+		)
+	}
+	out, err := GatherDNSResolve(input.Hostname)
+	if err != nil {
+		return nil, out, nil
+	}
+	return nil, out, nil
 }
 
 func HandleGetListeningPorts(

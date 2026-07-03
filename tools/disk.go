@@ -201,6 +201,62 @@ func GatherLargestFiles(path string, limit int) (LargestFilesOutput, error) {
 	return LargestFilesOutput{Path: path, Entries: entries}, nil
 }
 
+type GetMountOptionsInput struct {
+	MountPoint string `json:"mount_point,omitempty" jsonschema:"optional mount point filter (e.g. '/')"`
+}
+
+type MountEntry struct {
+	Source  string   `json:"source"`
+	Target  string   `json:"target"`
+	FSType  string   `json:"fs_type"`
+	Options []string `json:"options"`
+}
+
+type MountOptionsOutput struct {
+	Mounts []MountEntry `json:"mounts"`
+}
+
+func GatherMountOptions(mountPoint string) (MountOptionsOutput, error) {
+	args := []string{"--noheadings", "-o", "SOURCE,TARGET,FSTYPE,OPTIONS"}
+	cmd := exec.Command("findmnt", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return MountOptionsOutput{}, err
+	}
+	var mounts []MountEntry
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		if mountPoint != "" && fields[1] != mountPoint {
+			continue
+		}
+		mounts = append(mounts, MountEntry{
+			Source:  fields[0],
+			Target:  fields[1],
+			FSType:  fields[2],
+			Options: strings.Split(fields[3], ","),
+		})
+	}
+	return MountOptionsOutput{Mounts: mounts}, nil
+}
+
+func HandleGetMountOptions(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input GetMountOptionsInput,
+) (*mcp.CallToolResult, MountOptionsOutput, error) {
+	out, err := GatherMountOptions(input.MountPoint)
+	if err != nil {
+		return nil, MountOptionsOutput{}, err
+	}
+	return nil, out, nil
+}
+
 func HandleGetLargestFiles(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
