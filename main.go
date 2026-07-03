@@ -53,4 +53,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_docker_info",
 		Description: "Returns Docker containers and images if Docker is installed",
 	}, handleGetDockerInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_system_snapshot",
+		Description: "Returns a comprehensive snapshot of system status combining all tools",
+	}, handleGetSystemSnapshot)
 }

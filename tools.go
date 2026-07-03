@@ -342,6 +342,143 @@ func handleGetDockerInfo(ctx context.Context, req *mcp.CallToolRequest, _ getDoc
 	return nil, dockerInfoOutput{Containers: containers, Images: images}, nil
 }
 
+// --- get_system_snapshot ---
+
+type getSystemSnapshotInput struct{}
+
+type systemSnapshotOutput struct {
+	System      systemInfoOutput     `json:"system"`
+	CPU         cpuInfoOutput        `json:"cpu"`
+	Temperature cpuTemperatureOutput `json:"temperature"`
+	Memory      memoryInfoOutput     `json:"memory"`
+	Disk        diskInfoOutput       `json:"disk"`
+	Network     networkInfoOutput    `json:"network"`
+	Processes   processInfoOutput    `json:"processes"`
+	Docker      dockerInfoOutput     `json:"docker"`
+}
+
+func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ getSystemSnapshotInput) (*mcp.CallToolResult, systemSnapshotOutput, error) {
+	var snapshot systemSnapshotOutput
+	var errs []string
+
+	if info, err := host.Info(); err == nil {
+		snapshot.System = systemInfoOutput{
+			Hostname: info.Hostname, OSName: info.OS,
+			OSVersion: info.PlatformVersion, KernelVersion: info.KernelVersion,
+			Architecture: info.KernelArch, UptimeSeconds: info.Uptime,
+		}
+	} else {
+		errs = append(errs, "system: "+err.Error())
+	}
+
+	if cpuInfo, err := cpu.Info(); err == nil {
+		percent, _ := cpu.Percent(0, false)
+		var cores []cpuDetails
+		for _, c := range cpuInfo {
+			cores = append(cores, cpuDetails{
+				ModelName: c.ModelName, CoreCount: c.Cores, MHz: c.Mhz,
+			})
+		}
+		usage := 0.0
+		if len(percent) > 0 {
+			usage = percent[0]
+		}
+		snapshot.CPU = cpuInfoOutput{UsagePercent: usage, Cores: cores}
+	} else {
+		errs = append(errs, "cpu: "+err.Error())
+	}
+
+	if temps, err := sensors.SensorsTemperatures(); err == nil {
+		var t []temperatureStat
+		for _, s := range temps {
+			t = append(t, temperatureStat{SensorKey: s.SensorKey, Temperature: s.Temperature})
+		}
+		snapshot.Temperature = cpuTemperatureOutput{Temperatures: t}
+		if len(t) == 0 {
+			snapshot.Temperature.Message = "No temperature sensors available"
+		}
+	} else {
+		errs = append(errs, "temperature: "+err.Error())
+	}
+
+	if v, err := mem.VirtualMemory(); err == nil {
+		s, _ := mem.SwapMemory()
+		snapshot.Memory = memoryInfoOutput{
+			Total: v.Total, Used: v.Used, Free: v.Free, UsedPercent: v.UsedPercent,
+			SwapTotal: s.Total, SwapUsed: s.Used, SwapFree: s.Free, SwapUsedPercent: s.UsedPercent,
+		}
+	} else {
+		errs = append(errs, "memory: "+err.Error())
+	}
+
+	if parts, err := disk.Partitions(false); err == nil {
+		var disks []diskUsageStat
+		for _, p := range parts {
+			if u, err := disk.Usage(p.Mountpoint); err == nil {
+				disks = append(disks, diskUsageStat{
+					MountPoint: p.Mountpoint, Filesystem: p.Fstype, Device: p.Device,
+					Total: u.Total, Used: u.Used, Free: u.Free, UsedPercent: u.UsedPercent,
+				})
+			}
+		}
+		snapshot.Disk = diskInfoOutput{Partitions: disks}
+	} else {
+		errs = append(errs, "disk: "+err.Error())
+	}
+
+	if counters, err := net.IOCounters(true); err == nil {
+		var ifaces []interfaceStats
+		for _, c := range counters {
+			ifaces = append(ifaces, interfaceStats{
+				Name: c.Name, BytesSent: c.BytesSent, BytesRecv: c.BytesRecv,
+				PacketsSent: c.PacketsSent, PacketsRecv: c.PacketsRecv,
+				ErrorsIn: c.Errin, ErrorsOut: c.Errout,
+				DropsIn: c.Dropin, DropsOut: c.Dropout,
+			})
+		}
+		snapshot.Network = networkInfoOutput{Interfaces: ifaces}
+	} else {
+		errs = append(errs, "network: "+err.Error())
+	}
+
+	{
+		snapshot.Processes = processInfoOutput{}
+		if procs, err := process.Processes(); err == nil {
+			var stats []processStat
+			for _, p := range procs {
+				name, _ := p.Name()
+				cpu, _ := p.CPUPercent()
+				mem, _ := p.MemoryPercent()
+				status, _ := p.Status()
+				statusStr := ""
+				if len(status) > 0 {
+					statusStr = status[0]
+				}
+				stats = append(stats, processStat{
+					PID: p.Pid, Name: name, CPUPercent: cpu,
+					MemoryPercent: mem, Status: statusStr,
+				})
+			}
+			sort.Slice(stats, func(i, j int) bool { return stats[i].CPUPercent > stats[j].CPUPercent })
+			if len(stats) > 10 {
+				stats = stats[:10]
+			}
+			snapshot.Processes = processInfoOutput{Processes: stats}
+		} else {
+			errs = append(errs, "processes: "+err.Error())
+		}
+	}
+
+	if containers, err := listDockerContainers(); err == nil {
+		images, _ := listDockerImages()
+		snapshot.Docker = dockerInfoOutput{Containers: containers, Images: images}
+	} else {
+		snapshot.Docker = dockerInfoOutput{}
+	}
+
+	return nil, snapshot, nil
+}
+
 func listDockerContainers() ([]dockerContainer, error) {
 	cmd := exec.Command("docker", "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}")
 	out, err := cmd.Output()
