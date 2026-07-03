@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/sensors"
 )
 
 // getSystemInfoInput is intentionally empty (no required params).
@@ -75,4 +76,34 @@ func handleGetCPUInfo(ctx context.Context, req *mcp.CallToolRequest, _ getCPUInf
 		usage = percent[0]
 	}
 	return nil, cpuInfoOutput{UsagePercent: usage, PhysicalCoreCount: int32(physCount), Cores: cores}, nil
+}
+
+type getCPUTemperatureInput struct{}
+
+type temperatureStat struct {
+	SensorKey   string  `json:"sensor_key"`
+	Temperature float64 `json:"temperature_celsius"`
+}
+
+type cpuTemperatureOutput struct {
+	Temperatures []temperatureStat `json:"temperatures"`
+	Message      string            `json:"message,omitempty"`
+}
+
+func handleGetCPUTemperature(ctx context.Context, req *mcp.CallToolRequest, _ getCPUTemperatureInput) (*mcp.CallToolResult, cpuTemperatureOutput, error) {
+	temps, err := sensors.SensorsTemperatures()
+	if err != nil {
+		return nil, cpuTemperatureOutput{}, err
+	}
+	if len(temps) == 0 {
+		return nil, cpuTemperatureOutput{Message: "No temperature sensors available"}, nil
+	}
+	var result []temperatureStat
+	for _, t := range temps {
+		result = append(result, temperatureStat{
+			SensorKey:   t.SensorKey,
+			Temperature: t.Temperature,
+		})
+	}
+	return nil, cpuTemperatureOutput{Temperatures: result}, nil
 }
