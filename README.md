@@ -12,6 +12,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Network** - per-interface I/O statistics (bytes, packets, errors, drops)
 - **Processes** - running processes sorted by CPU or memory, with configurable limits
 - **Docker** - container and image listing (via Docker CLI)
+- **Packages** - query installed packages and check for available updates (supports pacman and dpkg)
 - **System snapshot** - all of the above in a single call, with graceful degradation on individual failures
 
 ## Prerequisites
@@ -68,26 +69,28 @@ Add the following to your MCP client configuration:
 
 ### Available tools
 
-| Tool                   | Description                                                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `get_system_info`      | Returns hostname, OS, kernel version, architecture, and uptime                                                                    |
-| `get_cpu_info`         | Returns CPU usage percentage, model, frequency, and core counts                                                                   |
-| `get_cpu_temperature`  | Returns current CPU temperature if sensor data is available                                                                       |
-| `get_memory_info`      | Returns memory usage including RAM and swap statistics                                                                            |
-| `get_disk_info`        | Returns disk usage for mounted partitions, optionally filtered by mount point                                                     |
-| `get_network_info`     | Returns network I/O statistics per interface                                                                                      |
-| `get_process_info`     | Returns list of running processes, sortable by CPU or memory, with configurable limit                                             |
-| `get_docker_info`      | Returns Docker containers and images if Docker is installed                                                                       |
-| `get_system_snapshot`  | Returns a comprehensive snapshot combining all tools                                                                              |
-| `get_journal_logs`     | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal |
-| `get_inode_usage`      | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                               |
-| `get_listening_ports`  | Returns listening ports and their associated processes for security auditing and port conflict resolution                         |
-| `get_service_status`   | Returns detailed status of a systemd service; set `user=true` to query user-level service                                         |
-| `get_top_io_processes` | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
-| `get_failed_logins`    | Returns recent failed login attempts to detect brute-force attacks                                                                |
-| `get_gpu_info`         | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
-| `get_largest_files`    | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                        |
-| `ping_host`            | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |
+| Tool                     | Description                                                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `get_system_info`        | Returns hostname, OS, kernel version, architecture, and uptime                                                                    |
+| `get_cpu_info`           | Returns CPU usage percentage, model, frequency, and core counts                                                                   |
+| `get_cpu_temperature`    | Returns current CPU temperature if sensor data is available                                                                       |
+| `get_memory_info`        | Returns memory usage including RAM and swap statistics                                                                            |
+| `get_disk_info`          | Returns disk usage for mounted partitions, optionally filtered by mount point                                                     |
+| `get_network_info`       | Returns network I/O statistics per interface                                                                                      |
+| `get_process_info`       | Returns list of running processes, sortable by CPU or memory, with configurable limit                                             |
+| `get_docker_info`        | Returns Docker containers and images if Docker is installed                                                                       |
+| `get_system_snapshot`    | Returns a comprehensive snapshot combining all tools                                                                              |
+| `get_journal_logs`       | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal |
+| `get_inode_usage`        | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                               |
+| `get_listening_ports`    | Returns listening ports and their associated processes for security auditing and port conflict resolution                         |
+| `get_service_status`     | Returns detailed status of a systemd service; set `user=true` to query user-level service                                         |
+| `get_top_io_processes`   | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
+| `get_failed_logins`      | Returns recent failed login attempts to detect brute-force attacks                                                                |
+| `get_gpu_info`           | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
+| `get_largest_files`      | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                        |
+| `ping_host`              | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |
+| `get_installed_packages` | Query installed packages (pacman -Q or dpkg -l), optionally filtered by name                                                      |
+| `check_updates`          | Count or list available package updates without applying them (pacman -Qu or apt list --upgradable)                               |
 
 ## Project structure
 
@@ -106,6 +109,7 @@ Add the following to your MCP client configuration:
 │   ├── service.go     # systemd service status
 │   ├── security.go    # Failed login detection
 │   ├── gpu.go         # GPU monitoring (NVIDIA/AMD/Intel)
+│   ├── packages.go    # Installed packages and updates check
 │   ├── ping.go        # ICMP ping
 │   ├── register.go    # Tool registration
 │   ├── util.go        # Shared helpers
