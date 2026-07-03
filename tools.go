@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"sort"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/shirou/gopsutil/v4/sensors"
 )
 
@@ -188,4 +191,111 @@ func handleGetMemoryInfo(ctx context.Context, req *mcp.CallToolRequest, _ getMem
 		SwapFree:        s.Free,
 		SwapUsedPercent: s.UsedPercent,
 	}, nil
+}
+
+type getNetworkInfoInput struct{}
+
+type interfaceStats struct {
+	Name        string `json:"name"`
+	BytesSent   uint64 `json:"bytes_sent"`
+	BytesRecv   uint64 `json:"bytes_recv"`
+	PacketsSent uint64 `json:"packets_sent"`
+	PacketsRecv uint64 `json:"packets_recv"`
+	ErrorsIn    uint64 `json:"errors_in"`
+	ErrorsOut   uint64 `json:"errors_out"`
+	DropsIn     uint64 `json:"drops_in"`
+	DropsOut    uint64 `json:"drops_out"`
+}
+
+type networkInfoOutput struct {
+	Interfaces []interfaceStats `json:"interfaces"`
+}
+
+func handleGetNetworkInfo(ctx context.Context, req *mcp.CallToolRequest, _ getNetworkInfoInput) (*mcp.CallToolResult, networkInfoOutput, error) {
+	counters, err := net.IOCounters(true)
+	if err != nil {
+		return nil, networkInfoOutput{}, err
+	}
+	var result []interfaceStats
+	for _, c := range counters {
+		result = append(result, interfaceStats{
+			Name:        c.Name,
+			BytesSent:   c.BytesSent,
+			BytesRecv:   c.BytesRecv,
+			PacketsSent: c.PacketsSent,
+			PacketsRecv: c.PacketsRecv,
+			ErrorsIn:    c.Errin,
+			ErrorsOut:   c.Errout,
+			DropsIn:     c.Dropin,
+			DropsOut:    c.Dropout,
+		})
+	}
+	return nil, networkInfoOutput{Interfaces: result}, nil
+}
+
+type getProcessInfoInput struct {
+	SortBy string `json:"sort_by" jsonschema:"sort by 'cpu' or 'memory' (default: cpu)"`
+	Limit  int    `json:"limit" jsonschema:"max results (default: 10, max: 100)"`
+}
+
+type processStat struct {
+	PID           int32   `json:"pid"`
+	Name          string  `json:"name"`
+	CPUPercent    float64 `json:"cpu_percent"`
+	MemoryPercent float32 `json:"memory_percent"`
+	Status        string  `json:"status"`
+}
+
+type processInfoOutput struct {
+	Processes []processStat `json:"processes"`
+}
+
+func handleGetProcessInfo(ctx context.Context, req *mcp.CallToolRequest, input getProcessInfoInput) (*mcp.CallToolResult, processInfoOutput, error) {
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+	sortBy := input.SortBy
+	if sortBy == "" {
+		sortBy = "cpu"
+	}
+
+	procs, err := process.Processes()
+	if err != nil {
+		return nil, processInfoOutput{}, err
+	}
+
+	var result []processStat
+	for _, p := range procs {
+		name, _ := p.Name()
+		cpu, _ := p.CPUPercent()
+		mem, _ := p.MemoryPercent()
+		status, _ := p.Status()
+		statusStr := ""
+		if len(status) > 0 {
+			statusStr = status[0]
+		}
+		result = append(result, processStat{
+			PID:           p.Pid,
+			Name:          name,
+			CPUPercent:    cpu,
+			MemoryPercent: mem,
+			Status:        statusStr,
+		})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if sortBy == "memory" {
+			return result[i].MemoryPercent > result[j].MemoryPercent
+		}
+		return result[i].CPUPercent > result[j].CPUPercent
+	})
+
+	if len(result) > limit {
+		result = result[:limit]
+	}
+
+	return nil, processInfoOutput{Processes: result}, nil
 }

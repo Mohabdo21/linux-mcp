@@ -41,4 +41,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_disk_info",
 		Description: "Returns disk usage for mounted partitions, optionally filtered by mount point",
 	}, handleGetDiskInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_network_info",
+		Description: "Returns network I/O statistics per interface",
+	}, handleGetNetworkInfo)
 }
