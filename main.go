@@ -13,7 +13,7 @@ func main() {
 		Version: "1.0.0",
 	}, nil)
 
-	//registerTools(server)
+	registerTools(server)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Printf("Server failed: %v", err)
@@ -21,5 +21,8 @@ func main() {
 }
 
 func registerTools(server *mcp.Server) {
-	// TODO: register all 9 tools here
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_system_info",
+		Description: "Returns system information including hostname, OS, kernel version, architecture, and uptime",
+	}, handleGetSystemInfo)
 }
