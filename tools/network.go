@@ -1,0 +1,125 @@
+package tools
+
+import (
+	"context"
+	"os/exec"
+	"strings"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/shirou/gopsutil/v4/net"
+)
+
+type GetNetworkInfoInput struct{}
+
+type InterfaceStats struct {
+	Name        string `json:"name"`
+	BytesSent   uint64 `json:"bytes_sent"`
+	BytesRecv   uint64 `json:"bytes_recv"`
+	PacketsSent uint64 `json:"packets_sent"`
+	PacketsRecv uint64 `json:"packets_recv"`
+	ErrorsIn    uint64 `json:"errors_in"`
+	ErrorsOut   uint64 `json:"errors_out"`
+	DropsIn     uint64 `json:"drops_in"`
+	DropsOut    uint64 `json:"drops_out"`
+}
+
+type NetworkInfoOutput struct {
+	Interfaces []InterfaceStats `json:"interfaces"`
+}
+
+func GatherNetworkInfo() (NetworkInfoOutput, error) {
+	counters, err := net.IOCounters(true)
+	if err != nil {
+		return NetworkInfoOutput{}, err
+	}
+	var result []InterfaceStats
+	for _, c := range counters {
+		result = append(result, InterfaceStats{
+			Name:        c.Name,
+			BytesSent:   c.BytesSent,
+			BytesRecv:   c.BytesRecv,
+			PacketsSent: c.PacketsSent,
+			PacketsRecv: c.PacketsRecv,
+			ErrorsIn:    c.Errin,
+			ErrorsOut:   c.Errout,
+			DropsIn:     c.Dropin,
+			DropsOut:    c.Dropout,
+		})
+	}
+	return NetworkInfoOutput{Interfaces: result}, nil
+}
+
+func HandleGetNetworkInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetNetworkInfoInput,
+) (*mcp.CallToolResult, NetworkInfoOutput, error) {
+	out, err := GatherNetworkInfo()
+	if err != nil {
+		return nil, NetworkInfoOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type GetListeningPortsInput struct {
+	Protocol string `json:"protocol,omitempty" jsonschema:"optional protocol filter: tcp, udp"`
+}
+
+type ListeningPort struct {
+	Protocol string `json:"protocol"`
+	Address  string `json:"address"`
+	Port     string `json:"port"`
+	Process  string `json:"process,omitempty"`
+}
+
+type ListeningPortsOutput struct {
+	Ports []ListeningPort `json:"ports"`
+}
+
+func GatherListeningPorts(protocol string) (ListeningPortsOutput, error) {
+	cmd := exec.Command("ss", "-tulnp")
+	out, err := cmd.Output()
+	if err != nil {
+		return ListeningPortsOutput{}, err
+	}
+	var ports []ListeningPort
+	for line := range strings.SplitSeq(
+		strings.TrimSpace(string(out)), "\n",
+	) {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 5 || fields[0] == "Netid" {
+			continue
+		}
+		netid := fields[0]
+		if protocol != "" && netid != protocol {
+			continue
+		}
+		addr, port, _ := SplitHostPort(fields[4])
+		proc := ""
+		if len(fields) >= 7 {
+			proc = ParseProcessField(fields[6])
+		}
+		ports = append(ports, ListeningPort{
+			Protocol: netid,
+			Address:  addr,
+			Port:     port,
+			Process:  proc,
+		})
+	}
+	return ListeningPortsOutput{Ports: ports}, nil
+}
+
+func HandleGetListeningPorts(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input GetListeningPortsInput,
+) (*mcp.CallToolResult, ListeningPortsOutput, error) {
+	out, err := GatherListeningPorts(input.Protocol)
+	if err != nil {
+		return nil, ListeningPortsOutput{}, err
+	}
+	return nil, out, nil
+}

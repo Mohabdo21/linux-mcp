@@ -1,4 +1,4 @@
-package main
+package tools
 
 import (
 	"errors"
@@ -7,9 +7,9 @@ import (
 )
 
 func TestGatherSystemInfo(t *testing.T) {
-	out, err := gatherSystemInfo()
+	out, err := GatherSystemInfo()
 	if err != nil {
-		t.Fatalf("gatherSystemInfo() error: %v", err)
+		t.Fatalf("GatherSystemInfo() error: %v", err)
 	}
 	if out.Hostname == "" {
 		t.Error("Hostname should not be empty")
@@ -29,9 +29,9 @@ func TestGatherSystemInfo(t *testing.T) {
 }
 
 func TestGatherCPUInfo(t *testing.T) {
-	out, err := gatherCPUInfo()
+	out, err := GatherCPUInfo()
 	if err != nil {
-		t.Fatalf("gatherCPUInfo() error: %v", err)
+		t.Fatalf("GatherCPUInfo() error: %v", err)
 	}
 	if len(out.Cores) == 0 {
 		t.Fatal("Cores should not be empty")
@@ -60,29 +60,31 @@ func TestGatherCPUInfo(t *testing.T) {
 }
 
 func TestGatherCPUTemperature(t *testing.T) {
-	out := gatherCPUTemperature()
+	out := GatherCPUTemperature()
 	if out.Message == "" && len(out.Temperatures) == 0 {
 		t.Error("Expected either Message or Temperatures")
 	}
 	if len(out.Temperatures) > 0 {
 		for i, s := range out.Temperatures {
 			if s.SensorKey == "" {
-				t.Errorf("Temperatures[%d].SensorKey should not be empty", i)
+				t.Errorf(
+					"Temperatures[%d].SensorKey should not be empty", i)
 			}
 		}
 	}
 }
 
 func TestGatherMemoryInfo(t *testing.T) {
-	out, err := gatherMemoryInfo()
+	out, err := GatherMemoryInfo()
 	if err != nil {
-		t.Fatalf("gatherMemoryInfo() error: %v", err)
+		t.Fatalf("GatherMemoryInfo() error: %v", err)
 	}
 	if out.Total == 0 {
 		t.Error("Total should not be 0")
 	}
 	if out.UsedPercent < 0 || out.UsedPercent > 100 {
-		t.Errorf("UsedPercent out of range [0,100]: %f", out.UsedPercent)
+		t.Errorf(
+			"UsedPercent out of range [0,100]: %f", out.UsedPercent)
 	}
 	if out.SwapUsedPercent < 0 || out.SwapUsedPercent > 100 {
 		t.Errorf(
@@ -93,9 +95,9 @@ func TestGatherMemoryInfo(t *testing.T) {
 }
 
 func TestGatherDiskInfo(t *testing.T) {
-	out, err := gatherDiskInfo("")
+	out, err := GatherDiskInfo("")
 	if err != nil {
-		t.Fatalf("gatherDiskInfo() error: %v", err)
+		t.Fatalf("GatherDiskInfo() error: %v", err)
 	}
 	if len(out.Partitions) == 0 {
 		t.Fatal("Partitions should not be empty")
@@ -118,9 +120,9 @@ func TestGatherDiskInfo(t *testing.T) {
 }
 
 func TestGatherDiskInfoWithFilter(t *testing.T) {
-	out, err := gatherDiskInfo("/")
+	out, err := GatherDiskInfo("/")
 	if err != nil {
-		t.Fatalf("gatherDiskInfo(\"/\") error: %v", err)
+		t.Fatalf("GatherDiskInfo(\"/\") error: %v", err)
 	}
 	if len(out.Partitions) == 0 {
 		t.Fatal("Expected at least / partition")
@@ -133,9 +135,9 @@ func TestGatherDiskInfoWithFilter(t *testing.T) {
 }
 
 func TestGatherDiskInfoWithNoMatch(t *testing.T) {
-	out, err := gatherDiskInfo("/nonexistent")
+	out, err := GatherDiskInfo("/nonexistent")
 	if err != nil {
-		t.Fatalf("gatherDiskInfo(\"/nonexistent\") error: %v", err)
+		t.Fatalf("GatherDiskInfo(\"/nonexistent\") error: %v", err)
 	}
 	if len(out.Partitions) != 0 {
 		t.Errorf(
@@ -146,9 +148,9 @@ func TestGatherDiskInfoWithNoMatch(t *testing.T) {
 }
 
 func TestGatherNetworkInfo(t *testing.T) {
-	out, err := gatherNetworkInfo()
+	out, err := GatherNetworkInfo()
 	if err != nil {
-		t.Fatalf("gatherNetworkInfo() error: %v", err)
+		t.Fatalf("GatherNetworkInfo() error: %v", err)
 	}
 	if len(out.Interfaces) == 0 {
 		t.Fatal("Interfaces should not be empty")
@@ -165,9 +167,9 @@ func TestGatherNetworkInfo(t *testing.T) {
 }
 
 func TestGatherProcessInfoDefaults(t *testing.T) {
-	out, err := gatherProcessInfo("", 0)
+	out, err := GatherProcessInfo("", 0)
 	if err != nil {
-		t.Fatalf("gatherProcessInfo(\"\", 0) error: %v", err)
+		t.Fatalf("GatherProcessInfo(\"\", 0) error: %v", err)
 	}
 	if len(out.Processes) == 0 {
 		t.Fatal("Processes should not be empty")
@@ -187,15 +189,16 @@ func TestGatherProcessInfoDefaults(t *testing.T) {
 }
 
 func TestGatherProcessInfoSortByMemory(t *testing.T) {
-	out, err := gatherProcessInfo("memory", 5)
+	out, err := GatherProcessInfo("memory", 5)
 	if err != nil {
-		t.Fatalf("gatherProcessInfo(\"memory\", 5) error: %v", err)
+		t.Fatalf("GatherProcessInfo(\"memory\", 5) error: %v", err)
 	}
 	if len(out.Processes) > 5 {
 		t.Errorf("Expected at most 5 processes, got %d", len(out.Processes))
 	}
 	for i := 1; i < len(out.Processes); i++ {
-		if out.Processes[i-1].MemoryPercent < out.Processes[i].MemoryPercent {
+		if out.Processes[i-1].MemoryPercent <
+			out.Processes[i].MemoryPercent {
 			t.Error("Processes should be sorted by Memory descending")
 			break
 		}
@@ -203,9 +206,9 @@ func TestGatherProcessInfoSortByMemory(t *testing.T) {
 }
 
 func TestGatherProcessInfoLimitClamping(t *testing.T) {
-	out, err := gatherProcessInfo("cpu", 200)
+	out, err := GatherProcessInfo("cpu", 200)
 	if err != nil {
-		t.Fatalf("gatherProcessInfo(\"cpu\", 200) error: %v", err)
+		t.Fatalf("GatherProcessInfo(\"cpu\", 200) error: %v", err)
 	}
 	if len(out.Processes) > 100 {
 		t.Errorf("Expected limit clamped to 100, got %d", len(out.Processes))
@@ -213,9 +216,9 @@ func TestGatherProcessInfoLimitClamping(t *testing.T) {
 }
 
 func TestGatherProcessInfoIncludesStatus(t *testing.T) {
-	out, err := gatherProcessInfo("cpu", 5)
+	out, err := GatherProcessInfo("cpu", 5)
 	if err != nil {
-		t.Fatalf("gatherProcessInfo(\"cpu\", 5) error: %v", err)
+		t.Fatalf("GatherProcessInfo(\"cpu\", 5) error: %v", err)
 	}
 	if len(out.Processes) > 0 && out.Processes[0].Status == "" {
 		t.Error("Process status should not be empty")
@@ -223,12 +226,12 @@ func TestGatherProcessInfoIncludesStatus(t *testing.T) {
 }
 
 func TestGatherDockerInfo(t *testing.T) {
-	out, err := gatherDockerInfo()
+	out, err := GatherDockerInfo()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("docker not installed")
 		}
-		t.Fatalf("gatherDockerInfo() error: %v", err)
+		t.Fatalf("GatherDockerInfo() error: %v", err)
 	}
 	t.Logf(
 		"Found %d containers and %d images",
@@ -239,10 +242,10 @@ func TestGatherDockerInfo(t *testing.T) {
 
 func TestGatherSystemSnapshot(t *testing.T) {
 	ctx := t.Context()
-	result, snapshot, err := handleGetSystemSnapshot(
+	result, snapshot, err := HandleGetSystemSnapshot(
 		ctx,
 		nil,
-		getSystemSnapshotInput{},
+		GetSystemSnapshotInput{},
 	)
 	if err != nil {
 		t.Fatalf("get_system_snapshot error: %v", err)
@@ -276,11 +279,10 @@ func TestGatherSystemSnapshot(t *testing.T) {
 }
 
 func TestGatherSystemSnapshotErrors(t *testing.T) {
-	// Verify the snapshot handler gracefully handles any errors
-	result, snapshot, err := handleGetSystemSnapshot(
+	result, snapshot, err := HandleGetSystemSnapshot(
 		t.Context(),
 		nil,
-		getSystemSnapshotInput{},
+		GetSystemSnapshotInput{},
 	)
 	if err != nil {
 		t.Fatalf("get_system_snapshot error: %v", err)
@@ -288,25 +290,24 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 	if result != nil {
 		t.Error("CallToolResult should be nil")
 	}
-	// Even with errors in subsystems, the snapshot should still return partial data
 	_ = snapshot
 }
 
 func TestGatherJournalLogs(t *testing.T) {
-	out, err := gatherJournalLogs("", "", "", "", 5, false)
+	out, err := GatherJournalLogs("", "", "", "", 5, false)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("journalctl not installed")
 		}
-		t.Fatalf("gatherJournalLogs() error: %v", err)
+		t.Fatalf("GatherJournalLogs() error: %v", err)
 	}
 	t.Logf("Found %d journal entries", len(out.Entries))
 }
 
 func TestGatherInodeUsage(t *testing.T) {
-	out, err := gatherInodeUsage("")
+	out, err := GatherInodeUsage("")
 	if err != nil {
-		t.Fatalf("gatherInodeUsage() error: %v", err)
+		t.Fatalf("GatherInodeUsage() error: %v", err)
 	}
 	if len(out.Mounts) == 0 {
 		t.Fatal("Mounts should not be empty")
@@ -322,9 +323,9 @@ func TestGatherInodeUsage(t *testing.T) {
 }
 
 func TestGatherInodeUsageWithFilter(t *testing.T) {
-	out, err := gatherInodeUsage("/")
+	out, err := GatherInodeUsage("/")
 	if err != nil {
-		t.Fatalf("gatherInodeUsage(\"/\") error: %v", err)
+		t.Fatalf("GatherInodeUsage(\"/\") error: %v", err)
 	}
 	if len(out.Mounts) == 0 {
 		t.Fatal("Expected at least / mount")
@@ -337,19 +338,21 @@ func TestGatherInodeUsageWithFilter(t *testing.T) {
 }
 
 func TestGatherListeningPorts(t *testing.T) {
-	out, err := gatherListeningPorts("")
+	out, err := GatherListeningPorts("")
 	if err != nil {
-		t.Fatalf("gatherListeningPorts() error: %v", err)
+		t.Fatalf("GatherListeningPorts() error: %v", err)
 	}
 	t.Logf("Found %d listening ports", len(out.Ports))
 }
 
 func TestGatherServiceStatus(t *testing.T) {
-	services := []string{"systemd-journald.service", "dbus.service", "sshd"}
-	var out serviceStatusOutput
+	services := []string{
+		"systemd-journald.service", "dbus.service", "sshd",
+	}
+	var out ServiceStatusOutput
 	var err error
 	for _, name := range services {
-		out, err = gatherServiceStatus(name, false)
+		out, err = GatherServiceStatus(name, false)
 		if err == nil {
 			break
 		}
@@ -367,53 +370,56 @@ func TestGatherServiceStatus(t *testing.T) {
 }
 
 func TestGatherTopIOProcesses(t *testing.T) {
-	out, err := gatherTopIOProcesses(5)
+	out, err := GatherTopIOProcesses(5)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("pidstat not installed")
 		}
-		t.Fatalf("gatherTopIOProcesses() error: %v", err)
+		t.Fatalf("GatherTopIOProcesses() error: %v", err)
 	}
 	t.Logf("Found %d IO processes", len(out.Processes))
 }
 
 func TestGatherFailedLogins(t *testing.T) {
-	out, err := gatherFailedLogins(5)
+	out, err := GatherFailedLogins(5)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("lastb not installed")
 		}
-		t.Skipf("gatherFailedLogins() error (likely permissions): %v", err)
+		t.Skipf("GatherFailedLogins() error (likely permissions): %v", err)
 	}
 	t.Logf("Found %d failed login entries", len(out.Entries))
 }
 
 func TestSplitHostPort(t *testing.T) {
-	addr, port, ok := splitHostPort("0.0.0.0:80")
+	addr, port, ok := SplitHostPort("0.0.0.0:80")
 	if !ok || addr != "0.0.0.0" || port != "80" {
-		t.Errorf("splitHostPort('0.0.0.0:80') = (%q, %q, %v)", addr, port, ok)
+		t.Errorf(
+			"SplitHostPort('0.0.0.0:80') = (%q, %q, %v)", addr, port, ok)
 	}
-	addr, port, ok = splitHostPort("[::]:443")
+	addr, port, ok = SplitHostPort("[::]:443")
 	if !ok || addr != "[::]" || port != "443" {
-		t.Errorf("splitHostPort('[::]:443') = (%q, %q, %v)", addr, port, ok)
+		t.Errorf(
+			"SplitHostPort('[::]:443') = (%q, %q, %v)", addr, port, ok)
 	}
 }
 
 func TestParseProcessField(t *testing.T) {
-	result := parseProcessField(`users:(("sshd",pid=1234,fd=3))`)
+	result := ParseProcessField(
+		`users:(("sshd",pid=1234,fd=3))`)
 	if result != "sshd" {
 		t.Errorf("expected 'sshd', got %q", result)
 	}
-	result = parseProcessField("plaintext")
+	result = ParseProcessField("plaintext")
 	if result != "plaintext" {
 		t.Errorf("expected 'plaintext', got %q", result)
 	}
 }
 
 func TestGatherLargestFiles(t *testing.T) {
-	out, err := gatherLargestFiles(".", 5)
+	out, err := GatherLargestFiles(".", 5)
 	if err != nil {
-		t.Fatalf("gatherLargestFiles() error: %v", err)
+		t.Fatalf("GatherLargestFiles() error: %v", err)
 	}
 	if out.Path == "" {
 		t.Error("Path should not be empty")
@@ -433,7 +439,7 @@ func TestGatherLargestFiles(t *testing.T) {
 }
 
 func TestGatherGPUInfo(t *testing.T) {
-	out, err := gatherGPUInfo()
+	out, err := GatherGPUInfo()
 	if err != nil {
 		t.Skipf("No GPU tool found: %v", err)
 	}
@@ -444,7 +450,7 @@ func TestGatherGPUInfo(t *testing.T) {
 }
 
 func TestGatherPing(t *testing.T) {
-	out, err := gatherPing("127.0.0.1", 1, 5)
+	out, err := GatherPing("127.0.0.1", 1, 5)
 	if err != nil {
 		t.Skipf("ping failed: %v", err)
 	}
@@ -454,7 +460,8 @@ func TestGatherPing(t *testing.T) {
 	if out.PacketsTransmitted < 1 {
 		t.Error("PacketsTransmitted should be >= 1")
 	}
-	t.Logf("Ping %s: %d/%d packets, %.1f%% loss, avg=%.2fms",
+	t.Logf(
+		"Ping %s: %d/%d packets, %.1f%% loss, avg=%.2fms",
 		out.Host, out.PacketsReceived, out.PacketsTransmitted,
 		out.PacketLossPercent, out.AvgLatencyMs)
 }
@@ -472,9 +479,9 @@ func TestHumanSize(t *testing.T) {
 		{1073741824, "1.0 GB"},
 	}
 	for _, c := range cases {
-		got := humanSize(c.bytes)
+		got := HumanSize(c.bytes)
 		if got != c.want {
-			t.Errorf("humanSize(%d) = %q, want %q", c.bytes, got, c.want)
+			t.Errorf("HumanSize(%d) = %q, want %q", c.bytes, got, c.want)
 		}
 	}
 }
@@ -490,9 +497,9 @@ func TestShellQuote(t *testing.T) {
 		{"/home/user", "'/home/user'"},
 	}
 	for _, c := range cases {
-		got := shellQuote(c.input)
+		got := ShellQuote(c.input)
 		if got != c.want {
-			t.Errorf("shellQuote(%q) = %q, want %q", c.input, got, c.want)
+			t.Errorf("ShellQuote(%q) = %q, want %q", c.input, got, c.want)
 		}
 	}
 }
