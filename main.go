@@ -62,7 +62,7 @@ func registerTools(server *mcp.Server) {
 	}, handleGetSystemSnapshot)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_journal_logs",
-		Description: "Reads systemd journal logs with optional filtering by unit, priority, and time range",
+		Description: "Reads systemd journal logs with optional filtering by unit, priority, and time range. Set user=true to query user-level journal.",
 	}, handleGetJournalLogs)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_inode_usage",
@@ -74,7 +74,7 @@ func registerTools(server *mcp.Server) {
 	}, handleGetListeningPorts)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_service_status",
-		Description: "Returns detailed status of a systemd service",
+		Description: "Returns detailed status of a systemd service. Set user=true to query user-level service.",
 	}, handleGetServiceStatus)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_top_io_processes",

@@ -293,7 +293,7 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 }
 
 func TestGatherJournalLogs(t *testing.T) {
-	out, err := gatherJournalLogs("", "", "", "", 5)
+	out, err := gatherJournalLogs("", "", "", "", 5, false)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("journalctl not installed")
@@ -349,7 +349,7 @@ func TestGatherServiceStatus(t *testing.T) {
 	var out serviceStatusOutput
 	var err error
 	for _, name := range services {
-		out, err = gatherServiceStatus(name)
+		out, err = gatherServiceStatus(name, false)
 		if err == nil {
 			break
 		}

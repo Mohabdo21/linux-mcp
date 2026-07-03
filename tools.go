@@ -576,6 +576,7 @@ type getJournalLogsInput struct {
 	Since    string `json:"since,omitempty"    jsonschema:"optional start time (e.g. '1 hour ago', '2024-07-03')"`
 	Until    string `json:"until,omitempty"    jsonschema:"optional end time"`
 	Lines    int    `json:"lines,omitempty"    jsonschema:"number of recent lines (default: 50)"`
+	User     bool   `json:"user,omitempty"     jsonschema:"query user-level journal (default: false)"`
 }
 
 type journalLogEntry struct {
@@ -589,7 +590,7 @@ type journalLogsOutput struct {
 
 func gatherJournalLogs(
 	unit, priority, since, until string,
-	lines int,
+	lines int, user bool,
 ) (journalLogsOutput, error) {
 	if lines <= 0 {
 		lines = 50
@@ -600,6 +601,9 @@ func gatherJournalLogs(
 		fmt.Sprintf("%d", lines),
 		"-o",
 		"short-iso",
+	}
+	if user {
+		args = append(args, "--user")
 	}
 	if unit != "" {
 		args = append(args, "-u", unit)
@@ -646,6 +650,7 @@ func handleGetJournalLogs(
 		input.Since,
 		input.Until,
 		input.Lines,
+		input.User,
 	)
 	if err != nil {
 		return nil, journalLogsOutput{}, err
@@ -796,7 +801,8 @@ func handleGetListeningPorts(
 }
 
 type getServiceStatusInput struct {
-	Name string `json:"name" jsonschema:"service name (e.g. 'nginx.service' or 'sshd')"`
+	Name string `json:"name"           jsonschema:"service name (e.g. 'nginx.service' or 'sshd')"`
+	User bool   `json:"user,omitempty" jsonschema:"query user-level service (default: false)"`
 }
 
 type serviceStatusOutput struct {
@@ -807,8 +813,12 @@ type serviceStatusOutput struct {
 	Output string `json:"output"`
 }
 
-func gatherServiceStatus(name string) (serviceStatusOutput, error) {
-	cmd := exec.Command("systemctl", "status", name, "--no-pager", "-l")
+func gatherServiceStatus(name string, user bool) (serviceStatusOutput, error) {
+	args := []string{"status", name, "--no-pager", "-l"}
+	if user {
+		args = append([]string{"--user"}, args...)
+	}
+	cmd := exec.Command("systemctl", args...)
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 	loaded := extractField(output, "Loaded:")
@@ -838,7 +848,7 @@ func handleGetServiceStatus(
 	req *mcp.CallToolRequest,
 	input getServiceStatusInput,
 ) (*mcp.CallToolResult, serviceStatusOutput, error) {
-	out, err := gatherServiceStatus(input.Name)
+	out, err := gatherServiceStatus(input.Name, input.User)
 	if err != nil {
 		return nil, out, nil
 	}
