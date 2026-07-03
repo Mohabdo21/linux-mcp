@@ -29,7 +29,11 @@ type systemInfoOutput struct {
 	UptimeSeconds uint64 `json:"uptime_seconds"`
 }
 
-func handleGetSystemInfo(ctx context.Context, req *mcp.CallToolRequest, _ getSystemInfoInput) (*mcp.CallToolResult, systemInfoOutput, error) {
+func handleGetSystemInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getSystemInfoInput,
+) (*mcp.CallToolResult, systemInfoOutput, error) {
 	info, err := host.Info()
 	if err != nil {
 		return nil, systemInfoOutput{}, err
@@ -53,12 +57,16 @@ type cpuDetails struct {
 }
 
 type cpuInfoOutput struct {
-	UsagePercent float64      `json:"usage_percent"`
-	PhysicalCoreCount int32   `json:"physical_core_count"`
-	Cores        []cpuDetails `json:"cores"`
+	UsagePercent      float64      `json:"usage_percent"`
+	PhysicalCoreCount int32        `json:"physical_core_count"`
+	Cores             []cpuDetails `json:"cores"`
 }
 
-func handleGetCPUInfo(ctx context.Context, req *mcp.CallToolRequest, _ getCPUInfoInput) (*mcp.CallToolResult, cpuInfoOutput, error) {
+func handleGetCPUInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getCPUInfoInput,
+) (*mcp.CallToolResult, cpuInfoOutput, error) {
 	info, err := cpu.Info()
 	if err != nil {
 		return nil, cpuInfoOutput{}, err
@@ -83,7 +91,11 @@ func handleGetCPUInfo(ctx context.Context, req *mcp.CallToolRequest, _ getCPUInf
 	if len(percent) > 0 {
 		usage = percent[0]
 	}
-	return nil, cpuInfoOutput{UsagePercent: usage, PhysicalCoreCount: int32(physCount), Cores: cores}, nil
+	return nil, cpuInfoOutput{
+		UsagePercent:      usage,
+		PhysicalCoreCount: int32(physCount),
+		Cores:             cores,
+	}, nil
 }
 
 type getCPUTemperatureInput struct{}
@@ -98,13 +110,19 @@ type cpuTemperatureOutput struct {
 	Message      string            `json:"message,omitempty"`
 }
 
-func handleGetCPUTemperature(ctx context.Context, req *mcp.CallToolRequest, _ getCPUTemperatureInput) (*mcp.CallToolResult, cpuTemperatureOutput, error) {
+func handleGetCPUTemperature(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getCPUTemperatureInput,
+) (*mcp.CallToolResult, cpuTemperatureOutput, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if err != nil {
 		return nil, cpuTemperatureOutput{}, err
 	}
 	if len(temps) == 0 {
-		return nil, cpuTemperatureOutput{Message: "No temperature sensors available"}, nil
+		return nil, cpuTemperatureOutput{
+			Message: "No temperature sensors available",
+		}, nil
 	}
 	var result []temperatureStat
 	for _, t := range temps {
@@ -147,7 +165,11 @@ type diskInfoOutput struct {
 	Partitions []diskUsageStat `json:"partitions"`
 }
 
-func handleGetDiskInfo(ctx context.Context, req *mcp.CallToolRequest, input getDiskInfoInput) (*mcp.CallToolResult, diskInfoOutput, error) {
+func handleGetDiskInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getDiskInfoInput,
+) (*mcp.CallToolResult, diskInfoOutput, error) {
 	partitions, err := disk.Partitions(false)
 	if err != nil {
 		return nil, diskInfoOutput{}, err
@@ -175,7 +197,11 @@ func handleGetDiskInfo(ctx context.Context, req *mcp.CallToolRequest, input getD
 	return nil, diskInfoOutput{Partitions: result}, nil
 }
 
-func handleGetMemoryInfo(ctx context.Context, req *mcp.CallToolRequest, _ getMemoryInfoInput) (*mcp.CallToolResult, memoryInfoOutput, error) {
+func handleGetMemoryInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getMemoryInfoInput,
+) (*mcp.CallToolResult, memoryInfoOutput, error) {
 	v, err := mem.VirtualMemory()
 	if err != nil {
 		return nil, memoryInfoOutput{}, err
@@ -214,7 +240,11 @@ type networkInfoOutput struct {
 	Interfaces []interfaceStats `json:"interfaces"`
 }
 
-func handleGetNetworkInfo(ctx context.Context, req *mcp.CallToolRequest, _ getNetworkInfoInput) (*mcp.CallToolResult, networkInfoOutput, error) {
+func handleGetNetworkInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getNetworkInfoInput,
+) (*mcp.CallToolResult, networkInfoOutput, error) {
 	counters, err := net.IOCounters(true)
 	if err != nil {
 		return nil, networkInfoOutput{}, err
@@ -238,7 +268,7 @@ func handleGetNetworkInfo(ctx context.Context, req *mcp.CallToolRequest, _ getNe
 
 type getProcessInfoInput struct {
 	SortBy string `json:"sort_by" jsonschema:"sort by 'cpu' or 'memory' (default: cpu)"`
-	Limit  int    `json:"limit" jsonschema:"max results (default: 10, max: 100)"`
+	Limit  int    `json:"limit"   jsonschema:"max results (default: 10, max: 100)"`
 }
 
 type processStat struct {
@@ -253,7 +283,11 @@ type processInfoOutput struct {
 	Processes []processStat `json:"processes"`
 }
 
-func handleGetProcessInfo(ctx context.Context, req *mcp.CallToolRequest, input getProcessInfoInput) (*mcp.CallToolResult, processInfoOutput, error) {
+func handleGetProcessInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getProcessInfoInput,
+) (*mcp.CallToolResult, processInfoOutput, error) {
 	limit := input.Limit
 	if limit <= 0 {
 		limit = 10
@@ -324,18 +358,26 @@ type dockerInfoOutput struct {
 	Images     []dockerImage     `json:"images"`
 }
 
-func handleGetDockerInfo(ctx context.Context, req *mcp.CallToolRequest, _ getDockerInfoInput) (*mcp.CallToolResult, dockerInfoOutput, error) {
+func handleGetDockerInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getDockerInfoInput,
+) (*mcp.CallToolResult, dockerInfoOutput, error) {
 	containers, err := listDockerContainers()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			return nil, dockerInfoOutput{}, errors.New("docker is not installed")
+			return nil, dockerInfoOutput{}, errors.New(
+				"docker is not installed",
+			)
 		}
 		return nil, dockerInfoOutput{}, err
 	}
 	images, err := listDockerImages()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			return nil, dockerInfoOutput{}, errors.New("docker is not installed")
+			return nil, dockerInfoOutput{}, errors.New(
+				"docker is not installed",
+			)
 		}
 		return nil, dockerInfoOutput{}, err
 	}
@@ -357,7 +399,11 @@ type systemSnapshotOutput struct {
 	Docker      dockerInfoOutput     `json:"docker"`
 }
 
-func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ getSystemSnapshotInput) (*mcp.CallToolResult, systemSnapshotOutput, error) {
+func handleGetSystemSnapshot(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getSystemSnapshotInput,
+) (*mcp.CallToolResult, systemSnapshotOutput, error) {
 	var snapshot systemSnapshotOutput
 	var errs []string
 
@@ -391,7 +437,13 @@ func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ ge
 	if temps, err := sensors.SensorsTemperatures(); err == nil {
 		var t []temperatureStat
 		for _, s := range temps {
-			t = append(t, temperatureStat{SensorKey: s.SensorKey, Temperature: s.Temperature})
+			t = append(
+				t,
+				temperatureStat{
+					SensorKey:   s.SensorKey,
+					Temperature: s.Temperature,
+				},
+			)
 		}
 		snapshot.Temperature = cpuTemperatureOutput{Temperatures: t}
 		if len(t) == 0 {
@@ -404,8 +456,14 @@ func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ ge
 	if v, err := mem.VirtualMemory(); err == nil {
 		s, _ := mem.SwapMemory()
 		snapshot.Memory = memoryInfoOutput{
-			Total: v.Total, Used: v.Used, Free: v.Free, UsedPercent: v.UsedPercent,
-			SwapTotal: s.Total, SwapUsed: s.Used, SwapFree: s.Free, SwapUsedPercent: s.UsedPercent,
+			Total:           v.Total,
+			Used:            v.Used,
+			Free:            v.Free,
+			UsedPercent:     v.UsedPercent,
+			SwapTotal:       s.Total,
+			SwapUsed:        s.Used,
+			SwapFree:        s.Free,
+			SwapUsedPercent: s.UsedPercent,
 		}
 	} else {
 		errs = append(errs, "memory: "+err.Error())
@@ -416,8 +474,13 @@ func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ ge
 		for _, p := range parts {
 			if u, err := disk.Usage(p.Mountpoint); err == nil {
 				disks = append(disks, diskUsageStat{
-					MountPoint: p.Mountpoint, Filesystem: p.Fstype, Device: p.Device,
-					Total: u.Total, Used: u.Used, Free: u.Free, UsedPercent: u.UsedPercent,
+					MountPoint:  p.Mountpoint,
+					Filesystem:  p.Fstype,
+					Device:      p.Device,
+					Total:       u.Total,
+					Used:        u.Used,
+					Free:        u.Free,
+					UsedPercent: u.UsedPercent,
 				})
 			}
 		}
@@ -459,7 +522,10 @@ func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ ge
 					MemoryPercent: mem, Status: statusStr,
 				})
 			}
-			sort.Slice(stats, func(i, j int) bool { return stats[i].CPUPercent > stats[j].CPUPercent })
+			sort.Slice(
+				stats,
+				func(i, j int) bool { return stats[i].CPUPercent > stats[j].CPUPercent },
+			)
 			if len(stats) > 10 {
 				stats = stats[:10]
 			}
@@ -471,7 +537,10 @@ func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ ge
 
 	if containers, err := listDockerContainers(); err == nil {
 		images, _ := listDockerImages()
-		snapshot.Docker = dockerInfoOutput{Containers: containers, Images: images}
+		snapshot.Docker = dockerInfoOutput{
+			Containers: containers,
+			Images:     images,
+		}
 	} else {
 		snapshot.Docker = dockerInfoOutput{}
 	}
@@ -480,13 +549,19 @@ func handleGetSystemSnapshot(ctx context.Context, req *mcp.CallToolRequest, _ ge
 }
 
 func listDockerContainers() ([]dockerContainer, error) {
-	cmd := exec.Command("docker", "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}")
+	cmd := exec.Command(
+		"docker",
+		"ps",
+		"-a",
+		"--format",
+		"{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}",
+	)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 	var containers []dockerContainer
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		if line == "" {
 			continue
 		}
@@ -502,13 +577,18 @@ func listDockerContainers() ([]dockerContainer, error) {
 }
 
 func listDockerImages() ([]dockerImage, error) {
-	cmd := exec.Command("docker", "images", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}")
+	cmd := exec.Command(
+		"docker",
+		"images",
+		"--format",
+		"{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}",
+	)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 	var images []dockerImage
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		if line == "" {
 			continue
 		}

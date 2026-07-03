@@ -15,7 +15,10 @@ func main() {
 
 	registerTools(server)
 
-	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+	if err := server.Run(
+		context.Background(),
+		&mcp.StdioTransport{},
+	); err != nil {
 		log.Printf("Server failed: %v", err)
 	}
 }

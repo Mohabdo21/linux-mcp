@@ -1,0 +1,33 @@
+---
+version: "2"
+
+run:
+  timeout: 5m
+  go: "1.26"
+
+linters:
+  default: standard
+  enable:
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - golines
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+  settings:
+    golines:
+      max-len: 80
