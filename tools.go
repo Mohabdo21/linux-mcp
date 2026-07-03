@@ -127,10 +127,12 @@ type cpuTemperatureOutput struct {
 
 func gatherCPUTemperature() cpuTemperatureOutput {
 	temps, err := sensors.SensorsTemperatures()
-	if err != nil || len(temps) == 0 {
-		return cpuTemperatureOutput{
-			Message: "No temperature sensors available",
+	if len(temps) == 0 {
+		msg := "No temperature sensors available"
+		if err != nil {
+			msg = err.Error()
 		}
+		return cpuTemperatureOutput{Message: msg}
 	}
 	var result []temperatureStat
 	for _, t := range temps {
@@ -139,7 +141,11 @@ func gatherCPUTemperature() cpuTemperatureOutput {
 			Temperature: t.Temperature,
 		})
 	}
-	return cpuTemperatureOutput{Temperatures: result}
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	return cpuTemperatureOutput{Temperatures: result, Message: msg}
 }
 
 func handleGetCPUTemperature(
