@@ -57,6 +57,7 @@ type SystemSnapshotOutput struct {
 	Memory      MemoryInfoOutput     `json:"memory"`
 	Disk        DiskInfoOutput       `json:"disk"`
 	Network     NetworkInfoOutput    `json:"network"`
+	LoadAverage LoadAverageOutput    `json:"load_average"`
 	Processes   ProcessInfoOutput    `json:"processes"`
 	Docker      DockerInfoOutput     `json:"docker"`
 	Errors      []string             `json:"errors,omitempty"`
@@ -100,6 +101,12 @@ func HandleGetSystemSnapshot(
 		snapshot.Network = out
 	} else {
 		errs = append(errs, "network: "+err.Error())
+	}
+
+	if out, err := GatherLoadAverage(); err == nil {
+		snapshot.LoadAverage = out
+	} else {
+		errs = append(errs, "load_average: "+err.Error())
 	}
 
 	if out, err := GatherProcessInfo("cpu", 10); err == nil {
