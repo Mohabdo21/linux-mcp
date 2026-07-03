@@ -68,17 +68,23 @@ Add the following to your MCP client configuration:
 
 ### Available tools
 
-| Tool                  | Description                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------- |
-| `get_system_info`     | Returns hostname, OS, kernel version, architecture, and uptime                        |
-| `get_cpu_info`        | Returns CPU usage percentage, model, frequency, and core counts                       |
-| `get_cpu_temperature` | Returns current CPU temperature if sensor data is available                           |
-| `get_memory_info`     | Returns memory usage including RAM and swap statistics                                |
-| `get_disk_info`       | Returns disk usage for mounted partitions, optionally filtered by mount point         |
-| `get_network_info`    | Returns network I/O statistics per interface                                          |
-| `get_process_info`    | Returns list of running processes, sortable by CPU or memory, with configurable limit |
-| `get_docker_info`     | Returns Docker containers and images if Docker is installed                           |
-| `get_system_snapshot` | Returns a comprehensive snapshot combining all tools                                  |
+| Tool                   | Description                                                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `get_system_info`      | Returns hostname, OS, kernel version, architecture, and uptime                                                                    |
+| `get_cpu_info`         | Returns CPU usage percentage, model, frequency, and core counts                                                                   |
+| `get_cpu_temperature`  | Returns current CPU temperature if sensor data is available                                                                       |
+| `get_memory_info`      | Returns memory usage including RAM and swap statistics                                                                            |
+| `get_disk_info`        | Returns disk usage for mounted partitions, optionally filtered by mount point                                                     |
+| `get_network_info`     | Returns network I/O statistics per interface                                                                                      |
+| `get_process_info`     | Returns list of running processes, sortable by CPU or memory, with configurable limit                                             |
+| `get_docker_info`      | Returns Docker containers and images if Docker is installed                                                                       |
+| `get_system_snapshot`  | Returns a comprehensive snapshot combining all tools                                                                              |
+| `get_journal_logs`     | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal |
+| `get_inode_usage`      | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                               |
+| `get_listening_ports`  | Returns listening ports and their associated processes for security auditing and port conflict resolution                         |
+| `get_service_status`   | Returns detailed status of a systemd service; set `user=true` to query user-level service                                         |
+| `get_top_io_processes` | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
+| `get_failed_logins`    | Returns recent failed login attempts to detect brute-force attacks                                                                |
 
 ## Project structure
 
