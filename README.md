@@ -99,52 +99,6 @@ Add the following to your MCP client configuration:
 | `get_mount_options`      | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                              |
 | `get_systemd_units`      | Returns all systemd units and their states for full service inventory                                                             |
 
-## Project structure
-
-```
-.
-├── main.go            # Server entry point
-├── tools/
-│   ├── cpu.go         # CPU info and temperature
-│   ├── memory.go      # RAM and swap statistics
-│   ├── disk.go        # Disk usage, inode usage, largest files
-│   ├── network.go     # Network I/O and listening ports
-│   ├── process.go     # Process listing and top I/O processes
-│   ├── docker.go      # Docker containers and images
-│   ├── system.go      # System info and snapshot
-│   ├── journal.go     # systemd journal logs
-│   ├── service.go     # systemd service status
-│   ├── security.go    # Failed login detection
-│   ├── gpu.go         # GPU monitoring (NVIDIA/AMD/Intel)
-│   ├── packages.go    # Installed packages and updates check
-│   ├── ping.go        # ICMP ping
-│   ├── register.go    # Tool registration
-│   ├── util.go        # Shared helpers
-│   └── tools_test.go  # Tests for all tools
-├── go.mod             # Go module definition (go 1.26.4)
-├── go.sum             # Go module checksums
-├── Makefile           # Build, test, and lint targets
-├── .golangci.yml      # Linter configuration
-├── .gitignore
-└── README.md
-```
-
-## Development
-
-```bash
-# Run checks (fmt, vet, lint)
-make check
-
-# Run tests
-make test
-
-# Build binary
-make build
-
-# Build static binary
-make build-static
-```
-
 ## License
 
 - [MIT](./LICENSE)
