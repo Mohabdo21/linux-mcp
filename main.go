@@ -49,4 +49,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_process_info",
 		Description: "Returns list of running processes, optionally sorted by CPU or memory usage with configurable limit",
 	}, handleGetProcessInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_docker_info",
+		Description: "Returns Docker containers and images if Docker is installed",
+	}, handleGetDockerInfo)
 }
