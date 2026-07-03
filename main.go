@@ -84,4 +84,16 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_failed_logins",
 		Description: "Returns recent failed login attempts to detect brute-force attacks",
 	}, handleGetFailedLogins)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_gpu_info",
+		Description: "Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)",
+	}, handleGetGPUInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_largest_files",
+		Description: "Find the top N largest files/directories in a given path (like du -sh | sort -hr | head)",
+	}, handleGetLargestFiles)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "ping_host",
+		Description: "Send ICMP packets to a host and return latency, packet loss, and response times",
+	}, handlePingHost)
 }

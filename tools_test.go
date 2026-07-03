@@ -409,3 +409,90 @@ func TestParseProcessField(t *testing.T) {
 		t.Errorf("expected 'plaintext', got %q", result)
 	}
 }
+
+func TestGatherLargestFiles(t *testing.T) {
+	out, err := gatherLargestFiles(".", 5)
+	if err != nil {
+		t.Fatalf("gatherLargestFiles() error: %v", err)
+	}
+	if out.Path == "" {
+		t.Error("Path should not be empty")
+	}
+	for i, e := range out.Entries {
+		if e.Name == "" {
+			t.Errorf("Entries[%d].Name should not be empty", i)
+		}
+		if e.SizeBytes < 0 {
+			t.Errorf("Entries[%d].SizeBytes should be >= 0", i)
+		}
+		if e.SizeHuman == "" {
+			t.Errorf("Entries[%d].SizeHuman should not be empty", i)
+		}
+	}
+	t.Logf("Found %d entries in %s", len(out.Entries), out.Path)
+}
+
+func TestGatherGPUInfo(t *testing.T) {
+	out, err := gatherGPUInfo()
+	if err != nil {
+		t.Skipf("No GPU tool found: %v", err)
+	}
+	if out.Vendor == "" {
+		t.Error("Vendor should not be empty")
+	}
+	t.Logf("GPU vendor: %s, devices: %d", out.Vendor, len(out.GPUs))
+}
+
+func TestGatherPing(t *testing.T) {
+	out, err := gatherPing("127.0.0.1", 1, 5)
+	if err != nil {
+		t.Skipf("ping failed: %v", err)
+	}
+	if out.Host != "127.0.0.1" {
+		t.Errorf("expected host 127.0.0.1, got %s", out.Host)
+	}
+	if out.PacketsTransmitted < 1 {
+		t.Error("PacketsTransmitted should be >= 1")
+	}
+	t.Logf("Ping %s: %d/%d packets, %.1f%% loss, avg=%.2fms",
+		out.Host, out.PacketsReceived, out.PacketsTransmitted,
+		out.PacketLossPercent, out.AvgLatencyMs)
+}
+
+func TestHumanSize(t *testing.T) {
+	cases := []struct {
+		bytes int64
+		want  string
+	}{
+		{0, "0 B"},
+		{500, "500 B"},
+		{1024, "1.0 KB"},
+		{1536, "1.5 KB"},
+		{1048576, "1.0 MB"},
+		{1073741824, "1.0 GB"},
+	}
+	for _, c := range cases {
+		got := humanSize(c.bytes)
+		if got != c.want {
+			t.Errorf("humanSize(%d) = %q, want %q", c.bytes, got, c.want)
+		}
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"simple", "'simple'"},
+		{"path with spaces", "'path with spaces'"},
+		{"it's", "'it'\\''s'"},
+		{"/home/user", "'/home/user'"},
+	}
+	for _, c := range cases {
+		got := shellQuote(c.input)
+		if got != c.want {
+			t.Errorf("shellQuote(%q) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}

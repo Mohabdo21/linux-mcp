@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -1019,4 +1021,325 @@ func handleGetFailedLogins(
 		return nil, failedLoginsOutput{}, err
 	}
 	return nil, out, nil
+}
+
+type getLargestFilesInput struct {
+	Path  string `json:"path,omitempty"  jsonschema:"directory to scan (default: current dir)"`
+	Limit int    `json:"limit,omitempty" jsonschema:"max results (default: 10, max: 100)"`
+}
+
+type largestFileEntry struct {
+	Name      string `json:"name"`
+	SizeBytes int64  `json:"size_bytes"`
+	SizeHuman string `json:"size_human"`
+	IsDir     bool   `json:"is_dir"`
+}
+
+type largestFilesOutput struct {
+	Path    string             `json:"path"`
+	Entries []largestFileEntry `json:"entries"`
+}
+
+func gatherLargestFiles(path string, limit int) (largestFilesOutput, error) {
+	if path == "" {
+		path = "."
+	}
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+	cmd := exec.Command("sh", "-c", fmt.Sprintf(
+		"du -sb %s/* %s/.[!.]* 2>/dev/null | sort -rn",
+		shellQuote(path), shellQuote(path),
+	))
+	out, err := cmd.Output()
+	if err != nil {
+		return largestFilesOutput{Path: path}, nil
+	}
+	var entries []largestFileEntry
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		size, _ := strconv.ParseInt(fields[0], 10, 64)
+		name := strings.Join(fields[1:], " ")
+		isDir := false
+		if info, err := os.Stat(name); err == nil {
+			isDir = info.IsDir()
+		}
+		entries = append(entries, largestFileEntry{
+			Name:      name,
+			SizeBytes: size,
+			SizeHuman: humanSize(size),
+			IsDir:     isDir,
+		})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].SizeBytes > entries[j].SizeBytes
+	})
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+	return largestFilesOutput{Path: path, Entries: entries}, nil
+}
+
+func humanSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func handleGetLargestFiles(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getLargestFilesInput,
+) (*mcp.CallToolResult, largestFilesOutput, error) {
+	out, err := gatherLargestFiles(input.Path, input.Limit)
+	if err != nil {
+		return nil, largestFilesOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type getGPUInfoInput struct{}
+
+type gpuDevice struct {
+	Index         int     `json:"index"`
+	Name          string  `json:"name"`
+	UsagePercent  float64 `json:"usage_percent"`
+	MemoryUsedMB  int64   `json:"memory_used_mb"`
+	MemoryTotalMB int64   `json:"memory_total_mb"`
+	TemperatureC  int64   `json:"temperature_c"`
+	PowerDrawW    float64 `json:"power_draw_w"`
+}
+
+type gpuInfoOutput struct {
+	Vendor string      `json:"vendor"`
+	GPUs   []gpuDevice `json:"gpus"`
+}
+
+func gatherNvidiaGPU() (gpuInfoOutput, error) {
+	cmd := exec.Command(
+		"nvidia-smi",
+		"--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
+		"--format=csv,noheader,nounits",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return gpuInfoOutput{}, err
+	}
+	var gpus []gpuDevice
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, ", ")
+		if len(fields) < 7 {
+			continue
+		}
+		idx, _ := strconv.Atoi(fields[0])
+		usage, _ := strconv.ParseFloat(fields[2], 64)
+		memUsed, _ := strconv.ParseInt(strings.TrimSpace(fields[3]), 10, 64)
+		memTotal, _ := strconv.ParseInt(strings.TrimSpace(fields[4]), 10, 64)
+		temp, _ := strconv.ParseInt(strings.TrimSpace(fields[5]), 10, 64)
+		power, _ := strconv.ParseFloat(strings.TrimSpace(fields[6]), 64)
+		gpus = append(gpus, gpuDevice{
+			Index:         idx,
+			Name:          fields[1],
+			UsagePercent:  usage,
+			MemoryUsedMB:  memUsed,
+			MemoryTotalMB: memTotal,
+			TemperatureC:  temp,
+			PowerDrawW:    power,
+		})
+	}
+	if len(gpus) == 0 {
+		return gpuInfoOutput{}, errors.New("no NVIDIA GPUs found")
+	}
+	return gpuInfoOutput{Vendor: "nvidia", GPUs: gpus}, nil
+}
+
+func gatherAMDGPU() (gpuInfoOutput, error) {
+	cmd := exec.Command("rocm-smi", "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return gpuInfoOutput{}, err
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return gpuInfoOutput{}, err
+	}
+	var gpus []gpuDevice
+	for key, val := range raw {
+		if !strings.HasPrefix(key, "card") {
+			continue
+		}
+		dev, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+		idxStr := strings.TrimPrefix(key, "card")
+		idx, _ := strconv.Atoi(idxStr)
+		name, _ := dev["Name"].(string)
+		gpu := gpuDevice{Index: idx, Name: name}
+		if usage, ok := dev["GPU use"].(string); ok {
+			usage = strings.TrimSuffix(usage, "%")
+			gpu.UsagePercent, _ = strconv.ParseFloat(usage, 64)
+		}
+		if memInfo, ok := dev["VRAM Total Memory (MB)"].(string); ok {
+			memTotal, _ := strconv.ParseInt(strings.TrimSpace(memInfo), 10, 64)
+			gpu.MemoryTotalMB = memTotal
+		}
+		if memInfo, ok := dev["VRAM Used Memory (MB)"].(string); ok {
+			memUsed, _ := strconv.ParseInt(strings.TrimSpace(memInfo), 10, 64)
+			gpu.MemoryUsedMB = memUsed
+		}
+		if temp, ok := dev["Temperature (Sensor) (C)"].(string); ok {
+			tempInt, _ := strconv.ParseInt(strings.TrimSpace(temp), 10, 64)
+			gpu.TemperatureC = tempInt
+		}
+		if power, ok := dev["Average Graphics Package Power (W)"].(string); ok {
+			powerF, _ := strconv.ParseFloat(strings.TrimSpace(power), 64)
+			gpu.PowerDrawW = powerF
+		}
+		gpus = append(gpus, gpu)
+	}
+	if len(gpus) == 0 {
+		return gpuInfoOutput{}, errors.New("no AMD GPUs found")
+	}
+	return gpuInfoOutput{Vendor: "amd", GPUs: gpus}, nil
+}
+
+func gatherGPUInfo() (gpuInfoOutput, error) {
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		if out, err := gatherNvidiaGPU(); err == nil {
+			return out, nil
+		}
+	}
+	if _, err := exec.LookPath("rocm-smi"); err == nil {
+		if out, err := gatherAMDGPU(); err == nil {
+			return out, nil
+		}
+	}
+	if _, err := exec.LookPath("intel_gpu_top"); err == nil {
+		return gpuInfoOutput{
+			Vendor: "intel",
+			GPUs:   []gpuDevice{{Name: "Intel GPU (detected)"}},
+		}, nil
+	}
+	return gpuInfoOutput{}, errors.New(
+		"no GPU tools found (tried nvidia-smi, rocm-smi, intel_gpu_top)",
+	)
+}
+
+func handleGetGPUInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ getGPUInfoInput,
+) (*mcp.CallToolResult, gpuInfoOutput, error) {
+	out, err := gatherGPUInfo()
+	if err != nil {
+		return nil, gpuInfoOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type pingHostInput struct {
+	Host    string `json:"host"              jsonschema:"hostname or IP address to ping"`
+	Count   int    `json:"count,omitempty"   jsonschema:"number of packets (default: 4)"`
+	Timeout int    `json:"timeout,omitempty" jsonschema:"timeout in seconds (default: 10)"`
+}
+
+type pingOutput struct {
+	Host               string  `json:"host"`
+	PacketsTransmitted int     `json:"packets_transmitted"`
+	PacketsReceived    int     `json:"packets_received"`
+	PacketLossPercent  float64 `json:"packet_loss_percent"`
+	MinLatencyMs       float64 `json:"min_latency_ms"`
+	AvgLatencyMs       float64 `json:"avg_latency_ms"`
+	MaxLatencyMs       float64 `json:"max_latency_ms"`
+}
+
+func gatherPing(host string, count, timeout int) (pingOutput, error) {
+	if count <= 0 {
+		count = 4
+	}
+	if timeout <= 0 {
+		timeout = 10
+	}
+	cmd := exec.Command(
+		"ping",
+		"-c",
+		fmt.Sprintf("%d", count),
+		"-w",
+		fmt.Sprintf("%d", timeout),
+		host,
+	)
+	out, err := cmd.Output()
+	output := string(out)
+	result := pingOutput{Host: host}
+	for line := range strings.SplitSeq(output, "\n") {
+		if strings.Contains(line, "packets transmitted") {
+			_, _ = fmt.Sscanf(
+				line,
+				"%d packets transmitted, %d received, %f%% packet loss",
+				&result.PacketsTransmitted,
+				&result.PacketsReceived,
+				&result.PacketLossPercent,
+			)
+		}
+		if strings.Contains(line, "rtt min/avg/max/mdev") {
+			if _, after, ok := strings.Cut(line, "= "); ok {
+				stats := strings.TrimSpace(after)
+				parts := strings.Split(stats, "/")
+				if len(parts) >= 3 {
+					_, _ = fmt.Sscanf(parts[0], "%f", &result.MinLatencyMs)
+					_, _ = fmt.Sscanf(parts[1], "%f", &result.AvgLatencyMs)
+					maxPart := strings.Fields(parts[2])
+					if len(maxPart) > 0 {
+						_, _ = fmt.Sscanf(
+							maxPart[0],
+							"%f",
+							&result.MaxLatencyMs,
+						)
+					}
+				}
+			}
+		}
+	}
+	if err != nil && output == "" {
+		return pingOutput{}, err
+	}
+	return result, nil
+}
+
+func handlePingHost(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input pingHostInput,
+) (*mcp.CallToolResult, pingOutput, error) {
+	if input.Host == "" {
+		return nil, pingOutput{}, errors.New("host is required")
+	}
+	out, err := gatherPing(input.Host, input.Count, input.Timeout)
+	if err != nil {
+		return nil, out, nil
+	}
+	return nil, out, nil
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
