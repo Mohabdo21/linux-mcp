@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -41,4 +42,20 @@ func ParseProcessField(s string) string {
 		}
 	}
 	return s
+}
+
+// ErrList collects errors during graceful degradation.
+type ErrList []string
+
+func (e *ErrList) Add(context string, err error) {
+	if err != nil {
+		*e = append(*e, context+": "+err.Error())
+	}
+}
+
+func (e ErrList) Err() error {
+	if len(e) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(e, "; "))
 }

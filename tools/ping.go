@@ -17,13 +17,14 @@ type PingHostInput struct {
 }
 
 type PingOutput struct {
-	Host               string  `json:"host"`
-	PacketsTransmitted int     `json:"packets_transmitted"`
-	PacketsReceived    int     `json:"packets_received"`
-	PacketLossPercent  float64 `json:"packet_loss_percent"`
-	MinLatencyMs       float64 `json:"min_latency_ms"`
-	AvgLatencyMs       float64 `json:"avg_latency_ms"`
-	MaxLatencyMs       float64 `json:"max_latency_ms"`
+	Host               string   `json:"host"`
+	PacketsTransmitted int      `json:"packets_transmitted"`
+	PacketsReceived    int      `json:"packets_received"`
+	PacketLossPercent  float64  `json:"packet_loss_percent"`
+	MinLatencyMs       float64  `json:"min_latency_ms"`
+	AvgLatencyMs       float64  `json:"avg_latency_ms"`
+	MaxLatencyMs       float64  `json:"max_latency_ms"`
+	Errors             []string `json:"errors,omitempty"`
 }
 
 func GatherPing(host string, count, timeout int) (PingOutput, error) {
@@ -91,7 +92,7 @@ func HandlePingHost(
 	}
 	out, err := GatherPing(input.Host, input.Count, input.Timeout)
 	if err != nil {
-		return nil, out, nil
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

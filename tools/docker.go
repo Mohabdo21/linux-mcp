@@ -28,6 +28,7 @@ type DockerImage struct {
 type DockerInfoOutput struct {
 	Containers []DockerContainer `json:"containers"`
 	Images     []DockerImage     `json:"images"`
+	Errors     []string          `json:"errors,omitempty"`
 }
 
 func ListDockerContainers() ([]DockerContainer, error) {
@@ -122,12 +123,7 @@ func HandleGetDockerInfo(
 ) (*mcp.CallToolResult, DockerInfoOutput, error) {
 	out, err := GatherDockerInfo()
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return nil, DockerInfoOutput{}, errors.New(
-				"docker is not installed",
-			)
-		}
-		return nil, DockerInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

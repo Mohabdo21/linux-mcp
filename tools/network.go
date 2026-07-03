@@ -26,6 +26,7 @@ type InterfaceStats struct {
 
 type NetworkInfoOutput struct {
 	Interfaces []InterfaceStats `json:"interfaces"`
+	Errors     []string         `json:"errors,omitempty"`
 }
 
 func GatherNetworkInfo() (NetworkInfoOutput, error) {
@@ -57,7 +58,7 @@ func HandleGetNetworkInfo(
 ) (*mcp.CallToolResult, NetworkInfoOutput, error) {
 	out, err := GatherNetworkInfo()
 	if err != nil {
-		return nil, NetworkInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -74,7 +75,8 @@ type ListeningPort struct {
 }
 
 type ListeningPortsOutput struct {
-	Ports []ListeningPort `json:"ports"`
+	Ports  []ListeningPort `json:"ports"`
+	Errors []string        `json:"errors,omitempty"`
 }
 
 func GatherListeningPorts(protocol string) (ListeningPortsOutput, error) {
@@ -120,6 +122,7 @@ type ResolveDNSInput struct {
 type ResolveDNSOutput struct {
 	Hostname  string   `json:"hostname"`
 	Addresses []string `json:"addresses"`
+	Errors    []string `json:"errors,omitempty"`
 }
 
 func GatherDNSResolve(hostname string) (ResolveDNSOutput, error) {
@@ -142,7 +145,7 @@ func HandleResolveDNS(
 	}
 	out, err := GatherDNSResolve(input.Hostname)
 	if err != nil {
-		return nil, out, nil
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -154,7 +157,7 @@ func HandleGetListeningPorts(
 ) (*mcp.CallToolResult, ListeningPortsOutput, error) {
 	out, err := GatherListeningPorts(input.Protocol)
 	if err != nil {
-		return nil, ListeningPortsOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

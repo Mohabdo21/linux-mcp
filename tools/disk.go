@@ -29,6 +29,7 @@ type DiskUsageStat struct {
 
 type DiskInfoOutput struct {
 	Partitions []DiskUsageStat `json:"partitions"`
+	Errors     []string        `json:"errors,omitempty"`
 }
 
 func GatherDiskInfo(mountPoint string) (DiskInfoOutput, error) {
@@ -66,7 +67,7 @@ func HandleGetDiskInfo(
 ) (*mcp.CallToolResult, DiskInfoOutput, error) {
 	out, err := GatherDiskInfo(input.MountPoint)
 	if err != nil {
-		return nil, DiskInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -86,6 +87,7 @@ type InodeUsageStat struct {
 
 type InodeUsageOutput struct {
 	Mounts []InodeUsageStat `json:"mounts"`
+	Errors []string         `json:"errors,omitempty"`
 }
 
 func GatherInodeUsage(mountPoint string) (InodeUsageOutput, error) {
@@ -129,7 +131,7 @@ func HandleGetInodeUsage(
 ) (*mcp.CallToolResult, InodeUsageOutput, error) {
 	out, err := GatherInodeUsage(input.MountPoint)
 	if err != nil {
-		return nil, InodeUsageOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -149,6 +151,7 @@ type LargestFileEntry struct {
 type LargestFilesOutput struct {
 	Path    string             `json:"path"`
 	Entries []LargestFileEntry `json:"entries"`
+	Errors  []string           `json:"errors,omitempty"`
 }
 
 func GatherLargestFiles(path string, limit int) (LargestFilesOutput, error) {
@@ -214,6 +217,7 @@ type MountEntry struct {
 
 type MountOptionsOutput struct {
 	Mounts []MountEntry `json:"mounts"`
+	Errors []string     `json:"errors,omitempty"`
 }
 
 func GatherMountOptions(mountPoint string) (MountOptionsOutput, error) {
@@ -252,7 +256,7 @@ func HandleGetMountOptions(
 ) (*mcp.CallToolResult, MountOptionsOutput, error) {
 	out, err := GatherMountOptions(input.MountPoint)
 	if err != nil {
-		return nil, MountOptionsOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -264,7 +268,7 @@ func HandleGetLargestFiles(
 ) (*mcp.CallToolResult, LargestFilesOutput, error) {
 	out, err := GatherLargestFiles(input.Path, input.Limit)
 	if err != nil {
-		return nil, LargestFilesOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

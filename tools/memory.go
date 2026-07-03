@@ -10,14 +10,15 @@ import (
 type GetMemoryInfoInput struct{}
 
 type MemoryInfoOutput struct {
-	Total           uint64  `json:"total"`
-	Used            uint64  `json:"used"`
-	Free            uint64  `json:"free"`
-	UsedPercent     float64 `json:"used_percent"`
-	SwapTotal       uint64  `json:"swap_total"`
-	SwapUsed        uint64  `json:"swap_used"`
-	SwapFree        uint64  `json:"swap_free"`
-	SwapUsedPercent float64 `json:"swap_used_percent"`
+	Total           uint64   `json:"total"`
+	Used            uint64   `json:"used"`
+	Free            uint64   `json:"free"`
+	UsedPercent     float64  `json:"used_percent"`
+	SwapTotal       uint64   `json:"swap_total"`
+	SwapUsed        uint64   `json:"swap_used"`
+	SwapFree        uint64   `json:"swap_free"`
+	SwapUsedPercent float64  `json:"swap_used_percent"`
+	Errors          []string `json:"errors,omitempty"`
 }
 
 func GatherMemoryInfo() (MemoryInfoOutput, error) {
@@ -48,7 +49,7 @@ func HandleGetMemoryInfo(
 ) (*mcp.CallToolResult, MemoryInfoOutput, error) {
 	out, err := GatherMemoryInfo()
 	if err != nil {
-		return nil, MemoryInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

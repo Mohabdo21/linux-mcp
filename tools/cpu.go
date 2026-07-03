@@ -20,6 +20,7 @@ type CPUInfoOutput struct {
 	UsagePercent      float64      `json:"usage_percent"`
 	PhysicalCoreCount int32        `json:"physical_core_count"`
 	Cores             []CPUDetails `json:"cores"`
+	Errors            []string     `json:"errors,omitempty"`
 }
 
 func GatherCPUInfo() (CPUInfoOutput, error) {
@@ -61,7 +62,7 @@ func HandleGetCPUInfo(
 ) (*mcp.CallToolResult, CPUInfoOutput, error) {
 	out, err := GatherCPUInfo()
 	if err != nil {
-		return nil, CPUInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -76,6 +77,7 @@ type TemperatureStat struct {
 type CPUTemperatureOutput struct {
 	Temperatures []TemperatureStat `json:"temperatures"`
 	Message      string            `json:"message,omitempty"`
+	Errors       []string          `json:"errors,omitempty"`
 }
 
 func GatherCPUTemperature() CPUTemperatureOutput {

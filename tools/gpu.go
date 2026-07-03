@@ -26,6 +26,7 @@ type GPUDevice struct {
 type GPUInfoOutput struct {
 	Vendor string      `json:"vendor"`
 	GPUs   []GPUDevice `json:"gpus"`
+	Errors []string    `json:"errors,omitempty"`
 }
 
 func GatherNvidiaGPU() (GPUInfoOutput, error) {
@@ -159,7 +160,7 @@ func HandleGetGPUInfo(
 ) (*mcp.CallToolResult, GPUInfoOutput, error) {
 	out, err := GatherGPUInfo()
 	if err != nil {
-		return nil, GPUInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -27,6 +26,7 @@ type ProcessStat struct {
 
 type ProcessInfoOutput struct {
 	Processes []ProcessStat `json:"processes"`
+	Errors    []string      `json:"errors,omitempty"`
 }
 
 func GatherProcessInfo(sortBy string, limit int) (ProcessInfoOutput, error) {
@@ -81,7 +81,7 @@ func HandleGetProcessInfo(
 ) (*mcp.CallToolResult, ProcessInfoOutput, error) {
 	out, err := GatherProcessInfo(input.SortBy, input.Limit)
 	if err != nil {
-		return nil, ProcessInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -100,6 +100,7 @@ type IOProcessStat struct {
 
 type TopIOProcessesOutput struct {
 	Processes []IOProcessStat `json:"processes"`
+	Errors    []string        `json:"errors,omitempty"`
 }
 
 func GatherTopIOProcesses(limit int) (TopIOProcessesOutput, error) {
@@ -148,12 +149,7 @@ func HandleGetTopIOProcesses(
 ) (*mcp.CallToolResult, TopIOProcessesOutput, error) {
 	out, err := GatherTopIOProcesses(input.Limit)
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return nil, TopIOProcessesOutput{}, errors.New(
-				"pidstat not installed (install sysstat package)",
-			)
-		}
-		return nil, TopIOProcessesOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

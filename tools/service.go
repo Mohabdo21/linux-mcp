@@ -14,11 +14,12 @@ type GetServiceStatusInput struct {
 }
 
 type ServiceStatusOutput struct {
-	Name   string `json:"name"`
-	Loaded string `json:"loaded,omitempty"`
-	Active string `json:"active,omitempty"`
-	PID    string `json:"pid,omitempty"`
-	Output string `json:"output"`
+	Name   string   `json:"name"`
+	Loaded string   `json:"loaded,omitempty"`
+	Active string   `json:"active,omitempty"`
+	PID    string   `json:"pid,omitempty"`
+	Output string   `json:"output"`
+	Errors []string `json:"errors,omitempty"`
 }
 
 func ExtractField(output, prefix string) string {
@@ -64,7 +65,8 @@ type SystemdUnit struct {
 }
 
 type SystemdUnitsOutput struct {
-	Units []SystemdUnit `json:"units"`
+	Units  []SystemdUnit `json:"units"`
+	Errors []string      `json:"errors,omitempty"`
 }
 
 func GatherSystemdUnits() (SystemdUnitsOutput, error) {
@@ -110,7 +112,7 @@ func HandleGetSystemdUnits(
 ) (*mcp.CallToolResult, SystemdUnitsOutput, error) {
 	out, err := GatherSystemdUnits()
 	if err != nil {
-		return nil, SystemdUnitsOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -122,7 +124,7 @@ func HandleGetServiceStatus(
 ) (*mcp.CallToolResult, ServiceStatusOutput, error) {
 	out, err := GatherServiceStatus(input.Name, input.User)
 	if err != nil {
-		return nil, out, nil
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

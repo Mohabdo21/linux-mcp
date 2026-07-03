@@ -13,12 +13,13 @@ import (
 type GetSystemInfoInput struct{}
 
 type SystemInfoOutput struct {
-	Hostname      string `json:"hostname"`
-	OSName        string `json:"os_name"`
-	OSVersion     string `json:"os_version"`
-	KernelVersion string `json:"kernel_version"`
-	Architecture  string `json:"architecture"`
-	UptimeSeconds uint64 `json:"uptime_seconds"`
+	Hostname      string   `json:"hostname"`
+	OSName        string   `json:"os_name"`
+	OSVersion     string   `json:"os_version"`
+	KernelVersion string   `json:"kernel_version"`
+	Architecture  string   `json:"architecture"`
+	UptimeSeconds uint64   `json:"uptime_seconds"`
+	Errors        []string `json:"errors,omitempty"`
 }
 
 func GatherSystemInfo() (SystemInfoOutput, error) {
@@ -43,7 +44,7 @@ func HandleGetSystemInfo(
 ) (*mcp.CallToolResult, SystemInfoOutput, error) {
 	out, err := GatherSystemInfo()
 	if err != nil {
-		return nil, SystemInfoOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -60,7 +61,7 @@ type SystemSnapshotOutput struct {
 	LoadAverage LoadAverageOutput    `json:"load_average"`
 	Processes   ProcessInfoOutput    `json:"processes"`
 	Docker      DockerInfoOutput     `json:"docker"`
-	Errors      []string             `json:"errors,omitempty"`
+	Errors      ErrList              `json:"errors,omitempty"`
 }
 
 func HandleGetSystemSnapshot(
@@ -69,18 +70,18 @@ func HandleGetSystemSnapshot(
 	_ GetSystemSnapshotInput,
 ) (*mcp.CallToolResult, SystemSnapshotOutput, error) {
 	var snapshot SystemSnapshotOutput
-	var errs []string
+	var errs ErrList
 
 	if out, err := GatherSystemInfo(); err == nil {
 		snapshot.System = out
 	} else {
-		errs = append(errs, "system: "+err.Error())
+		errs.Add("system", err)
 	}
 
 	if out, err := GatherCPUInfo(); err == nil {
 		snapshot.CPU = out
 	} else {
-		errs = append(errs, "cpu: "+err.Error())
+		errs.Add("cpu", err)
 	}
 
 	snapshot.Temperature = GatherCPUTemperature()
@@ -88,37 +89,37 @@ func HandleGetSystemSnapshot(
 	if out, err := GatherMemoryInfo(); err == nil {
 		snapshot.Memory = out
 	} else {
-		errs = append(errs, "memory: "+err.Error())
+		errs.Add("memory", err)
 	}
 
 	if out, err := GatherDiskInfo(""); err == nil {
 		snapshot.Disk = out
 	} else {
-		errs = append(errs, "disk: "+err.Error())
+		errs.Add("disk", err)
 	}
 
 	if out, err := GatherNetworkInfo(); err == nil {
 		snapshot.Network = out
 	} else {
-		errs = append(errs, "network: "+err.Error())
+		errs.Add("network", err)
 	}
 
 	if out, err := GatherLoadAverage(); err == nil {
 		snapshot.LoadAverage = out
 	} else {
-		errs = append(errs, "load_average: "+err.Error())
+		errs.Add("load_average", err)
 	}
 
 	if out, err := GatherProcessInfo("cpu", 10); err == nil {
 		snapshot.Processes = out
 	} else {
-		errs = append(errs, "processes: "+err.Error())
+		errs.Add("processes", err)
 	}
 
 	if out, err := GatherDockerInfo(); err == nil {
 		snapshot.Docker = out
 	} else {
-		errs = append(errs, "docker: "+err.Error())
+		errs.Add("docker", err)
 		snapshot.Docker = DockerInfoOutput{}
 	}
 
@@ -129,9 +130,10 @@ func HandleGetSystemSnapshot(
 type GetLoadAverageInput struct{}
 
 type LoadAverageOutput struct {
-	Load1  float64 `json:"load_1"`
-	Load5  float64 `json:"load_5"`
-	Load15 float64 `json:"load_15"`
+	Load1  float64  `json:"load_1"`
+	Load5  float64  `json:"load_5"`
+	Load15 float64  `json:"load_15"`
+	Errors []string `json:"errors,omitempty"`
 }
 
 func GatherLoadAverage() (LoadAverageOutput, error) {
@@ -156,7 +158,7 @@ func HandleGetLoadAverage(
 ) (*mcp.CallToolResult, LoadAverageOutput, error) {
 	out, err := GatherLoadAverage()
 	if err != nil {
-		return nil, LoadAverageOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

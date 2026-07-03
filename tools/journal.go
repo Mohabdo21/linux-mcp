@@ -25,6 +25,7 @@ type JournalLogEntry struct {
 
 type JournalLogsOutput struct {
 	Entries []JournalLogEntry `json:"entries"`
+	Errors  []string          `json:"errors,omitempty"`
 }
 
 func GatherJournalLogs(
@@ -94,7 +95,7 @@ func HandleGetJournalLogs(
 		input.User,
 	)
 	if err != nil {
-		return nil, JournalLogsOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

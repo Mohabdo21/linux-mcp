@@ -23,6 +23,7 @@ type FailedLoginEntry struct {
 
 type FailedLoginsOutput struct {
 	Entries []FailedLoginEntry `json:"entries"`
+	Errors  []string           `json:"errors,omitempty"`
 }
 
 func ParseLastbOutput(output string) []FailedLoginEntry {
@@ -115,7 +116,8 @@ type LoggedInUser struct {
 }
 
 type LoggedInUsersOutput struct {
-	Users []LoggedInUser `json:"users"`
+	Users  []LoggedInUser `json:"users"`
+	Errors []string       `json:"errors,omitempty"`
 }
 
 func GatherLoggedInUsers() (LoggedInUsersOutput, error) {
@@ -153,7 +155,7 @@ func HandleGetLoggedInUsers(
 ) (*mcp.CallToolResult, LoggedInUsersOutput, error) {
 	out, err := GatherLoggedInUsers()
 	if err != nil {
-		return nil, LoggedInUsersOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -165,7 +167,7 @@ func HandleGetFailedLogins(
 ) (*mcp.CallToolResult, FailedLoginsOutput, error) {
 	out, err := GatherFailedLogins(input.Lines)
 	if err != nil {
-		return nil, FailedLoginsOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }

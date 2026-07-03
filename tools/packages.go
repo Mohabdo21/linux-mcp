@@ -20,6 +20,7 @@ type InstalledPackage struct {
 type InstalledPackagesOutput struct {
 	Packages []InstalledPackage `json:"packages"`
 	Total    int                `json:"total"`
+	Errors   []string           `json:"errors,omitempty"`
 }
 
 type CheckUpdatesInput struct{}
@@ -33,6 +34,7 @@ type AvailableUpdate struct {
 type CheckUpdatesOutput struct {
 	Updates []AvailableUpdate `json:"updates"`
 	Total   int               `json:"total"`
+	Errors  []string          `json:"errors,omitempty"`
 }
 
 func detectPkgManager() string {
@@ -236,7 +238,7 @@ func HandleGetInstalledPackages(
 ) (*mcp.CallToolResult, InstalledPackagesOutput, error) {
 	out, err := GatherInstalledPackages(input.Name)
 	if err != nil {
-		return nil, InstalledPackagesOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
@@ -248,7 +250,7 @@ func HandleCheckUpdates(
 ) (*mcp.CallToolResult, CheckUpdatesOutput, error) {
 	out, err := GatherCheckUpdates()
 	if err != nil {
-		return nil, CheckUpdatesOutput{}, err
+		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
 }
