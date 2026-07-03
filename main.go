@@ -37,4 +37,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_memory_info",
 		Description: "Returns memory usage including RAM and swap statistics",
 	}, handleGetMemoryInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_disk_info",
+		Description: "Returns disk usage for mounted partitions, optionally filtered by mount point",
+	}, handleGetDiskInfo)
 }

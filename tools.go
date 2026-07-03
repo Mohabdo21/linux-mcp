@@ -5,6 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/sensors"
@@ -120,6 +121,52 @@ type memoryInfoOutput struct {
 	SwapUsed        uint64  `json:"swap_used"`
 	SwapFree        uint64  `json:"swap_free"`
 	SwapUsedPercent float64 `json:"swap_used_percent"`
+}
+
+type getDiskInfoInput struct {
+	MountPoint string `json:"mount_point" jsonschema:"optional mount point filter"`
+}
+
+type diskUsageStat struct {
+	MountPoint  string  `json:"mount_point"`
+	Filesystem  string  `json:"filesystem"`
+	Device      string  `json:"device"`
+	Total       uint64  `json:"total"`
+	Used        uint64  `json:"used"`
+	Free        uint64  `json:"free"`
+	UsedPercent float64 `json:"used_percent"`
+}
+
+type diskInfoOutput struct {
+	Partitions []diskUsageStat `json:"partitions"`
+}
+
+func handleGetDiskInfo(ctx context.Context, req *mcp.CallToolRequest, input getDiskInfoInput) (*mcp.CallToolResult, diskInfoOutput, error) {
+	partitions, err := disk.Partitions(false)
+	if err != nil {
+		return nil, diskInfoOutput{}, err
+	}
+
+	var result []diskUsageStat
+	for _, p := range partitions {
+		if input.MountPoint != "" && p.Mountpoint != input.MountPoint {
+			continue
+		}
+		usage, err := disk.Usage(p.Mountpoint)
+		if err != nil {
+			continue
+		}
+		result = append(result, diskUsageStat{
+			MountPoint:  p.Mountpoint,
+			Filesystem:  p.Fstype,
+			Device:      p.Device,
+			Total:       usage.Total,
+			Used:        usage.Used,
+			Free:        usage.Free,
+			UsedPercent: usage.UsedPercent,
+		})
+	}
+	return nil, diskInfoOutput{Partitions: result}, nil
 }
 
 func handleGetMemoryInfo(ctx context.Context, req *mcp.CallToolRequest, _ getMemoryInfoInput) (*mcp.CallToolResult, memoryInfoOutput, error) {
