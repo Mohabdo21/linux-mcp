@@ -45,4 +45,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_network_info",
 		Description: "Returns network I/O statistics per interface",
 	}, handleGetNetworkInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_process_info",
+		Description: "Returns list of running processes, optionally sorted by CPU or memory usage with configurable limit",
+	}, handleGetProcessInfo)
 }
