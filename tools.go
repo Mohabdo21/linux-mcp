@@ -117,7 +117,9 @@ func handleGetCPUTemperature(
 ) (*mcp.CallToolResult, cpuTemperatureOutput, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if err != nil {
-		return nil, cpuTemperatureOutput{Message: "No temperature sensors available"}, nil
+		return nil, cpuTemperatureOutput{
+			Message: "No temperature sensors available",
+		}, nil
 	}
 	if len(temps) == 0 {
 		return nil, cpuTemperatureOutput{
@@ -310,7 +312,7 @@ func handleGetProcessInfo(
 		cpu, _ := p.CPUPercent()
 		mem, _ := p.MemoryPercent()
 		status, _ := p.Status()
-	statusStr := strings.Join(status, ",")
+		statusStr := strings.Join(status, ",")
 		result = append(result, processStat{
 			PID:           p.Pid,
 			Name:          name,
@@ -394,6 +396,7 @@ type systemSnapshotOutput struct {
 	Network     networkInfoOutput    `json:"network"`
 	Processes   processInfoOutput    `json:"processes"`
 	Docker      dockerInfoOutput     `json:"docker"`
+	Errors      []string             `json:"errors,omitempty"`
 }
 
 func handleGetSystemSnapshot(
@@ -427,7 +430,11 @@ func handleGetSystemSnapshot(
 		if len(percent) > 0 {
 			usage = percent[0]
 		}
-		snapshot.CPU = cpuInfoOutput{UsagePercent: usage, PhysicalCoreCount: int32(physCount), Cores: cores}
+		snapshot.CPU = cpuInfoOutput{
+			UsagePercent:      usage,
+			PhysicalCoreCount: int32(physCount),
+			Cores:             cores,
+		}
 	} else {
 		errs = append(errs, "cpu: "+err.Error())
 	}
@@ -448,7 +455,9 @@ func handleGetSystemSnapshot(
 			snapshot.Temperature.Message = "No temperature sensors available"
 		}
 	} else {
-		snapshot.Temperature = cpuTemperatureOutput{Message: "No temperature sensors available"}
+		snapshot.Temperature = cpuTemperatureOutput{
+			Message: "No temperature sensors available",
+		}
 	}
 
 	if v, err := mem.VirtualMemory(); err == nil {
@@ -511,10 +520,7 @@ func handleGetSystemSnapshot(
 				cpu, _ := p.CPUPercent()
 				mem, _ := p.MemoryPercent()
 				status, _ := p.Status()
-				statusStr := ""
-				if len(status) > 0 {
-					statusStr = status[0]
-				}
+				statusStr := strings.Join(status, ",")
 				stats = append(stats, processStat{
 					PID: p.Pid, Name: name, CPUPercent: cpu,
 					MemoryPercent: mem, Status: statusStr,
@@ -544,6 +550,7 @@ func handleGetSystemSnapshot(
 		snapshot.Docker = dockerInfoOutput{}
 	}
 
+	snapshot.Errors = errs
 	return nil, snapshot, nil
 }
 
