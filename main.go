@@ -60,4 +60,28 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_system_snapshot",
 		Description: "Returns a comprehensive snapshot of system status combining all tools",
 	}, handleGetSystemSnapshot)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_journal_logs",
+		Description: "Reads systemd journal logs with optional filtering by unit, priority, and time range",
+	}, handleGetJournalLogs)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_inode_usage",
+		Description: "Returns inode usage for mounted filesystems to diagnose 'disk full' errors when df shows free space",
+	}, handleGetInodeUsage)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_listening_ports",
+		Description: "Returns listening ports and their associated processes for security auditing and port conflict resolution",
+	}, handleGetListeningPorts)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_service_status",
+		Description: "Returns detailed status of a systemd service",
+	}, handleGetServiceStatus)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_top_io_processes",
+		Description: "Returns processes with the highest disk I/O activity to diagnose system lag",
+	}, handleGetTopIOProcesses)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_failed_logins",
+		Description: "Returns recent failed login attempts to detect brute-force attacks",
+	}, handleGetFailedLogins)
 }

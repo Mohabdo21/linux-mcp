@@ -291,3 +291,121 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 	// Even with errors in subsystems, the snapshot should still return partial data
 	_ = snapshot
 }
+
+func TestGatherJournalLogs(t *testing.T) {
+	out, err := gatherJournalLogs("", "", "", "", 5)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("journalctl not installed")
+		}
+		t.Fatalf("gatherJournalLogs() error: %v", err)
+	}
+	t.Logf("Found %d journal entries", len(out.Entries))
+}
+
+func TestGatherInodeUsage(t *testing.T) {
+	out, err := gatherInodeUsage("")
+	if err != nil {
+		t.Fatalf("gatherInodeUsage() error: %v", err)
+	}
+	if len(out.Mounts) == 0 {
+		t.Fatal("Mounts should not be empty")
+	}
+	for i, m := range out.Mounts {
+		if m.Filesystem == "" {
+			t.Errorf("Mounts[%d].Filesystem should not be empty", i)
+		}
+		if m.MountedOn == "" {
+			t.Errorf("Mounts[%d].MountedOn should not be empty", i)
+		}
+	}
+}
+
+func TestGatherInodeUsageWithFilter(t *testing.T) {
+	out, err := gatherInodeUsage("/")
+	if err != nil {
+		t.Fatalf("gatherInodeUsage(\"/\") error: %v", err)
+	}
+	if len(out.Mounts) == 0 {
+		t.Fatal("Expected at least / mount")
+	}
+	for _, m := range out.Mounts {
+		if m.MountedOn != "/" {
+			t.Errorf("Expected mounted_on /, got %s", m.MountedOn)
+		}
+	}
+}
+
+func TestGatherListeningPorts(t *testing.T) {
+	out, err := gatherListeningPorts("")
+	if err != nil {
+		t.Fatalf("gatherListeningPorts() error: %v", err)
+	}
+	t.Logf("Found %d listening ports", len(out.Ports))
+}
+
+func TestGatherServiceStatus(t *testing.T) {
+	services := []string{"systemd-journald.service", "dbus.service", "sshd"}
+	var out serviceStatusOutput
+	var err error
+	for _, name := range services {
+		out, err = gatherServiceStatus(name)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		t.Skipf("No common service found: %v", err)
+	}
+	if out.Name == "" {
+		t.Error("Name should not be empty")
+	}
+	if out.Output == "" {
+		t.Error("Output should not be empty")
+	}
+	t.Logf("Service %s: %s", out.Name, out.Active)
+}
+
+func TestGatherTopIOProcesses(t *testing.T) {
+	out, err := gatherTopIOProcesses(5)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("pidstat not installed")
+		}
+		t.Fatalf("gatherTopIOProcesses() error: %v", err)
+	}
+	t.Logf("Found %d IO processes", len(out.Processes))
+}
+
+func TestGatherFailedLogins(t *testing.T) {
+	out, err := gatherFailedLogins(5)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("lastb not installed")
+		}
+		t.Skipf("gatherFailedLogins() error (likely permissions): %v", err)
+	}
+	t.Logf("Found %d failed login entries", len(out.Entries))
+}
+
+func TestSplitHostPort(t *testing.T) {
+	addr, port, ok := splitHostPort("0.0.0.0:80")
+	if !ok || addr != "0.0.0.0" || port != "80" {
+		t.Errorf("splitHostPort('0.0.0.0:80') = (%q, %q, %v)", addr, port, ok)
+	}
+	addr, port, ok = splitHostPort("[::]:443")
+	if !ok || addr != "[::]" || port != "443" {
+		t.Errorf("splitHostPort('[::]:443') = (%q, %q, %v)", addr, port, ok)
+	}
+}
+
+func TestParseProcessField(t *testing.T) {
+	result := parseProcessField(`users:(("sshd",pid=1234,fd=3))`)
+	if result != "sshd" {
+		t.Errorf("expected 'sshd', got %q", result)
+	}
+	result = parseProcessField("plaintext")
+	if result != "plaintext" {
+		t.Errorf("expected 'plaintext', got %q", result)
+	}
+}

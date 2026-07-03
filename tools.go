@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -566,4 +568,445 @@ func listDockerImages() ([]dockerImage, error) {
 		})
 	}
 	return images, nil
+}
+
+type getJournalLogsInput struct {
+	Unit     string `json:"unit,omitempty"     jsonschema:"optional systemd unit name (e.g. 'nginx.service')"`
+	Priority string `json:"priority,omitempty" jsonschema:"optional log priority: emerg,alert,crit,err,warning,notice,info,debug"`
+	Since    string `json:"since,omitempty"    jsonschema:"optional start time (e.g. '1 hour ago', '2024-07-03')"`
+	Until    string `json:"until,omitempty"    jsonschema:"optional end time"`
+	Lines    int    `json:"lines,omitempty"    jsonschema:"number of recent lines (default: 50)"`
+}
+
+type journalLogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Message   string `json:"message"`
+}
+
+type journalLogsOutput struct {
+	Entries []journalLogEntry `json:"entries"`
+}
+
+func gatherJournalLogs(
+	unit, priority, since, until string,
+	lines int,
+) (journalLogsOutput, error) {
+	if lines <= 0 {
+		lines = 50
+	}
+	args := []string{
+		"--no-pager",
+		"-n",
+		fmt.Sprintf("%d", lines),
+		"-o",
+		"short-iso",
+	}
+	if unit != "" {
+		args = append(args, "-u", unit)
+	}
+	if priority != "" {
+		args = append(args, "-p", priority)
+	}
+	if since != "" {
+		args = append(args, "--since", since)
+	}
+	if until != "" {
+		args = append(args, "--until", until)
+	}
+	cmd := exec.Command("journalctl", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return journalLogsOutput{}, err
+	}
+	var entries []journalLogEntry
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		entries = append(entries, journalLogEntry{
+			Timestamp: parts[0],
+			Message:   parts[2],
+		})
+	}
+	return journalLogsOutput{Entries: entries}, nil
+}
+
+func handleGetJournalLogs(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getJournalLogsInput,
+) (*mcp.CallToolResult, journalLogsOutput, error) {
+	out, err := gatherJournalLogs(
+		input.Unit,
+		input.Priority,
+		input.Since,
+		input.Until,
+		input.Lines,
+	)
+	if err != nil {
+		return nil, journalLogsOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type getInodeUsageInput struct {
+	MountPoint string `json:"mount_point,omitempty" jsonschema:"optional mount point filter"`
+}
+
+type inodeUsageStat struct {
+	Filesystem  string `json:"filesystem"`
+	Inodes      uint64 `json:"inodes"`
+	IUsed       uint64 `json:"iused"`
+	IFree       uint64 `json:"ifree"`
+	IUsePercent string `json:"iuse_percent"`
+	MountedOn   string `json:"mounted_on"`
+}
+
+type inodeUsageOutput struct {
+	Mounts []inodeUsageStat `json:"mounts"`
+}
+
+func gatherInodeUsage(mountPoint string) (inodeUsageOutput, error) {
+	cmd := exec.Command("df", "-i")
+	out, err := cmd.Output()
+	if err != nil {
+		return inodeUsageOutput{}, err
+	}
+	var mounts []inodeUsageStat
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 6 || fields[0] == "Filesystem" {
+			continue
+		}
+		inodes, _ := strconv.ParseUint(fields[1], 10, 64)
+		iused, _ := strconv.ParseUint(fields[2], 10, 64)
+		ifree, _ := strconv.ParseUint(fields[3], 10, 64)
+		mounted := fields[5]
+
+		if mountPoint != "" && mounted != mountPoint {
+			continue
+		}
+		mounts = append(mounts, inodeUsageStat{
+			Filesystem:  fields[0],
+			Inodes:      inodes,
+			IUsed:       iused,
+			IFree:       ifree,
+			IUsePercent: fields[4],
+			MountedOn:   mounted,
+		})
+	}
+	return inodeUsageOutput{Mounts: mounts}, nil
+}
+
+func handleGetInodeUsage(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getInodeUsageInput,
+) (*mcp.CallToolResult, inodeUsageOutput, error) {
+	out, err := gatherInodeUsage(input.MountPoint)
+	if err != nil {
+		return nil, inodeUsageOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type getListeningPortsInput struct {
+	Protocol string `json:"protocol,omitempty" jsonschema:"optional protocol filter: tcp, udp"`
+}
+
+type listeningPort struct {
+	Protocol string `json:"protocol"`
+	Address  string `json:"address"`
+	Port     string `json:"port"`
+	Process  string `json:"process,omitempty"`
+}
+
+type listeningPortsOutput struct {
+	Ports []listeningPort `json:"ports"`
+}
+
+func gatherListeningPorts(protocol string) (listeningPortsOutput, error) {
+	cmd := exec.Command("ss", "-tulnp")
+	out, err := cmd.Output()
+	if err != nil {
+		return listeningPortsOutput{}, err
+	}
+	var ports []listeningPort
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 5 || fields[0] == "Netid" {
+			continue
+		}
+		netid := fields[0]
+		if protocol != "" && netid != protocol {
+			continue
+		}
+		addr, port, _ := splitHostPort(fields[4])
+		proc := ""
+		if len(fields) >= 7 {
+			proc = parseProcessField(fields[6])
+		}
+		ports = append(ports, listeningPort{
+			Protocol: netid,
+			Address:  addr,
+			Port:     port,
+			Process:  proc,
+		})
+	}
+	return listeningPortsOutput{Ports: ports}, nil
+}
+
+func splitHostPort(s string) (string, string, bool) {
+	idx := strings.LastIndex(s, ":")
+	if idx >= 0 {
+		return s[:idx], s[idx+1:], true
+	}
+	return s, "", false
+}
+
+func parseProcessField(s string) string {
+	if trimmed, ok := strings.CutPrefix(s, "users:(("); ok {
+		if start := strings.Index(trimmed, "\""); start >= 0 {
+			trimmed = trimmed[start+1:]
+			if before, _, ok := strings.Cut(trimmed, "\""); ok {
+				return before
+			}
+		}
+	}
+	return s
+}
+
+func handleGetListeningPorts(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getListeningPortsInput,
+) (*mcp.CallToolResult, listeningPortsOutput, error) {
+	out, err := gatherListeningPorts(input.Protocol)
+	if err != nil {
+		return nil, listeningPortsOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type getServiceStatusInput struct {
+	Name string `json:"name" jsonschema:"service name (e.g. 'nginx.service' or 'sshd')"`
+}
+
+type serviceStatusOutput struct {
+	Name   string `json:"name"`
+	Loaded string `json:"loaded,omitempty"`
+	Active string `json:"active,omitempty"`
+	PID    string `json:"pid,omitempty"`
+	Output string `json:"output"`
+}
+
+func gatherServiceStatus(name string) (serviceStatusOutput, error) {
+	cmd := exec.Command("systemctl", "status", name, "--no-pager", "-l")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+	loaded := extractField(output, "Loaded:")
+	active := extractField(output, "Active:")
+	pid := extractField(output, "Main PID:")
+	return serviceStatusOutput{
+		Name:   name,
+		Loaded: strings.TrimSpace(loaded),
+		Active: strings.TrimSpace(active),
+		PID:    strings.TrimSpace(pid),
+		Output: output,
+	}, err
+}
+
+func extractField(output, prefix string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if after, ok := strings.CutPrefix(trimmed, prefix); ok {
+			return strings.TrimSpace(after)
+		}
+	}
+	return ""
+}
+
+func handleGetServiceStatus(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getServiceStatusInput,
+) (*mcp.CallToolResult, serviceStatusOutput, error) {
+	out, err := gatherServiceStatus(input.Name)
+	if err != nil {
+		return nil, out, nil
+	}
+	return nil, out, nil
+}
+
+type getTopIOProcessesInput struct {
+	Limit int `json:"limit,omitempty" jsonschema:"max results (default: 10, max: 50)"`
+}
+
+type ioProcessStat struct {
+	Time    string  `json:"time"`
+	PID     int     `json:"pid"`
+	KbRdS   float64 `json:"kb_rd_s"`
+	KbWrS   float64 `json:"kb_wr_s"`
+	Command string  `json:"command"`
+}
+
+type topIOProcessesOutput struct {
+	Processes []ioProcessStat `json:"processes"`
+}
+
+func gatherTopIOProcesses(limit int) (topIOProcessesOutput, error) {
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 50 {
+		limit = 50
+	}
+	cmd := exec.Command("pidstat", "-d", "1", "1")
+	out, err := cmd.Output()
+	if err != nil {
+		return topIOProcessesOutput{}, err
+	}
+	var procs []ioProcessStat
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 6 || fields[0] == "Linux" || fields[0] == "#" {
+			continue
+		}
+		pid, _ := strconv.Atoi(fields[1])
+		rdS, _ := strconv.ParseFloat(fields[2], 64)
+		wrS, _ := strconv.ParseFloat(fields[3], 64)
+		procs = append(procs, ioProcessStat{
+			Time:    fields[0],
+			PID:     pid,
+			KbRdS:   rdS,
+			KbWrS:   wrS,
+			Command: strings.Join(fields[5:], " "),
+		})
+	}
+	sort.Slice(procs, func(i, j int) bool {
+		return procs[i].KbRdS+procs[i].KbWrS > procs[j].KbRdS+procs[j].KbWrS
+	})
+	if len(procs) > limit {
+		procs = procs[:limit]
+	}
+	return topIOProcessesOutput{Processes: procs}, nil
+}
+
+func handleGetTopIOProcesses(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getTopIOProcessesInput,
+) (*mcp.CallToolResult, topIOProcessesOutput, error) {
+	out, err := gatherTopIOProcesses(input.Limit)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, topIOProcessesOutput{}, errors.New(
+				"pidstat not installed (install sysstat package)",
+			)
+		}
+		return nil, topIOProcessesOutput{}, err
+	}
+	return nil, out, nil
+}
+
+type getFailedLoginsInput struct {
+	Lines int `json:"lines,omitempty" jsonschema:"number of recent entries (default: 20)"`
+}
+
+type failedLoginEntry struct {
+	Username  string `json:"username"`
+	Terminal  string `json:"terminal"`
+	Source    string `json:"source"`
+	Timestamp string `json:"timestamp"`
+}
+
+type failedLoginsOutput struct {
+	Entries []failedLoginEntry `json:"entries"`
+}
+
+func gatherFailedLogins(lines int) (failedLoginsOutput, error) {
+	if lines <= 0 {
+		lines = 20
+	}
+	out, err := exec.Command("lastb", "-n", fmt.Sprintf("%d", lines)).Output()
+	if err == nil {
+		return failedLoginsOutput{Entries: parseLastbOutput(string(out))}, nil
+	}
+	if !errors.Is(err, exec.ErrNotFound) {
+		if entries := parseLastbOutput(string(out)); len(entries) > 0 {
+			return failedLoginsOutput{Entries: entries}, nil
+		}
+	}
+	return gatherFailedLoginsJournalctl(lines)
+}
+
+func parseLastbOutput(output string) []failedLoginEntry {
+	var entries []failedLoginEntry
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
+		if line == "" || strings.HasPrefix(line, "btmp begins") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		entries = append(entries, failedLoginEntry{
+			Username:  fields[0],
+			Terminal:  fields[1],
+			Source:    fields[2],
+			Timestamp: strings.Join(fields[3:], " "),
+		})
+	}
+	return entries
+}
+
+func parseJournalctlFailedLogins(output string) []failedLoginEntry {
+	var entries []failedLoginEntry
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		entries = append(entries, failedLoginEntry{
+			Timestamp: parts[0],
+			Terminal:  parts[1],
+			Source:    "",
+			Username:  parts[2],
+		})
+	}
+	return entries
+}
+
+func gatherFailedLoginsJournalctl(lines int) (failedLoginsOutput, error) {
+	out, err := exec.Command(
+		"journalctl", "-u", "sshd", "-u", "systemd-logind",
+		"--grep", "Failed password|authentication failure|Failed login",
+		"--no-pager", "-o", "short-iso", "-n", fmt.Sprintf("%d", lines),
+	).Output()
+	entries := parseJournalctlFailedLogins(string(out))
+	if err != nil && errors.Is(err, exec.ErrNotFound) {
+		return failedLoginsOutput{}, err
+	}
+	return failedLoginsOutput{Entries: entries}, nil
+}
+
+func handleGetFailedLogins(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input getFailedLoginsInput,
+) (*mcp.CallToolResult, failedLoginsOutput, error) {
+	out, err := gatherFailedLogins(input.Lines)
+	if err != nil {
+		return nil, failedLoginsOutput{}, err
+	}
+	return nil, out, nil
 }
