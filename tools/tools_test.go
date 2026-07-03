@@ -466,6 +466,45 @@ func TestGatherPing(t *testing.T) {
 		out.PacketLossPercent, out.AvgLatencyMs)
 }
 
+func TestGatherInstalledPackages(t *testing.T) {
+	out, err := GatherInstalledPackages("")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("no supported package manager found")
+		}
+		t.Skipf("GatherInstalledPackages() error: %v", err)
+	}
+	if out.Total == 0 {
+		t.Error("Total should be > 0")
+	}
+	if len(out.Packages) == 0 {
+		t.Error("Packages should not be empty")
+	}
+	t.Logf("Found %d installed packages", out.Total)
+}
+
+func TestGatherInstalledPackagesFilter(t *testing.T) {
+	out, err := GatherInstalledPackages("linux")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("no supported package manager found")
+		}
+		t.Skipf("GatherInstalledPackages() error: %v", err)
+	}
+	t.Logf("Found %d packages matching filter", out.Total)
+}
+
+func TestGatherCheckUpdates(t *testing.T) {
+	out, err := GatherCheckUpdates()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("no supported package manager found")
+		}
+		t.Skipf("GatherCheckUpdates() error: %v", err)
+	}
+	t.Logf("Found %d available updates", out.Total)
+}
+
 func TestHumanSize(t *testing.T) {
 	cases := []struct {
 		bytes int64

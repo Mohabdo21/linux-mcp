@@ -93,4 +93,16 @@ func RegisterTools(server *mcp.Server) {
 		Description: "Send ICMP packets to a host and return latency, " +
 			"packet loss, and response times",
 	}, HandlePingHost)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_installed_packages",
+		Description: "Query installed packages " +
+			"(Arch: pacman -Q, Debian: dpkg -l, etc.), " +
+			"optionally filtered by name",
+	}, HandleGetInstalledPackages)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "check_updates",
+		Description: "Count or list available package updates " +
+			"without applying them " +
+			"(e.g., pacman -Qu, apt list --upgradable)",
+	}, HandleCheckUpdates)
 }
