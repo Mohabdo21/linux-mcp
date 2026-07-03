@@ -9,7 +9,7 @@ import (
 
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "linux-mcp",
+		Name:    "system-status",
 		Version: "1.0.0",
 	}, nil)
 
