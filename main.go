@@ -25,4 +25,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_system_info",
 		Description: "Returns system information including hostname, OS, kernel version, architecture, and uptime",
 	}, handleGetSystemInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_cpu_info",
+		Description: "Returns CPU information including usage percentage, model, frequency, and core counts",
+	}, handleGetCPUInfo)
 }
