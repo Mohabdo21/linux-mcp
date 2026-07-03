@@ -117,7 +117,7 @@ func handleGetCPUTemperature(
 ) (*mcp.CallToolResult, cpuTemperatureOutput, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if err != nil {
-		return nil, cpuTemperatureOutput{}, err
+		return nil, cpuTemperatureOutput{Message: "No temperature sensors available"}, nil
 	}
 	if len(temps) == 0 {
 		return nil, cpuTemperatureOutput{
@@ -310,10 +310,7 @@ func handleGetProcessInfo(
 		cpu, _ := p.CPUPercent()
 		mem, _ := p.MemoryPercent()
 		status, _ := p.Status()
-		statusStr := ""
-		if len(status) > 0 {
-			statusStr = status[0]
-		}
+	statusStr := strings.Join(status, ",")
 		result = append(result, processStat{
 			PID:           p.Pid,
 			Name:          name,
@@ -419,6 +416,7 @@ func handleGetSystemSnapshot(
 
 	if cpuInfo, err := cpu.Info(); err == nil {
 		percent, _ := cpu.Percent(0, false)
+		physCount, _ := cpu.Counts(true)
 		var cores []cpuDetails
 		for _, c := range cpuInfo {
 			cores = append(cores, cpuDetails{
@@ -429,7 +427,7 @@ func handleGetSystemSnapshot(
 		if len(percent) > 0 {
 			usage = percent[0]
 		}
-		snapshot.CPU = cpuInfoOutput{UsagePercent: usage, Cores: cores}
+		snapshot.CPU = cpuInfoOutput{UsagePercent: usage, PhysicalCoreCount: int32(physCount), Cores: cores}
 	} else {
 		errs = append(errs, "cpu: "+err.Error())
 	}
@@ -450,7 +448,7 @@ func handleGetSystemSnapshot(
 			snapshot.Temperature.Message = "No temperature sensors available"
 		}
 	} else {
-		errs = append(errs, "temperature: "+err.Error())
+		snapshot.Temperature = cpuTemperatureOutput{Message: "No temperature sensors available"}
 	}
 
 	if v, err := mem.VirtualMemory(); err == nil {
@@ -542,6 +540,7 @@ func handleGetSystemSnapshot(
 			Images:     images,
 		}
 	} else {
+		errs = append(errs, "docker: "+err.Error())
 		snapshot.Docker = dockerInfoOutput{}
 	}
 
