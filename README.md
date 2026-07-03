@@ -86,7 +86,7 @@ Add the following to your MCP client configuration:
 | `get_top_io_processes` | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
 | `get_failed_logins`    | Returns recent failed login attempts to detect brute-force attacks                                                                |
 | `get_gpu_info`         | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
-| `get_largest_files`    | Find the top N largest files/directories in a given path (like du -sh | sort -hr | head)                                          |
+| `get_largest_files`    | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                        |
 | `ping_host`            | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |
 
 ## Project structure
