@@ -93,9 +93,23 @@ Add the following to your MCP client configuration:
 
 ```
 .
-├── main.go            # Server entry point and tool registration
-├── tools.go           # All tool handler implementations
-├── tools_test.go      # Tests for all tools
+├── main.go            # Server entry point
+├── tools/
+│   ├── cpu.go         # CPU info and temperature
+│   ├── memory.go      # RAM and swap statistics
+│   ├── disk.go        # Disk usage, inode usage, largest files
+│   ├── network.go     # Network I/O and listening ports
+│   ├── process.go     # Process listing and top I/O processes
+│   ├── docker.go      # Docker containers and images
+│   ├── system.go      # System info and snapshot
+│   ├── journal.go     # systemd journal logs
+│   ├── service.go     # systemd service status
+│   ├── security.go    # Failed login detection
+│   ├── gpu.go         # GPU monitoring (NVIDIA/AMD/Intel)
+│   ├── ping.go        # ICMP ping
+│   ├── register.go    # Tool registration
+│   ├── util.go        # Shared helpers
+│   └── tools_test.go  # Tests for all tools
 ├── go.mod             # Go module definition (go 1.26.4)
 ├── go.sum             # Go module checksums
 ├── Makefile           # Build, test, and lint targets
