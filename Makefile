@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-BINARY = linux_mcp
+BINARY = linux-mcp
 BUILD_DIR = bin
 
 .PHONY: build build-static test check

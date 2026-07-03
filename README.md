@@ -1,4 +1,4 @@
-# linux_mcp - System Status MCP Server
+# linux-mcp - Linux MCP Server
 
 A Linux system monitoring server built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Provides real-time system information - CPU, memory, disk, network, processes, Docker, and more - via MCP tools over STDIO transport.
 
@@ -28,12 +28,12 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 ### Build from source
 
 ```bash
-git clone https://github.com/Mohabdo21/linux_mcp.git
-cd linux_mcp
+git clone https://github.com/Mohabdo21/linux-mcp.git
+cd linux-mcp
 make build
 ```
 
-The binary is placed at `bin/linux_mcp`.
+The binary is placed at `bin/linux-mcp`.
 
 For a fully static binary (no libc dependency):
 
@@ -48,7 +48,7 @@ The server communicates over STDIO transport, following the MCP standard. It is 
 ### Running directly
 
 ```bash
-./bin/linux_mcp
+./bin/linux-mcp
 ```
 
 This starts the server and listens for MCP requests on STDIN/STDOUT.
@@ -60,9 +60,9 @@ Add the following to your MCP client configuration:
 ```json
 {
   "mcpServers": {
-    "system-status": {
+    "linux-mcp": {
       "type": "local",
-      "command": "/path/to/linux_mcp",
+      "command": "/path/to/linux-mcp",
       "enabled": true
     }
   }

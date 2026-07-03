@@ -6,12 +6,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/Mohabdo21/linux_mcp/tools"
+	"github.com/Mohabdo21/linux-mcp/tools"
 )
 
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "system-status",
+		Name:    "linux-mcp",
 		Version: "1.0.0",
 	}, nil)
 
