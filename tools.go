@@ -38,10 +38,9 @@ func handleGetSystemInfo(ctx context.Context, req *mcp.CallToolRequest, _ getSys
 type getCPUInfoInput struct{}
 
 type cpuDetails struct {
-	ModelName         string  `json:"model_name"`
-	CoreCount         int32   `json:"core_count"`
-	PhysicalCoreCount int32   `json:"physical_core_count"`
-	MHz               float64 `json:"mhz"`
+	ModelName string  `json:"model_name"`
+	CoreCount int32   `json:"core_count"`
+	MHz       float64 `json:"mhz"`
 }
 
 type cpuInfoOutput struct {
@@ -66,10 +65,9 @@ func handleGetCPUInfo(ctx context.Context, req *mcp.CallToolRequest, _ getCPUInf
 	var cores []cpuDetails
 	for _, c := range info {
 		cores = append(cores, cpuDetails{
-			ModelName:         c.ModelName,
-			CoreCount:         c.Cores,
-			PhysicalCoreCount: int32(physCount),
-			MHz:               c.Mhz,
+			ModelName: c.ModelName,
+			CoreCount: c.Cores,
+			MHz:       c.Mhz,
 		})
 	}
 	usage := 0.0
