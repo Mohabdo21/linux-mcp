@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/sensors"
 )
 
@@ -106,4 +107,38 @@ func handleGetCPUTemperature(ctx context.Context, req *mcp.CallToolRequest, _ ge
 		})
 	}
 	return nil, cpuTemperatureOutput{Temperatures: result}, nil
+}
+
+type getMemoryInfoInput struct{}
+
+type memoryInfoOutput struct {
+	Total           uint64  `json:"total"`
+	Used            uint64  `json:"used"`
+	Free            uint64  `json:"free"`
+	UsedPercent     float64 `json:"used_percent"`
+	SwapTotal       uint64  `json:"swap_total"`
+	SwapUsed        uint64  `json:"swap_used"`
+	SwapFree        uint64  `json:"swap_free"`
+	SwapUsedPercent float64 `json:"swap_used_percent"`
+}
+
+func handleGetMemoryInfo(ctx context.Context, req *mcp.CallToolRequest, _ getMemoryInfoInput) (*mcp.CallToolResult, memoryInfoOutput, error) {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return nil, memoryInfoOutput{}, err
+	}
+	s, err := mem.SwapMemory()
+	if err != nil {
+		return nil, memoryInfoOutput{}, err
+	}
+	return nil, memoryInfoOutput{
+		Total:           v.Total,
+		Used:            v.Used,
+		Free:            v.Free,
+		UsedPercent:     v.UsedPercent,
+		SwapTotal:       s.Total,
+		SwapUsed:        s.Used,
+		SwapFree:        s.Free,
+		SwapUsedPercent: s.UsedPercent,
+	}, nil
 }

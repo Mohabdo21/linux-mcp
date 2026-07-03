@@ -33,4 +33,8 @@ func registerTools(server *mcp.Server) {
 		Name:        "get_cpu_temperature",
 		Description: "Returns current CPU temperature if sensor data is available",
 	}, handleGetCPUTemperature)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_memory_info",
+		Description: "Returns memory usage including RAM and swap statistics",
+	}, handleGetMemoryInfo)
 }
