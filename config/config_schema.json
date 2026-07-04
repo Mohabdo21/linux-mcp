@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "linux-mcp Configuration",
+  "type": "object",
+  "properties": {
+    "log_level": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"],
+      "description": "Structured log level (stderr only)"
+    },
+    "timeouts": {
+      "type": "object",
+      "description": "Per-tool timeout overrides as Go duration strings",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9]+(ns|us|ms|s|m)$"
+      }
+    },
+    "disabled": {
+      "type": "array",
+      "description": "Tool names to disable at startup",
+      "items": { "type": "string" }
+    }
+  }
+}
