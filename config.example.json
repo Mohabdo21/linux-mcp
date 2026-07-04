@@ -1,0 +1,8 @@
+{
+  "log_level": "info",
+  "timeouts": {
+    "get_system_snapshot": "60s",
+    "ping_host": "5s"
+  },
+  "disabled": []
+}
