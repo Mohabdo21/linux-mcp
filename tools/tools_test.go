@@ -813,6 +813,67 @@ func TestHumanSize(t *testing.T) {
 	}
 }
 
+func TestGatherManPage(t *testing.T) {
+	out, err := GatherManPage(t.Context(), "ls", 0, true)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	if out.Command != "ls" {
+		t.Errorf("expected command 'ls', got %q", out.Command)
+	}
+	if out.Content == "" {
+		t.Error("Content should not be empty")
+	}
+	if !strings.Contains(out.Content, "LS") {
+		t.Error("Content should contain 'LS' as man page header")
+	}
+}
+
+func TestGatherManPageNotFound(t *testing.T) {
+	_, err := GatherManPage(t.Context(), "nonexistent_command_xyz", 0, true)
+	if err == nil {
+		t.Fatal("expected error for nonexistent command")
+	}
+	if !strings.Contains(err.Error(), "No manual page found") {
+		t.Errorf("expected 'No manual page found' error, got: %v", err)
+	}
+}
+
+func TestGatherManPageMaxLines(t *testing.T) {
+	out, err := GatherManPage(t.Context(), "ls", 5, true)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	lines := strings.Count(out.Content, "\n") + 1
+	if lines > 5 {
+		t.Errorf("expected at most 5 lines, got %d", lines)
+	}
+	if out.Truncated != true {
+		t.Error("expected Truncated to be true")
+	}
+}
+
+func TestGatherManPageCleanSpecialChars(t *testing.T) {
+	// With cleanup on, backspace sequences should be removed
+	out, err := GatherManPage(t.Context(), "ls", 0, true)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	// Man output often has backspace sequences like 'W\x08WI\x08ID\x08DE\x08E'
+	// We're just testing the content is non-empty and doesn't have raw \x08
+	if !strings.Contains(out.Content, "\x08") {
+		return // no backspaces to clean is fine
+	}
+	t.Error("Expected backspace characters to be cleaned")
+}
+
+func TestHandleManPageEmptyCommand(t *testing.T) {
+	_, _, err := HandleGetManPage(t.Context(), nil, GetManPageInput{})
+	if err == nil {
+		t.Error("expected error for empty command")
+	}
+}
+
 func TestShellQuote(t *testing.T) {
 	cases := []struct {
 		input string

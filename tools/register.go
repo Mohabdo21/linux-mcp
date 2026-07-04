@@ -184,4 +184,10 @@ func RegisterTools(server *mcp.Server) {
 		Description: "Returns all systemd units and their states " +
 			"for full service inventory",
 	}, HandleGetSystemdUnits)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_man_page",
+		Description: "Returns the full system manual page for a " +
+			"given command as plain text. " +
+			"Uses 'man -P cat' to get raw text output.",
+	}, HandleGetManPage)
 }
