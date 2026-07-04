@@ -14,8 +14,11 @@ import (
 
 type GetManPageInput struct {
 	Command           string `json:"command"                       jsonschema:"command name to get the man page for"`
-	MaxLines          int    `json:"max_lines,omitempty"           jsonschema:"maximum number of lines to return (default: 0 = no limit, max: 10000)"`
+	MaxLines          int    `json:"max_lines,omitempty"           jsonschema:"maximum number of lines to return (default: 500, max: 10000)"`
 	CleanSpecialChars bool   `json:"clean_special_chars,omitempty" jsonschema:"clean backspace formatting characters (default: true)"`
+	Search            string `json:"search,omitempty"              jsonschema:"search term to grep for in the man page (case-insensitive)"`
+	ContextLines      int    `json:"context_lines,omitempty"       jsonschema:"number of context lines before/after each search match (default: 2 when search is used)"`
+	Offset            int    `json:"offset,omitempty"              jsonschema:"line offset to start reading from (0-based)"`
 }
 
 type ManPageOutput struct {
@@ -44,6 +47,9 @@ func GatherManPage(
 	command string,
 	maxLines int,
 	cleanSpecialChars bool,
+	search string,
+	contextLines int,
+	offset int,
 ) (ManPageOutput, error) {
 	if _, err := exec.LookPath("man"); err != nil {
 		return ManPageOutput{}, errors.New("man command not found")
@@ -68,18 +74,51 @@ func GatherManPage(
 	if cleanSpecialChars {
 		content = cleanManOutput(content)
 	}
-	truncated := false
-	if maxLines > 0 {
-		lines := strings.Split(content, "\n")
-		if len(lines) > maxLines {
-			lines = lines[:maxLines]
-			truncated = true
+	lines := strings.Split(content, "\n")
+
+	// Apply search filter with context lines
+	if search != "" {
+		searchLower := strings.ToLower(search)
+		matched := make([]bool, len(lines))
+		for i, line := range lines {
+			if strings.Contains(strings.ToLower(line), searchLower) {
+				matched[i] = true
+			}
 		}
-		content = strings.Join(lines, "\n")
+		include := make([]bool, len(lines))
+		for i, m := range matched {
+			if m {
+				start := max(i-contextLines, 0)
+				end := min(i+contextLines+1, len(lines))
+				for j := start; j < end; j++ {
+					include[j] = true
+				}
+			}
+		}
+		var filtered []string
+		for i, incl := range include {
+			if incl {
+				filtered = append(filtered, lines[i])
+			}
+		}
+		lines = filtered
 	}
+
+	// Apply offset
+	if offset > 0 && offset < len(lines) {
+		lines = lines[offset:]
+	}
+
+	// Apply maxLines cap
+	truncated := false
+	if maxLines > 0 && len(lines) > maxLines {
+		lines = lines[:maxLines]
+		truncated = true
+	}
+
 	return ManPageOutput{
 		Command:   command,
-		Content:   content,
+		Content:   strings.Join(lines, "\n"),
 		Truncated: truncated,
 	}, nil
 }
@@ -97,12 +136,21 @@ func HandleGetManPage(
 		return nil, ManPageOutput{},
 			errors.New("command is required")
 	}
-	maxLines := min(max(input.MaxLines, 0), 10000)
+	maxLines := input.MaxLines
+	if maxLines <= 0 {
+		maxLines = 500
+	}
+	maxLines = min(maxLines, 10000)
+	contextLines := input.ContextLines
+	if input.Search != "" && contextLines <= 0 {
+		contextLines = 2
+	}
 	ctx, cancel := WithToolTimeout(ctx, "get_man_page", 15*time.Second)
 	defer cancel()
 
 	start := time.Now()
-	out, err := GatherManPage(ctx, input.Command, maxLines, true)
+	out, err := GatherManPage(ctx, input.Command, maxLines, true,
+		input.Search, contextLines, input.Offset)
 	LogToolCall(ctx, "get_man_page", time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())

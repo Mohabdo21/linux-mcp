@@ -814,7 +814,7 @@ func TestHumanSize(t *testing.T) {
 }
 
 func TestGatherManPage(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 0, true)
+	out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
 	if err != nil {
 		t.Skipf("GatherManPage() error: %v", err)
 	}
@@ -830,7 +830,15 @@ func TestGatherManPage(t *testing.T) {
 }
 
 func TestGatherManPageNotFound(t *testing.T) {
-	_, err := GatherManPage(t.Context(), "nonexistent_command_xyz", 0, true)
+	_, err := GatherManPage(
+		t.Context(),
+		"nonexistent_command_xyz",
+		500,
+		true,
+		"",
+		0,
+		0,
+	)
 	if err == nil {
 		t.Fatal("expected error for nonexistent command")
 	}
@@ -840,7 +848,7 @@ func TestGatherManPageNotFound(t *testing.T) {
 }
 
 func TestGatherManPageMaxLines(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 5, true)
+	out, err := GatherManPage(t.Context(), "ls", 5, true, "", 0, 0)
 	if err != nil {
 		t.Skipf("GatherManPage() error: %v", err)
 	}
@@ -854,17 +862,69 @@ func TestGatherManPageMaxLines(t *testing.T) {
 }
 
 func TestGatherManPageCleanSpecialChars(t *testing.T) {
-	// With cleanup on, backspace sequences should be removed
-	out, err := GatherManPage(t.Context(), "ls", 0, true)
+	out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
 	if err != nil {
 		t.Skipf("GatherManPage() error: %v", err)
 	}
-	// Man output often has backspace sequences like 'W\x08WI\x08ID\x08DE\x08E'
-	// We're just testing the content is non-empty and doesn't have raw \x08
 	if !strings.Contains(out.Content, "\x08") {
-		return // no backspaces to clean is fine
+		return
 	}
 	t.Error("Expected backspace characters to be cleaned")
+}
+
+func TestGatherManPageSearch(t *testing.T) {
+	out, err := GatherManPage(t.Context(), "ls", 500, true, "FILE", 0, 0)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	if out.Content == "" {
+		t.Error("search results should not be empty when term exists")
+	}
+	if !strings.Contains(out.Content, "FILE") {
+		t.Error("search results should contain the search term")
+	}
+}
+
+func TestGatherManPageSearchNotFound(t *testing.T) {
+	out, err := GatherManPage(
+		t.Context(),
+		"ls",
+		500,
+		true,
+		"XYZZY_NONEXISTENT_123",
+		0,
+		0,
+	)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	if out.Content != "" {
+		t.Error("expected empty content for search with no matches")
+	}
+}
+
+func TestGatherManPageOffset(t *testing.T) {
+	out, err := GatherManPage(t.Context(), "ls", 10, true, "", 0, 0)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	out2, err2 := GatherManPage(t.Context(), "ls", 10, true, "", 0, 10)
+	if err2 != nil {
+		t.Skipf("GatherManPage() error: %v", err2)
+	}
+	if out.Content == out2.Content {
+		t.Error("offset 0 and offset 10 should return different content")
+	}
+}
+
+func TestGatherManPageContextLines(t *testing.T) {
+	out, err := GatherManPage(t.Context(), "ls", 500, true, "FILE", 2, 0)
+	if err != nil {
+		t.Skipf("GatherManPage() error: %v", err)
+	}
+	if out.Content == "" {
+		t.Error("should return content with context lines")
+	}
 }
 
 func TestHandleManPageEmptyCommand(t *testing.T) {

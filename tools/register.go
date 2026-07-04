@@ -186,8 +186,8 @@ func RegisterTools(server *mcp.Server) {
 	}, HandleGetSystemdUnits)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_man_page",
-		Description: "Returns the full system manual page for a " +
-			"given command as plain text. " +
-			"Uses 'man -P cat' to get raw text output.",
+		Description: "Fetches the authoritative man page for any Linux command. " +
+			"Use this when the user asks about flags, syntax, or edge cases. " +
+			"Optional search helps pinpoint specific sections.",
 	}, HandleGetManPage)
 }
