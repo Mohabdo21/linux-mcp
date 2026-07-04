@@ -4,13 +4,42 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os/exec"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+var errInvalidHost = errors.New(
+	"invalid host: must be a valid hostname or IP address")
+
+func validHost(host string) bool {
+	if host == "" || len(host) > 253 {
+		return false
+	}
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	for _, r := range host {
+		if r != '.' && r != '-' && !unicode.IsLetter(r) &&
+			!unicode.IsDigit(r) {
+			return false
+		}
+	}
+	for label := range strings.SplitSeq(host, ".") {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+	}
+	return true
+}
 
 type PingHostInput struct {
 	Host    string `json:"host"              jsonschema:"hostname or IP address to ping"`
@@ -97,8 +126,8 @@ func HandlePingHost(
 		return nil, PingOutput{},
 			errors.New("tool disabled by configuration")
 	}
-	if input.Host == "" {
-		return nil, PingOutput{}, errors.New("host is required")
+	if !validHost(input.Host) {
+		return nil, PingOutput{}, errInvalidHost
 	}
 	ctx, cancel := WithToolTimeout(
 		ctx, "ping_host", 10*time.Second)
