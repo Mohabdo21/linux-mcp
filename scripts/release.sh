@@ -150,6 +150,12 @@ tag_and_push() {
 }
 
 create_release() {
+	if [ "$FORCE" = true ]; then
+		if gh release view "$VERSION" --json id &>/dev/null 2>&1; then
+			warn "Release $VERSION already exists on GitHub. Deleting..."
+			gh release delete "$VERSION" --yes
+		fi
+	fi
 	gh release create "$VERSION" \
 		bin/linux-mcp \
 		bin/linux-mcp_static \
