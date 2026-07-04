@@ -12,7 +12,7 @@
     {
       "registryType": "mcpb",
       "identifier": "https://github.com/Mohabdo21/linux-mcp/releases/download/v0.1.6/linux-mcp",
-      "fileSha256": "cb4c10972f2215224e7180773647fda3448798145da2b2e7f4accffcddaf8548",
+      "fileSha256": "ae81790e33cc19610753cf430253223e2aa9d132045f13b59264dfd4e30d9707",
       "transport": {
         "type": "stdio"
       },
