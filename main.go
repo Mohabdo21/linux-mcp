@@ -45,13 +45,13 @@ func main() {
 	setupLogging()
 
 	slog.Info("server starting",
-		"version", "1.0.0",
+		"version", "0.1.0",
 		"log_level", config.Get().LogLevel,
 	)
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "linux-mcp",
-		Version: "1.0.0",
+		Version: "0.1.0",
 	}, nil)
 
 	tools.RegisterTools(server)
