@@ -146,6 +146,19 @@ create_release() {
 	info "URL: https://github.com/$repo/releases/tag/$VERSION"
 }
 
+publish_to_registry() {
+	if [ ! -f mcp-publisher ]; then
+		info "Downloading mcp-publisher..."
+		curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+	fi
+	if [ ! -f .mcpregistry_github_token ] || [ ! -f .mcpregistry_registry_token ]; then
+		error "MCP Registry token files (.mcpregistry_github_token, .mcpregistry_registry_token) not found. Run 'mcp-publisher login' first."
+	fi
+	info "Publishing to MCP Registry..."
+	./mcp-publisher publish
+	info "Published to MCP Registry successfully!"
+}
+
 main() {
 	preflight_checks
 	resolve_version
@@ -154,6 +167,7 @@ main() {
 	update_server_json
 	tag_and_push
 	create_release
+	publish_to_registry
 }
 
 main
