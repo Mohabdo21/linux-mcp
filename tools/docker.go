@@ -31,8 +31,8 @@ type DockerInfoOutput struct {
 	Errors     []string          `json:"errors,omitempty"`
 }
 
-func ListDockerContainers() ([]DockerContainer, error) {
-	cmd := exec.Command(
+func ListDockerContainers(ctx context.Context) ([]DockerContainer, error) {
+	cmd := exec.CommandContext(ctx,
 		"docker",
 		"ps",
 		"-a",
@@ -62,8 +62,8 @@ func ListDockerContainers() ([]DockerContainer, error) {
 	return containers, nil
 }
 
-func ListDockerImages() ([]DockerImage, error) {
-	cmd := exec.Command(
+func ListDockerImages(ctx context.Context) ([]DockerImage, error) {
+	cmd := exec.CommandContext(ctx,
 		"docker",
 		"images",
 		"--format",
@@ -92,23 +92,16 @@ func ListDockerImages() ([]DockerImage, error) {
 	return images, nil
 }
 
-func GatherDockerInfo() (DockerInfoOutput, error) {
-	containers, err := ListDockerContainers()
+func GatherDockerInfo(ctx context.Context) (DockerInfoOutput, error) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return DockerInfoOutput{}, errors.New("docker is not installed")
+	}
+	containers, err := ListDockerContainers(ctx)
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return DockerInfoOutput{}, errors.New(
-				"docker is not installed",
-			)
-		}
 		return DockerInfoOutput{}, err
 	}
-	images, err := ListDockerImages()
+	images, err := ListDockerImages(ctx)
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return DockerInfoOutput{}, errors.New(
-				"docker is not installed",
-			)
-		}
 		return DockerInfoOutput{}, err
 	}
 	return DockerInfoOutput{
@@ -121,7 +114,7 @@ func HandleGetDockerInfo(
 	req *mcp.CallToolRequest,
 	_ GetDockerInfoInput,
 ) (*mcp.CallToolResult, DockerInfoOutput, error) {
-	out, err := GatherDockerInfo()
+	out, err := GatherDockerInfo(ctx)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

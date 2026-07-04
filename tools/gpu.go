@@ -29,8 +29,9 @@ type GPUInfoOutput struct {
 	Errors []string    `json:"errors,omitempty"`
 }
 
-func GatherNvidiaGPU() (GPUInfoOutput, error) {
-	cmd := exec.Command(
+func GatherNvidiaGPU(ctx context.Context) (GPUInfoOutput, error) {
+	cmd := exec.CommandContext(
+		ctx,
 		"nvidia-smi",
 		"--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
 		"--format=csv,noheader,nounits",
@@ -76,8 +77,8 @@ func GatherNvidiaGPU() (GPUInfoOutput, error) {
 	return GPUInfoOutput{Vendor: "nvidia", GPUs: gpus}, nil
 }
 
-func GatherAMDGPU() (GPUInfoOutput, error) {
-	cmd := exec.Command("rocm-smi", "--json")
+func GatherAMDGPU(ctx context.Context) (GPUInfoOutput, error) {
+	cmd := exec.CommandContext(ctx, "rocm-smi", "--json")
 	out, err := cmd.Output()
 	if err != nil {
 		return GPUInfoOutput{}, err
@@ -131,14 +132,14 @@ func GatherAMDGPU() (GPUInfoOutput, error) {
 	return GPUInfoOutput{Vendor: "amd", GPUs: gpus}, nil
 }
 
-func GatherGPUInfo() (GPUInfoOutput, error) {
+func GatherGPUInfo(ctx context.Context) (GPUInfoOutput, error) {
 	if _, err := exec.LookPath("nvidia-smi"); err == nil {
-		if out, err := GatherNvidiaGPU(); err == nil {
+		if out, err := GatherNvidiaGPU(ctx); err == nil {
 			return out, nil
 		}
 	}
 	if _, err := exec.LookPath("rocm-smi"); err == nil {
-		if out, err := GatherAMDGPU(); err == nil {
+		if out, err := GatherAMDGPU(ctx); err == nil {
 			return out, nil
 		}
 	}
@@ -158,7 +159,7 @@ func HandleGetGPUInfo(
 	req *mcp.CallToolRequest,
 	_ GetGPUInfoInput,
 ) (*mcp.CallToolResult, GPUInfoOutput, error) {
-	out, err := GatherGPUInfo()
+	out, err := GatherGPUInfo(ctx)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

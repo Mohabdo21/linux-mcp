@@ -79,8 +79,11 @@ type ListeningPortsOutput struct {
 	Errors []string        `json:"errors,omitempty"`
 }
 
-func GatherListeningPorts(protocol string) (ListeningPortsOutput, error) {
-	cmd := exec.Command("ss", "-tulnp")
+func GatherListeningPorts(
+	ctx context.Context,
+	protocol string,
+) (ListeningPortsOutput, error) {
+	cmd := exec.CommandContext(ctx, "ss", "-tulnp")
 	out, err := cmd.Output()
 	if err != nil {
 		return ListeningPortsOutput{}, err
@@ -155,7 +158,7 @@ func HandleGetListeningPorts(
 	req *mcp.CallToolRequest,
 	input GetListeningPortsInput,
 ) (*mcp.CallToolResult, ListeningPortsOutput, error) {
-	out, err := GatherListeningPorts(input.Protocol)
+	out, err := GatherListeningPorts(ctx, input.Protocol)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

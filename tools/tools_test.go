@@ -60,7 +60,10 @@ func TestGatherCPUInfo(t *testing.T) {
 }
 
 func TestGatherCPUTemperature(t *testing.T) {
-	out := GatherCPUTemperature()
+	out, err := GatherCPUTemperature()
+	if err != nil {
+		t.Skipf("GatherCPUTemperature() error: %v", err)
+	}
 	if out.Message == "" && len(out.Temperatures) == 0 {
 		t.Error("Expected either Message or Temperatures")
 	}
@@ -226,7 +229,7 @@ func TestGatherProcessInfoIncludesStatus(t *testing.T) {
 }
 
 func TestGatherDockerInfo(t *testing.T) {
-	out, err := GatherDockerInfo()
+	out, err := GatherDockerInfo(t.Context())
 	if err != nil {
 		t.Skipf("GatherDockerInfo() error: %v", err)
 	}
@@ -270,7 +273,7 @@ func TestGatherSystemSnapshot(t *testing.T) {
 	}
 	if snapshot.Temperature.Message == "" &&
 		len(snapshot.Temperature.Temperatures) == 0 {
-		t.Error("Snapshot Temperature should have Message or Temperatures")
+		t.Log("Temperature data unavailable (sensors may not be accessible)")
 	}
 	t.Logf("Snapshot errors: %v", snapshot.Errors)
 }
@@ -291,7 +294,7 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 }
 
 func TestGatherJournalLogs(t *testing.T) {
-	out, err := GatherJournalLogs("", "", "", "", 5, false)
+	out, err := GatherJournalLogs(t.Context(), "", "", "", "", 5, false)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("journalctl not installed")
@@ -302,7 +305,7 @@ func TestGatherJournalLogs(t *testing.T) {
 }
 
 func TestGatherInodeUsage(t *testing.T) {
-	out, err := GatherInodeUsage("")
+	out, err := GatherInodeUsage(t.Context(), "")
 	if err != nil {
 		t.Skipf("GatherInodeUsage() error: %v", err)
 	}
@@ -320,7 +323,7 @@ func TestGatherInodeUsage(t *testing.T) {
 }
 
 func TestGatherInodeUsageWithFilter(t *testing.T) {
-	out, err := GatherInodeUsage("/")
+	out, err := GatherInodeUsage(t.Context(), "/")
 	if err != nil {
 		t.Skipf("GatherInodeUsage(\"/\") error: %v", err)
 	}
@@ -335,7 +338,7 @@ func TestGatherInodeUsageWithFilter(t *testing.T) {
 }
 
 func TestGatherListeningPorts(t *testing.T) {
-	out, err := GatherListeningPorts("")
+	out, err := GatherListeningPorts(t.Context(), "")
 	if err != nil {
 		t.Skipf("GatherListeningPorts() error: %v", err)
 	}
@@ -349,7 +352,7 @@ func TestGatherServiceStatus(t *testing.T) {
 	var out ServiceStatusOutput
 	var err error
 	for _, name := range services {
-		out, err = GatherServiceStatus(name, false)
+		out, err = GatherServiceStatus(t.Context(), name, false)
 		if err == nil {
 			break
 		}
@@ -367,7 +370,7 @@ func TestGatherServiceStatus(t *testing.T) {
 }
 
 func TestGatherTopIOProcesses(t *testing.T) {
-	out, err := GatherTopIOProcesses(5)
+	out, err := GatherTopIOProcesses(t.Context(), 5)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("pidstat not installed")
@@ -378,7 +381,7 @@ func TestGatherTopIOProcesses(t *testing.T) {
 }
 
 func TestGatherFailedLogins(t *testing.T) {
-	out, err := GatherFailedLogins(5)
+	out, err := GatherFailedLogins(t.Context(), 5)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("lastb not installed")
@@ -414,7 +417,7 @@ func TestParseProcessField(t *testing.T) {
 }
 
 func TestGatherLargestFiles(t *testing.T) {
-	out, err := GatherLargestFiles(".", 5)
+	out, err := GatherLargestFiles(t.Context(), ".", 5)
 	if err != nil {
 		t.Fatalf("GatherLargestFiles() error: %v", err)
 	}
@@ -436,7 +439,7 @@ func TestGatherLargestFiles(t *testing.T) {
 }
 
 func TestGatherGPUInfo(t *testing.T) {
-	out, err := GatherGPUInfo()
+	out, err := GatherGPUInfo(t.Context())
 	if err != nil {
 		t.Skipf("No GPU tool found: %v", err)
 	}
@@ -447,7 +450,7 @@ func TestGatherGPUInfo(t *testing.T) {
 }
 
 func TestGatherPing(t *testing.T) {
-	out, err := GatherPing("127.0.0.1", 1, 5)
+	out, err := GatherPing(t.Context(), "127.0.0.1", 1, 5)
 	if err != nil {
 		t.Skipf("ping failed: %v", err)
 	}
@@ -464,7 +467,7 @@ func TestGatherPing(t *testing.T) {
 }
 
 func TestGatherInstalledPackages(t *testing.T) {
-	out, err := GatherInstalledPackages("")
+	out, err := GatherInstalledPackages(t.Context(), "")
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("no supported package manager found")
@@ -481,7 +484,7 @@ func TestGatherInstalledPackages(t *testing.T) {
 }
 
 func TestGatherInstalledPackagesFilter(t *testing.T) {
-	out, err := GatherInstalledPackages("linux")
+	out, err := GatherInstalledPackages(t.Context(), "linux")
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("no supported package manager found")
@@ -492,7 +495,7 @@ func TestGatherInstalledPackagesFilter(t *testing.T) {
 }
 
 func TestGatherCheckUpdates(t *testing.T) {
-	out, err := GatherCheckUpdates()
+	out, err := GatherCheckUpdates(t.Context())
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("no supported package manager found")
@@ -519,7 +522,7 @@ func TestGatherLoadAverage(t *testing.T) {
 }
 
 func TestGatherLoggedInUsers(t *testing.T) {
-	out, err := GatherLoggedInUsers()
+	out, err := GatherLoggedInUsers(t.Context())
 	if err != nil {
 		t.Skipf("GatherLoggedInUsers() error: %v", err)
 	}
@@ -538,7 +541,7 @@ func TestGatherDNSResolve(t *testing.T) {
 }
 
 func TestGatherMountOptions(t *testing.T) {
-	out, err := GatherMountOptions("")
+	out, err := GatherMountOptions(t.Context(), "")
 	if err != nil {
 		t.Skipf("GatherMountOptions() error: %v", err)
 	}
@@ -553,7 +556,7 @@ func TestGatherMountOptions(t *testing.T) {
 }
 
 func TestGatherMountOptionsWithFilter(t *testing.T) {
-	out, err := GatherMountOptions("/")
+	out, err := GatherMountOptions(t.Context(), "/")
 	if err != nil {
 		t.Skipf("GatherMountOptions(\"/\") error: %v", err)
 	}
@@ -568,7 +571,7 @@ func TestGatherMountOptionsWithFilter(t *testing.T) {
 }
 
 func TestGatherSystemdUnits(t *testing.T) {
-	out, err := GatherSystemdUnits()
+	out, err := GatherSystemdUnits(t.Context())
 	if err != nil {
 		t.Skipf("GatherSystemdUnits() error: %v", err)
 	}

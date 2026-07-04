@@ -80,14 +80,14 @@ type CPUTemperatureOutput struct {
 	Errors       []string          `json:"errors,omitempty"`
 }
 
-func GatherCPUTemperature() CPUTemperatureOutput {
+func GatherCPUTemperature() (CPUTemperatureOutput, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if len(temps) == 0 {
 		msg := "No temperature sensors available"
 		if err != nil {
 			msg = err.Error()
 		}
-		return CPUTemperatureOutput{Message: msg}
+		return CPUTemperatureOutput{Message: msg}, err
 	}
 	var result []TemperatureStat
 	for _, t := range temps {
@@ -96,11 +96,7 @@ func GatherCPUTemperature() CPUTemperatureOutput {
 			Temperature: t.Temperature,
 		})
 	}
-	msg := ""
-	if err != nil {
-		msg = err.Error()
-	}
-	return CPUTemperatureOutput{Temperatures: result, Message: msg}
+	return CPUTemperatureOutput{Temperatures: result}, err
 }
 
 func HandleGetCPUTemperature(
@@ -108,5 +104,9 @@ func HandleGetCPUTemperature(
 	req *mcp.CallToolRequest,
 	_ GetCPUTemperatureInput,
 ) (*mcp.CallToolResult, CPUTemperatureOutput, error) {
-	return nil, GatherCPUTemperature(), nil
+	out, err := GatherCPUTemperature()
+	if err != nil {
+		out.Errors = append(out.Errors, err.Error())
+	}
+	return nil, out, nil
 }

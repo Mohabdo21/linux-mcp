@@ -90,8 +90,11 @@ type InodeUsageOutput struct {
 	Errors []string         `json:"errors,omitempty"`
 }
 
-func GatherInodeUsage(mountPoint string) (InodeUsageOutput, error) {
-	cmd := exec.Command("df", "-i")
+func GatherInodeUsage(
+	ctx context.Context,
+	mountPoint string,
+) (InodeUsageOutput, error) {
+	cmd := exec.CommandContext(ctx, "df", "-i")
 	out, err := cmd.Output()
 	if err != nil {
 		return InodeUsageOutput{}, err
@@ -129,7 +132,7 @@ func HandleGetInodeUsage(
 	req *mcp.CallToolRequest,
 	input GetInodeUsageInput,
 ) (*mcp.CallToolResult, InodeUsageOutput, error) {
-	out, err := GatherInodeUsage(input.MountPoint)
+	out, err := GatherInodeUsage(ctx, input.MountPoint)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -154,7 +157,11 @@ type LargestFilesOutput struct {
 	Errors  []string           `json:"errors,omitempty"`
 }
 
-func GatherLargestFiles(path string, limit int) (LargestFilesOutput, error) {
+func GatherLargestFiles(
+	ctx context.Context,
+	path string,
+	limit int,
+) (LargestFilesOutput, error) {
 	if path == "" {
 		path = "."
 	}
@@ -163,7 +170,7 @@ func GatherLargestFiles(path string, limit int) (LargestFilesOutput, error) {
 	} else if limit > 100 {
 		limit = 100
 	}
-	cmd := exec.Command("sh", "-c", fmt.Sprintf(
+	cmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(
 		"du -sb %s/* %s/.[!.]* 2>/dev/null | sort -rn",
 		ShellQuote(path), ShellQuote(path),
 	))
@@ -220,9 +227,12 @@ type MountOptionsOutput struct {
 	Errors []string     `json:"errors,omitempty"`
 }
 
-func GatherMountOptions(mountPoint string) (MountOptionsOutput, error) {
+func GatherMountOptions(
+	ctx context.Context,
+	mountPoint string,
+) (MountOptionsOutput, error) {
 	args := []string{"--noheadings", "-o", "SOURCE,TARGET,FSTYPE,OPTIONS"}
-	cmd := exec.Command("findmnt", args...)
+	cmd := exec.CommandContext(ctx, "findmnt", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return MountOptionsOutput{}, err
@@ -254,7 +264,7 @@ func HandleGetMountOptions(
 	req *mcp.CallToolRequest,
 	input GetMountOptionsInput,
 ) (*mcp.CallToolResult, MountOptionsOutput, error) {
-	out, err := GatherMountOptions(input.MountPoint)
+	out, err := GatherMountOptions(ctx, input.MountPoint)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -266,7 +276,7 @@ func HandleGetLargestFiles(
 	req *mcp.CallToolRequest,
 	input GetLargestFilesInput,
 ) (*mcp.CallToolResult, LargestFilesOutput, error) {
-	out, err := GatherLargestFiles(input.Path, input.Limit)
+	out, err := GatherLargestFiles(ctx, input.Path, input.Limit)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

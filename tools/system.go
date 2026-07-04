@@ -84,7 +84,11 @@ func HandleGetSystemSnapshot(
 		errs.Add("cpu", err)
 	}
 
-	snapshot.Temperature = GatherCPUTemperature()
+	if out, err := GatherCPUTemperature(); err == nil {
+		snapshot.Temperature = out
+	} else {
+		errs.Add("temperature", err)
+	}
 
 	if out, err := GatherMemoryInfo(); err == nil {
 		snapshot.Memory = out
@@ -116,7 +120,7 @@ func HandleGetSystemSnapshot(
 		errs.Add("processes", err)
 	}
 
-	if out, err := GatherDockerInfo(); err == nil {
+	if out, err := GatherDockerInfo(ctx); err == nil {
 		snapshot.Docker = out
 	} else {
 		errs.Add("docker", err)

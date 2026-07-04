@@ -29,7 +29,7 @@ type JournalLogsOutput struct {
 }
 
 func GatherJournalLogs(
-	unit, priority, since, until string,
+	ctx context.Context, unit, priority, since, until string,
 	lines int, user bool,
 ) (JournalLogsOutput, error) {
 	if lines <= 0 {
@@ -57,7 +57,7 @@ func GatherJournalLogs(
 	if until != "" {
 		args = append(args, "--until", until)
 	}
-	cmd := exec.Command("journalctl", args...)
+	cmd := exec.CommandContext(ctx, "journalctl", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return JournalLogsOutput{}, err
@@ -87,7 +87,7 @@ func HandleGetJournalLogs(
 	input GetJournalLogsInput,
 ) (*mcp.CallToolResult, JournalLogsOutput, error) {
 	out, err := GatherJournalLogs(
-		input.Unit,
+		ctx, input.Unit,
 		input.Priority,
 		input.Since,
 		input.Until,

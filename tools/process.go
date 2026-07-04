@@ -103,13 +103,16 @@ type TopIOProcessesOutput struct {
 	Errors    []string        `json:"errors,omitempty"`
 }
 
-func GatherTopIOProcesses(limit int) (TopIOProcessesOutput, error) {
+func GatherTopIOProcesses(
+	ctx context.Context,
+	limit int,
+) (TopIOProcessesOutput, error) {
 	if limit <= 0 {
 		limit = 10
 	} else if limit > 50 {
 		limit = 50
 	}
-	cmd := exec.Command("pidstat", "-d", "1", "1")
+	cmd := exec.CommandContext(ctx, "pidstat", "-d", "1", "1")
 	out, err := cmd.Output()
 	if err != nil {
 		return TopIOProcessesOutput{}, err
@@ -147,7 +150,7 @@ func HandleGetTopIOProcesses(
 	req *mcp.CallToolRequest,
 	input GetTopIOProcessesInput,
 ) (*mcp.CallToolResult, TopIOProcessesOutput, error) {
-	out, err := GatherTopIOProcesses(input.Limit)
+	out, err := GatherTopIOProcesses(ctx, input.Limit)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

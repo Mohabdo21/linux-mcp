@@ -33,13 +33,13 @@ func ExtractField(output, prefix string) string {
 }
 
 func GatherServiceStatus(
-	name string, user bool,
+	ctx context.Context, name string, user bool,
 ) (ServiceStatusOutput, error) {
 	args := []string{"status", name, "--no-pager", "-l"}
 	if user {
 		args = append([]string{"--user"}, args...)
 	}
-	cmd := exec.Command("systemctl", args...)
+	cmd := exec.CommandContext(ctx, "systemctl", args...)
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 	loaded := ExtractField(output, "Loaded:")
@@ -69,8 +69,8 @@ type SystemdUnitsOutput struct {
 	Errors []string      `json:"errors,omitempty"`
 }
 
-func GatherSystemdUnits() (SystemdUnitsOutput, error) {
-	cmd := exec.Command(
+func GatherSystemdUnits(ctx context.Context) (SystemdUnitsOutput, error) {
+	cmd := exec.CommandContext(ctx,
 		"systemctl",
 		"list-units",
 		"--all",
@@ -110,7 +110,7 @@ func HandleGetSystemdUnits(
 	req *mcp.CallToolRequest,
 	_ GetSystemdUnitsInput,
 ) (*mcp.CallToolResult, SystemdUnitsOutput, error) {
-	out, err := GatherSystemdUnits()
+	out, err := GatherSystemdUnits(ctx)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -122,7 +122,7 @@ func HandleGetServiceStatus(
 	req *mcp.CallToolRequest,
 	input GetServiceStatusInput,
 ) (*mcp.CallToolResult, ServiceStatusOutput, error) {
-	out, err := GatherServiceStatus(input.Name, input.User)
+	out, err := GatherServiceStatus(ctx, input.Name, input.User)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

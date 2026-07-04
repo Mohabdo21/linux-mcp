@@ -27,14 +27,18 @@ type PingOutput struct {
 	Errors             []string `json:"errors,omitempty"`
 }
 
-func GatherPing(host string, count, timeout int) (PingOutput, error) {
+func GatherPing(
+	ctx context.Context,
+	host string,
+	count, timeout int,
+) (PingOutput, error) {
 	if count <= 0 {
 		count = 4
 	}
 	if timeout <= 0 {
 		timeout = 10
 	}
-	cmd := exec.Command(
+	cmd := exec.CommandContext(ctx,
 		"ping",
 		"-c",
 		fmt.Sprintf("%d", count),
@@ -90,7 +94,7 @@ func HandlePingHost(
 	if input.Host == "" {
 		return nil, PingOutput{}, errors.New("host is required")
 	}
-	out, err := GatherPing(input.Host, input.Count, input.Timeout)
+	out, err := GatherPing(ctx, input.Host, input.Count, input.Timeout)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

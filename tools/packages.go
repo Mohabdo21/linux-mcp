@@ -47,26 +47,32 @@ func detectPkgManager() string {
 	return ""
 }
 
-func GatherInstalledPackages(name string) (InstalledPackagesOutput, error) {
+func GatherInstalledPackages(
+	ctx context.Context,
+	name string,
+) (InstalledPackagesOutput, error) {
 	pm := detectPkgManager()
 	switch pm {
 	case "pacman":
-		return gatherPacmanPackages(name)
+		return gatherPacmanPackages(ctx, name)
 	case "dpkg":
-		return gatherDpkgPackages(name)
+		return gatherDpkgPackages(ctx, name)
 	default:
 		return InstalledPackagesOutput{}, exec.ErrNotFound
 	}
 }
 
-func gatherPacmanPackages(name string) (InstalledPackagesOutput, error) {
+func gatherPacmanPackages(
+	ctx context.Context,
+	name string,
+) (InstalledPackagesOutput, error) {
 	var args []string
 	if name == "" {
 		args = []string{"-Q"}
 	} else {
 		args = []string{"-Qs", name}
 	}
-	out, err := exec.Command("pacman", args...).Output()
+	out, err := exec.CommandContext(ctx, "pacman", args...).Output()
 	if err != nil {
 		return InstalledPackagesOutput{}, err
 	}
@@ -97,12 +103,15 @@ func parsePacmanQOutput(output string) InstalledPackagesOutput {
 	}
 }
 
-func gatherDpkgPackages(name string) (InstalledPackagesOutput, error) {
+func gatherDpkgPackages(
+	ctx context.Context,
+	name string,
+) (InstalledPackagesOutput, error) {
 	args := []string{"-l"}
 	if name != "" {
 		args = []string{"-l", name}
 	}
-	out, err := exec.Command("dpkg", args...).Output()
+	out, err := exec.CommandContext(ctx, "dpkg", args...).Output()
 	if err != nil {
 		return InstalledPackagesOutput{}, err
 	}
@@ -129,20 +138,20 @@ func parseDpkgLOutput(output string) InstalledPackagesOutput {
 	}
 }
 
-func GatherCheckUpdates() (CheckUpdatesOutput, error) {
+func GatherCheckUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
 	pm := detectPkgManager()
 	switch pm {
 	case "pacman":
-		return gatherPacmanUpdates()
+		return gatherPacmanUpdates(ctx)
 	case "dpkg":
-		return gatherAptUpdates()
+		return gatherAptUpdates(ctx)
 	default:
 		return CheckUpdatesOutput{}, exec.ErrNotFound
 	}
 }
 
-func gatherPacmanUpdates() (CheckUpdatesOutput, error) {
-	out, err := exec.Command("pacman", "-Qu").Output()
+func gatherPacmanUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
+	out, err := exec.CommandContext(ctx, "pacman", "-Qu").Output()
 	if err != nil {
 		if len(out) == 0 {
 			return CheckUpdatesOutput{}, nil
@@ -183,8 +192,8 @@ func parsePacmanQuOutput(output string) CheckUpdatesOutput {
 	}
 }
 
-func gatherAptUpdates() (CheckUpdatesOutput, error) {
-	out, err := exec.Command("apt", "list", "--upgradable").Output()
+func gatherAptUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
+	out, err := exec.CommandContext(ctx, "apt", "list", "--upgradable").Output()
 	if err != nil {
 		if len(out) == 0 {
 			return CheckUpdatesOutput{}, err
@@ -236,7 +245,7 @@ func HandleGetInstalledPackages(
 	req *mcp.CallToolRequest,
 	input GetInstalledPackagesInput,
 ) (*mcp.CallToolResult, InstalledPackagesOutput, error) {
-	out, err := GatherInstalledPackages(input.Name)
+	out, err := GatherInstalledPackages(ctx, input.Name)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -248,7 +257,7 @@ func HandleCheckUpdates(
 	req *mcp.CallToolRequest,
 	_ CheckUpdatesInput,
 ) (*mcp.CallToolResult, CheckUpdatesOutput, error) {
-	out, err := GatherCheckUpdates()
+	out, err := GatherCheckUpdates(ctx)
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
