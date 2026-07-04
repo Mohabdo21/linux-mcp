@@ -18,6 +18,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Security** - active user sessions and failed login detection
 - **Packages** - query installed packages and check for available updates (supports pacman and dpkg)
 - **System snapshot** - all of the above in a single call, with graceful degradation on individual failures
+- **Man pages** - retrieve system manual pages for any installed command
 - **Resources** - system data also available as readable MCP resources (`system:///info`, `system:///cpu`, etc.)
 
 ## Prerequisites
@@ -117,6 +118,7 @@ Add the following to your MCP client configuration:
 | `check_updates`                | Count or list available package updates without applying them (pacman -Qu or apt list --upgradable)                               |
 | `get_load_average`             | Returns 1-, 5-, and 15-minute load averages as a universal system health check                                                    |
 | `get_logged_in_users`          | Returns active user sessions for security and workload awareness                                                                  |
+| `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit                                    |
 | `resolve_dns`                  | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                             |
 | `get_mount_options`            | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                              |
 | `get_systemd_units`            | Returns all systemd units and their states for full service inventory                                                             |
