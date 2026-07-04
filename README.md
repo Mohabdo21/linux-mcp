@@ -104,6 +104,7 @@ Add the following to your MCP client configuration:
 | `get_docker_volumes`           | Returns Docker volumes with driver, mountpoint, size, and label information                                                       |
 | `get_docker_system_info`       | Returns Docker daemon version, storage driver, runtimes, and resource counts                                                      |
 | `get_docker_disk_usage`        | Returns Docker disk usage for containers, images, volumes, and build cache                                                        |
+| `get_environment_variables`    | Returns all active environment variables as a sorted key-value map; useful for debugging PATH, API keys, and locale settings      |
 | `get_system_snapshot`          | Returns a comprehensive snapshot combining all tools                                                                              |
 | `get_journal_logs`             | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal |
 | `get_inode_usage`              | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                               |
@@ -112,6 +113,7 @@ Add the following to your MCP client configuration:
 | `get_top_io_processes`         | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
 | `get_failed_logins`            | Returns recent failed login attempts to detect brute-force attacks                                                                |
 | `get_gpu_info`                 | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
+| `get_hardware_bus_info`        | Lists detected PCI and USB devices for driver troubleshooting and hardware identification                                         |
 | `get_largest_files`            | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                        |
 | `ping_host`                    | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |
 | `get_installed_packages`       | Query installed packages (pacman -Q or dpkg -l), optionally filtered by name                                                      |

@@ -935,7 +935,7 @@ func TestHandleManPageEmptyCommand(t *testing.T) {
 }
 
 func TestGatherEnvironmentVariables(t *testing.T) {
-	out, err := GatherEnvironmentVariables(t.Context())
+	out, err := GatherEnvironmentVariables(t.Context(), "")
 	if err != nil {
 		t.Fatalf("GatherEnvironmentVariables() error: %v", err)
 	}
@@ -968,7 +968,7 @@ func TestGatherEnvironmentVariables(t *testing.T) {
 }
 
 func TestGatherHardwareBusInfo(t *testing.T) {
-	out, err := GatherHardwareBusInfo(t.Context())
+	out, err := GatherHardwareBusInfo(t.Context(), "")
 	if err != nil {
 		t.Skipf("GatherHardwareBusInfo() error (CLI may be missing): %v", err)
 	}

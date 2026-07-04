@@ -3,8 +3,10 @@ package tools
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -183,7 +185,9 @@ func GatherLoadAverage(ctx context.Context) (LoadAverageOutput, error) {
 	return LoadAverageOutput{Load1: load1, Load5: load5, Load15: load15}, nil
 }
 
-type GetEnvironmentVariablesInput struct{}
+type GetEnvironmentVariablesInput struct {
+	Search string `json:"search,omitempty" jsonschema:"optional search string to filter by name (matches prefix or substring)"`
+}
 
 type EnvironmentVariable struct {
 	Name  string `json:"name"`
@@ -198,14 +202,20 @@ type EnvironmentVariablesOutput struct {
 
 func GatherEnvironmentVariables(
 	ctx context.Context,
+	search string,
 ) (EnvironmentVariablesOutput, error) {
 	env := os.Environ()
 	variables := make([]EnvironmentVariable, 0, len(env))
 	for _, pair := range env {
 		for i := 0; i < len(pair); i++ {
 			if pair[i] == '=' {
+				name := pair[:i]
+				if search != "" && !strings.HasPrefix(name, search) &&
+					!strings.Contains(name, search) {
+					continue
+				}
 				variables = append(variables, EnvironmentVariable{
-					Name:  pair[:i],
+					Name:  name,
 					Value: pair[i+1:],
 				})
 				break
@@ -224,7 +234,7 @@ func GatherEnvironmentVariables(
 func HandleGetEnvironmentVariables(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	_ GetEnvironmentVariablesInput,
+	input GetEnvironmentVariablesInput,
 ) (*mcp.CallToolResult, EnvironmentVariablesOutput, error) {
 	if config.IsDisabled("get_environment_variables") {
 		return nil, EnvironmentVariablesOutput{},
@@ -235,7 +245,7 @@ func HandleGetEnvironmentVariables(
 	defer cancel()
 
 	start := time.Now()
-	out, err := GatherEnvironmentVariables(ctx)
+	out, err := GatherEnvironmentVariables(ctx, input.Search)
 	LogToolCall(ctx, "get_environment_variables",
 		time.Since(start), len(out.Errors))
 	if err != nil {
@@ -244,7 +254,9 @@ func HandleGetEnvironmentVariables(
 	return nil, out, nil
 }
 
-type GetHardwareBusInfoInput struct{}
+type GetHardwareBusInfoInput struct {
+	Search string `json:"search,omitempty" jsonschema:"optional search string to filter devices by any field (bus, slot, class, vendor, device)"`
+}
 
 type BusDevice struct {
 	Bus    string `json:"bus"`
@@ -258,6 +270,127 @@ type HardwareBusInfoOutput struct {
 	PCIDevices []BusDevice `json:"pci_devices"`
 	USBDevices []BusDevice `json:"usb_devices"`
 	Errors     []string    `json:"errors,omitempty"`
+}
+
+const (
+	pciSysfsPath = "/sys/bus/pci/devices"
+	usbSysfsPath = "/sys/bus/usb/devices"
+)
+
+var pciBaseClasses = map[uint8]string{
+	0x00: "Unclassified device",
+	0x01: "Mass storage controller",
+	0x02: "Network controller",
+	0x03: "Display controller",
+	0x04: "Multimedia controller",
+	0x05: "Memory controller",
+	0x06: "Bridge",
+	0x07: "Communication controller",
+	0x08: "Base system peripheral",
+	0x09: "Input device controller",
+	0x0a: "Docking station",
+	0x0b: "Processor",
+	0x0c: "Serial bus controller",
+	0x0d: "Wireless controller",
+	0x0e: "Intelligent controller",
+	0x0f: "Satellite communication controller",
+	0x10: "Encryption controller",
+	0x11: "Signal processing controller",
+	0x12: "Processing accelerators",
+	0x13: "Non-Essential Instrumentation",
+	0x14: "Coprocessor",
+}
+
+func readSysfsFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+func parsePCIDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
+	entries, err := os.ReadDir(pciSysfsPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", pciSysfsPath, err)
+	}
+
+	var devices []BusDevice
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		base := filepath.Join(pciSysfsPath, name)
+
+		vendor, _ := readSysfsFile(filepath.Join(base, "vendor"))
+		device, _ := readSysfsFile(filepath.Join(base, "device"))
+		classHex, _ := readSysfsFile(filepath.Join(base, "class"))
+
+		className := ""
+		if len(classHex) >= 4 {
+			val, err := strconv.ParseUint(classHex[2:4], 16, 8)
+			if err == nil {
+				if n, ok := pciBaseClasses[uint8(val)]; ok {
+					className = n
+				}
+			}
+		}
+
+		devices = append(devices, BusDevice{
+			Bus:    "pci",
+			Slot:   name,
+			Class:  className,
+			Vendor: vendor,
+			Device: device,
+		})
+	}
+
+	if devices == nil {
+		devices = []BusDevice{}
+	}
+	return devices, nil
+}
+
+func parseUSBDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
+	entries, err := os.ReadDir(usbSysfsPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", usbSysfsPath, err)
+	}
+
+	var devices []BusDevice
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		base := filepath.Join(usbSysfsPath, entry.Name())
+
+		vendor, err := readSysfsFile(filepath.Join(base, "idVendor"))
+		if err != nil {
+			continue // skip interfaces without vendor info
+		}
+		product, _ := readSysfsFile(filepath.Join(base, "idProduct"))
+		desc, _ := readSysfsFile(filepath.Join(base, "product"))
+		busnum, _ := readSysfsFile(filepath.Join(base, "busnum"))
+		devnum, _ := readSysfsFile(filepath.Join(base, "devnum"))
+
+		deviceDesc := desc
+		if deviceDesc == "" {
+			deviceDesc = vendor + ":" + product
+		}
+
+		devices = append(devices, BusDevice{
+			Bus:    busnum,
+			Slot:   devnum,
+			Vendor: vendor,
+			Device: deviceDesc,
+		})
+	}
+
+	if devices == nil {
+		devices = []BusDevice{}
+	}
+	return devices, nil
 }
 
 func parseLspciOutput(ctx context.Context) ([]BusDevice, error) {
@@ -327,22 +460,61 @@ func parseLsusbOutput(ctx context.Context) ([]BusDevice, error) {
 	return devices, nil
 }
 
-func GatherHardwareBusInfo(ctx context.Context) (HardwareBusInfoOutput, error) {
+func deviceMatches(d BusDevice, search string) bool {
+	if search == "" {
+		return true
+	}
+	search = strings.ToLower(search)
+	return strings.Contains(strings.ToLower(d.Bus), search) ||
+		strings.Contains(strings.ToLower(d.Slot), search) ||
+		strings.Contains(strings.ToLower(d.Class), search) ||
+		strings.Contains(strings.ToLower(d.Vendor), search) ||
+		strings.Contains(strings.ToLower(d.Device), search)
+}
+
+func filterDevices(devices []BusDevice, search string) []BusDevice {
+	if search == "" {
+		return devices
+	}
+	var filtered []BusDevice
+	for _, d := range devices {
+		if deviceMatches(d, search) {
+			filtered = append(filtered, d)
+		}
+	}
+	if filtered == nil {
+		filtered = []BusDevice{}
+	}
+	return filtered
+}
+
+func GatherHardwareBusInfo(
+	ctx context.Context,
+	search string,
+) (HardwareBusInfoOutput, error) {
 	var out HardwareBusInfoOutput
 	var errs ErrList
 
 	pci, err := parseLspciOutput(ctx)
 	if err != nil {
-		errs.Add("lspci", err)
-	} else {
-		out.PCIDevices = pci
+		pci, err = parsePCIDevicesSysfs(ctx)
+		if err != nil {
+			errs.Add("pci", err)
+		}
+	}
+	if pci != nil {
+		out.PCIDevices = filterDevices(pci, search)
 	}
 
 	usb, err := parseLsusbOutput(ctx)
 	if err != nil {
-		errs.Add("lsusb", err)
-	} else {
-		out.USBDevices = usb
+		usb, err = parseUSBDevicesSysfs(ctx)
+		if err != nil {
+			errs.Add("usb", err)
+		}
+	}
+	if usb != nil {
+		out.USBDevices = filterDevices(usb, search)
 	}
 
 	out.Errors = errs
@@ -352,7 +524,7 @@ func GatherHardwareBusInfo(ctx context.Context) (HardwareBusInfoOutput, error) {
 func HandleGetHardwareBusInfo(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	_ GetHardwareBusInfoInput,
+	input GetHardwareBusInfoInput,
 ) (*mcp.CallToolResult, HardwareBusInfoOutput, error) {
 	if config.IsDisabled("get_hardware_bus_info") {
 		return nil, HardwareBusInfoOutput{},
@@ -363,7 +535,7 @@ func HandleGetHardwareBusInfo(
 	defer cancel()
 
 	start := time.Now()
-	out, err := GatherHardwareBusInfo(ctx)
+	out, err := GatherHardwareBusInfo(ctx, input.Search)
 	LogToolCall(ctx, "get_hardware_bus_info",
 		time.Since(start), len(out.Errors))
 	if err != nil {
