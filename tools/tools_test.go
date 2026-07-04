@@ -3,6 +3,7 @@ package tools
 import (
 	"errors"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -237,6 +238,210 @@ func TestGatherDockerInfo(t *testing.T) {
 		"Found %d containers and %d images",
 		len(out.Containers),
 		len(out.Images),
+	)
+}
+
+func TestGatherContainerDetail(t *testing.T) {
+	containers, err := ListDockerContainers(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if len(containers) == 0 {
+		t.Skip("No containers available to inspect")
+	}
+	out, err := GatherContainerDetail(t.Context(), containers[0].ID)
+	if err != nil {
+		t.Skipf("GatherContainerDetail() error: %v", err)
+	}
+	if out.Container.ID == "" {
+		t.Error("Container ID should not be empty")
+	}
+	if out.Container.Name == "" {
+		t.Error("Container Name should not be empty")
+	}
+	t.Logf(
+		"Container %s (%s) image=%s",
+		out.Container.Name,
+		out.Container.ID,
+		out.Container.Image,
+	)
+}
+
+func TestGatherContainerLogs(t *testing.T) {
+	containers, err := ListDockerContainers(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if len(containers) == 0 {
+		t.Skip("No containers available to fetch logs")
+	}
+	out, err := GatherContainerLogs(t.Context(), containers[0].ID, 5, false)
+	if err != nil {
+		t.Skipf("GatherContainerLogs() error: %v", err)
+	}
+	t.Logf(
+		"Got %d log lines from container %s",
+		len(out.Logs),
+		containers[0].ID,
+	)
+}
+
+func TestGatherContainerStats(t *testing.T) {
+	containers, err := ListDockerContainers(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	var statsID string
+	for _, c := range containers {
+		if strings.Contains(c.Status, "Up") {
+			statsID = c.ID
+			break
+		}
+	}
+	if statsID == "" {
+		t.Skip("No running container available for stats")
+	}
+	out, err := GatherContainerStats(t.Context(), statsID)
+	if err != nil {
+		t.Skipf("GatherContainerStats() error: %v", err)
+	}
+	t.Logf("Container %s: CPU=%.1f%% Memory=%d/%d PIDs=%d",
+		statsID, out.Stats.CPUPercent, out.Stats.MemoryUsage,
+		out.Stats.MemoryLimit, out.Stats.PIDs)
+}
+
+func TestGatherContainerTop(t *testing.T) {
+	containers, err := ListDockerContainers(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	var topID string
+	for _, c := range containers {
+		if strings.Contains(c.Status, "Up") {
+			topID = c.ID
+			break
+		}
+	}
+	if topID == "" {
+		t.Skip("No running container available for top")
+	}
+	out, err := GatherContainerTop(t.Context(), topID, nil)
+	if err != nil {
+		t.Skipf("GatherContainerTop() error: %v", err)
+	}
+	if len(out.Titles) == 0 {
+		t.Error("Titles should not be empty")
+	}
+	t.Logf(
+		"Container %s: %d processes, titles=%v",
+		topID,
+		len(out.Processes),
+		out.Titles,
+	)
+}
+
+func TestGatherContainerDiff(t *testing.T) {
+	containers, err := ListDockerContainers(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if len(containers) == 0 {
+		t.Skip("No containers available for diff")
+	}
+	out, err := GatherContainerDiff(t.Context(), containers[0].ID)
+	if err != nil {
+		t.Skipf("GatherContainerDiff() error: %v", err)
+	}
+	t.Logf(
+		"Container %s: %d filesystem changes",
+		containers[0].ID,
+		len(out.Changes),
+	)
+}
+
+func TestGatherImageHistory(t *testing.T) {
+	images, err := ListDockerImages(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if len(images) == 0 {
+		t.Skip("No images available")
+	}
+	out, err := GatherImageHistory(t.Context(), images[0].ID)
+	if err != nil {
+		t.Skipf("GatherImageHistory() error: %v", err)
+	}
+	if len(out.Layers) == 0 {
+		t.Error("Layers should not be empty")
+	}
+	t.Logf("Image %s: %d layers", images[0].ID, len(out.Layers))
+}
+
+func TestGatherImageDetail(t *testing.T) {
+	images, err := ListDockerImages(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if len(images) == 0 {
+		t.Skip("No images available")
+	}
+	out, err := GatherImageDetail(t.Context(), images[0].ID)
+	if err != nil {
+		t.Skipf("GatherImageDetail() error: %v", err)
+	}
+	if out.Image.ID == "" {
+		t.Error("Image ID should not be empty")
+	}
+	t.Logf("Image %s: arch=%s os=%s size=%s layers=%d",
+		out.Image.ID, out.Image.Architecture, out.Image.OS,
+		out.Image.Size, len(out.Image.Layers))
+}
+
+func TestGatherDockerNetworks(t *testing.T) {
+	out, err := GatherDockerNetworks(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if len(out.Networks) == 0 {
+		t.Error("Networks should not be empty on a Docker host")
+	}
+	t.Logf("Found %d Docker networks", len(out.Networks))
+}
+
+func TestGatherDockerVolumes(t *testing.T) {
+	out, err := GatherDockerVolumes(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	t.Logf("Found %d Docker volumes", len(out.Volumes))
+}
+
+func TestGatherDockerSystemInfo(t *testing.T) {
+	out, err := GatherDockerSystemInfo(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	if out.Info.ServerVersion == "" {
+		t.Error("ServerVersion should not be empty")
+	}
+	t.Logf("Docker %s (%s/%s) driver=%s cgroups=%s runtimes=%v",
+		out.Info.ServerVersion, out.Info.Architecture, out.Info.OSType,
+		out.Info.Driver, out.Info.CgroupDriver, out.Info.Runtimes)
+}
+
+func TestGatherDockerDiskUsage(t *testing.T) {
+	out, err := GatherDockerDiskUsage(t.Context())
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	t.Logf(
+		"Containers: %d active/%d total (%s), Images: %d active/%d total (%s)",
+		out.Containers.ActiveCount,
+		out.Containers.TotalCount,
+		out.Containers.TotalSize,
+		out.Images.ActiveCount,
+		out.Images.TotalCount,
+		out.Images.TotalSize,
 	)
 }
 

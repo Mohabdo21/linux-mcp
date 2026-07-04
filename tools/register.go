@@ -43,6 +43,60 @@ func RegisterTools(server *mcp.Server) {
 			"is installed",
 	}, HandleGetDockerInfo)
 	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_container_details",
+		Description: "Returns detailed information about a Docker " +
+			"container including state, config, env, mounts, and network settings",
+	}, HandleGetContainerDetail)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_container_logs",
+		Description: "Returns log lines from a Docker container " +
+			"(stdout/stderr) with optional tail count and timestamps",
+	}, HandleGetContainerLogs)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_container_stats",
+		Description: "Returns live resource usage statistics for a " +
+			"Docker container including CPU, memory, network I/O, and PIDs",
+	}, HandleGetContainerStats)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_docker_container_top",
+		Description: "Returns running processes inside a Docker container",
+	}, HandleGetContainerTop)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_container_diff",
+		Description: "Returns filesystem changes (added, modified, " +
+			"deleted files) in a Docker container since it was started",
+	}, HandleGetContainerDiff)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_image_history",
+		Description: "Returns the layer history of a Docker image " +
+			"including commands, sizes, and creation times",
+	}, HandleGetImageHistory)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_image_details",
+		Description: "Returns detailed information about a Docker " +
+			"image including config, env, entrypoint, labels, and layers",
+	}, HandleGetImageDetail)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_networks",
+		Description: "Returns a list of Docker networks with driver, " +
+			"scope, and configuration details",
+	}, HandleGetDockerNetworks)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_volumes",
+		Description: "Returns a list of Docker volumes with driver, " +
+			"mountpoint, size, and label information",
+	}, HandleGetDockerVolumes)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_system_info",
+		Description: "Returns Docker daemon system information " +
+			"including version, storage driver, runtimes, and resource counts",
+	}, HandleGetDockerSystemInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_disk_usage",
+		Description: "Returns Docker disk usage breakdown for " +
+			"containers, images, volumes, and build cache",
+	}, HandleGetDockerDiskUsage)
+	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_system_snapshot",
 		Description: "Returns a comprehensive snapshot of system " +
 			"status combining all tools",
