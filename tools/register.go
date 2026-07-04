@@ -190,4 +190,18 @@ func RegisterTools(server *mcp.Server) {
 			"Use this when the user asks about flags, syntax, or edge cases. " +
 			"Optional search helps pinpoint specific sections.",
 	}, HandleGetManPage)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_environment_variables",
+		Description: "Returns all active environment variables for the " +
+			"current process as a sorted key-value map. " +
+			"Useful for debugging PATH, API keys, locale settings, " +
+			"and shell configuration in the MCP server runtime.",
+	}, HandleGetEnvironmentVariables)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_hardware_bus_info",
+		Description: "Lists detected PCI and USB devices on the system. " +
+			"Useful for identifying attached hardware like network cards, " +
+			"audio interfaces, and expansion cards " +
+			"for driver troubleshooting and configuration verification.",
+	}, HandleGetHardwareBusInfo)
 }

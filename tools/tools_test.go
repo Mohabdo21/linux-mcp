@@ -934,6 +934,70 @@ func TestHandleManPageEmptyCommand(t *testing.T) {
 	}
 }
 
+func TestGatherEnvironmentVariables(t *testing.T) {
+	out, err := GatherEnvironmentVariables(t.Context())
+	if err != nil {
+		t.Fatalf("GatherEnvironmentVariables() error: %v", err)
+	}
+	if out.Count == 0 {
+		t.Fatal("Expected at least one environment variable")
+	}
+	if len(out.Variables) != out.Count {
+		t.Errorf(
+			"Variables length %d != Count %d",
+			len(out.Variables),
+			out.Count,
+		)
+	}
+	foundPath := false
+	for _, v := range out.Variables {
+		if v.Name == "PATH" {
+			foundPath = true
+			break
+		}
+	}
+	if !foundPath {
+		t.Error("Expected PATH environment variable to be present")
+	}
+	for i := 1; i < len(out.Variables); i++ {
+		if out.Variables[i-1].Name > out.Variables[i].Name {
+			t.Error("Variables should be sorted by name")
+			break
+		}
+	}
+}
+
+func TestGatherHardwareBusInfo(t *testing.T) {
+	out, err := GatherHardwareBusInfo(t.Context())
+	if err != nil {
+		t.Skipf("GatherHardwareBusInfo() error (CLI may be missing): %v", err)
+	}
+	if len(out.PCIDevices) == 0 && len(out.USBDevices) == 0 {
+		t.Log("No PCI or USB devices found (expected on minimal systems)")
+	}
+	for i, d := range out.PCIDevices {
+		if d.Bus != "pci" {
+			t.Errorf("PCIDevices[%d].Bus = %q, want 'pci'", i, d.Bus)
+		}
+		if d.Device == "" {
+			t.Errorf("PCIDevices[%d].Device should not be empty", i)
+		}
+	}
+	for i, d := range out.USBDevices {
+		if d.Bus == "" {
+			t.Errorf("USBDevices[%d].Bus should not be empty", i)
+		}
+		if d.Device == "" {
+			t.Errorf("USBDevices[%d].Device should not be empty", i)
+		}
+	}
+	t.Logf(
+		"Found %d PCI devices, %d USB devices",
+		len(out.PCIDevices),
+		len(out.USBDevices),
+	)
+}
+
 func TestShellQuote(t *testing.T) {
 	cases := []struct {
 		input string
