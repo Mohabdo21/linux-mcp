@@ -5,7 +5,9 @@ import (
 	"errors"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -114,7 +116,18 @@ func HandleGetDockerInfo(
 	req *mcp.CallToolRequest,
 	_ GetDockerInfoInput,
 ) (*mcp.CallToolResult, DockerInfoOutput, error) {
+	if config.IsDisabled("get_docker_info") {
+		return nil, DockerInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_docker_info", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherDockerInfo(ctx)
+	LogToolCall(ctx, "get_docker_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

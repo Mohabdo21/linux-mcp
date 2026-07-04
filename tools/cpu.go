@@ -2,7 +2,10 @@ package tools
 
 import (
 	"context"
+	"errors"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/sensors"
@@ -23,7 +26,7 @@ type CPUInfoOutput struct {
 	Errors            []string     `json:"errors,omitempty"`
 }
 
-func GatherCPUInfo() (CPUInfoOutput, error) {
+func GatherCPUInfo(ctx context.Context) (CPUInfoOutput, error) {
 	info, err := cpu.Info()
 	if err != nil {
 		return CPUInfoOutput{}, err
@@ -60,7 +63,18 @@ func HandleGetCPUInfo(
 	req *mcp.CallToolRequest,
 	_ GetCPUInfoInput,
 ) (*mcp.CallToolResult, CPUInfoOutput, error) {
-	out, err := GatherCPUInfo()
+	if config.IsDisabled("get_cpu_info") {
+		return nil, CPUInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_cpu_info", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherCPUInfo(ctx)
+	LogToolCall(ctx, "get_cpu_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -80,7 +94,7 @@ type CPUTemperatureOutput struct {
 	Errors       []string          `json:"errors,omitempty"`
 }
 
-func GatherCPUTemperature() (CPUTemperatureOutput, error) {
+func GatherCPUTemperature(ctx context.Context) (CPUTemperatureOutput, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if len(temps) == 0 {
 		msg := "No temperature sensors available"
@@ -104,7 +118,18 @@ func HandleGetCPUTemperature(
 	req *mcp.CallToolRequest,
 	_ GetCPUTemperatureInput,
 ) (*mcp.CallToolResult, CPUTemperatureOutput, error) {
-	out, err := GatherCPUTemperature()
+	if config.IsDisabled("get_cpu_temperature") {
+		return nil, CPUTemperatureOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_cpu_temperature", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherCPUTemperature(ctx)
+	LogToolCall(ctx, "get_cpu_temperature",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

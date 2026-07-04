@@ -2,7 +2,10 @@ package tools
 
 import (
 	"context"
+	"errors"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/mem"
 )
@@ -21,7 +24,7 @@ type MemoryInfoOutput struct {
 	Errors          []string `json:"errors,omitempty"`
 }
 
-func GatherMemoryInfo() (MemoryInfoOutput, error) {
+func GatherMemoryInfo(ctx context.Context) (MemoryInfoOutput, error) {
 	v, err := mem.VirtualMemory()
 	if err != nil {
 		return MemoryInfoOutput{}, err
@@ -47,7 +50,18 @@ func HandleGetMemoryInfo(
 	req *mcp.CallToolRequest,
 	_ GetMemoryInfoInput,
 ) (*mcp.CallToolResult, MemoryInfoOutput, error) {
-	out, err := GatherMemoryInfo()
+	if config.IsDisabled("get_memory_info") {
+		return nil, MemoryInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_memory_info", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherMemoryInfo(ctx)
+	LogToolCall(ctx, "get_memory_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

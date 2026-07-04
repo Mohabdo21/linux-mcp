@@ -7,7 +7,7 @@ import (
 )
 
 func TestGatherSystemInfo(t *testing.T) {
-	out, err := GatherSystemInfo()
+	out, err := GatherSystemInfo(t.Context())
 	if err != nil {
 		t.Skipf("GatherSystemInfo() error: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestGatherSystemInfo(t *testing.T) {
 }
 
 func TestGatherCPUInfo(t *testing.T) {
-	out, err := GatherCPUInfo()
+	out, err := GatherCPUInfo(t.Context())
 	if err != nil {
 		t.Skipf("GatherCPUInfo() error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestGatherCPUInfo(t *testing.T) {
 }
 
 func TestGatherCPUTemperature(t *testing.T) {
-	out, err := GatherCPUTemperature()
+	out, err := GatherCPUTemperature(t.Context())
 	if err != nil {
 		t.Skipf("GatherCPUTemperature() error: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestGatherCPUTemperature(t *testing.T) {
 }
 
 func TestGatherMemoryInfo(t *testing.T) {
-	out, err := GatherMemoryInfo()
+	out, err := GatherMemoryInfo(t.Context())
 	if err != nil {
 		t.Skipf("GatherMemoryInfo() error: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestGatherMemoryInfo(t *testing.T) {
 }
 
 func TestGatherDiskInfo(t *testing.T) {
-	out, err := GatherDiskInfo("")
+	out, err := GatherDiskInfo(t.Context(), "")
 	if err != nil {
 		t.Skipf("GatherDiskInfo() error: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestGatherDiskInfo(t *testing.T) {
 }
 
 func TestGatherDiskInfoWithFilter(t *testing.T) {
-	out, err := GatherDiskInfo("/")
+	out, err := GatherDiskInfo(t.Context(), "/")
 	if err != nil {
 		t.Skipf("GatherDiskInfo(\"/\") error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestGatherDiskInfoWithFilter(t *testing.T) {
 }
 
 func TestGatherDiskInfoWithNoMatch(t *testing.T) {
-	out, err := GatherDiskInfo("/nonexistent")
+	out, err := GatherDiskInfo(t.Context(), "/nonexistent")
 	if err != nil {
 		t.Fatalf("GatherDiskInfo(\"/nonexistent\") error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestGatherDiskInfoWithNoMatch(t *testing.T) {
 }
 
 func TestGatherNetworkInfo(t *testing.T) {
-	out, err := GatherNetworkInfo()
+	out, err := GatherNetworkInfo(t.Context())
 	if err != nil {
 		t.Skipf("GatherNetworkInfo() error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestGatherNetworkInfo(t *testing.T) {
 }
 
 func TestGatherProcessInfoDefaults(t *testing.T) {
-	out, err := GatherProcessInfo("", 0)
+	out, err := GatherProcessInfo(t.Context(), "", 0)
 	if err != nil {
 		t.Skipf("GatherProcessInfo(\"\", 0) error: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestGatherProcessInfoDefaults(t *testing.T) {
 }
 
 func TestGatherProcessInfoSortByMemory(t *testing.T) {
-	out, err := GatherProcessInfo("memory", 5)
+	out, err := GatherProcessInfo(t.Context(), "memory", 5)
 	if err != nil {
 		t.Skipf("GatherProcessInfo(\"memory\", 5) error: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestGatherProcessInfoSortByMemory(t *testing.T) {
 }
 
 func TestGatherProcessInfoLimitClamping(t *testing.T) {
-	out, err := GatherProcessInfo("cpu", 200)
+	out, err := GatherProcessInfo(t.Context(), "cpu", 200)
 	if err != nil {
 		t.Skipf("GatherProcessInfo(\"cpu\", 200) error: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestGatherProcessInfoLimitClamping(t *testing.T) {
 }
 
 func TestGatherProcessInfoIncludesStatus(t *testing.T) {
-	out, err := GatherProcessInfo("cpu", 5)
+	out, err := GatherProcessInfo(t.Context(), "cpu", 5)
 	if err != nil {
 		t.Skipf("GatherProcessInfo(\"cpu\", 5) error: %v", err)
 	}
@@ -506,7 +506,7 @@ func TestGatherCheckUpdates(t *testing.T) {
 }
 
 func TestGatherLoadAverage(t *testing.T) {
-	out, err := GatherLoadAverage()
+	out, err := GatherLoadAverage(t.Context())
 	if err != nil {
 		t.Skipf("GatherLoadAverage() error: %v", err)
 	}
@@ -530,7 +530,7 @@ func TestGatherLoggedInUsers(t *testing.T) {
 }
 
 func TestGatherDNSResolve(t *testing.T) {
-	out, err := GatherDNSResolve("localhost")
+	out, err := GatherDNSResolve(t.Context(), "localhost")
 	if err != nil {
 		t.Skipf("GatherDNSResolve(\"localhost\") error: %v", err)
 	}

@@ -2,11 +2,14 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/process"
 )
@@ -29,7 +32,11 @@ type ProcessInfoOutput struct {
 	Errors    []string      `json:"errors,omitempty"`
 }
 
-func GatherProcessInfo(sortBy string, limit int) (ProcessInfoOutput, error) {
+func GatherProcessInfo(
+	ctx context.Context,
+	sortBy string,
+	limit int,
+) (ProcessInfoOutput, error) {
 	if limit <= 0 {
 		limit = 10
 	} else if limit > 100 {
@@ -79,7 +86,18 @@ func HandleGetProcessInfo(
 	req *mcp.CallToolRequest,
 	input GetProcessInfoInput,
 ) (*mcp.CallToolResult, ProcessInfoOutput, error) {
-	out, err := GatherProcessInfo(input.SortBy, input.Limit)
+	if config.IsDisabled("get_process_info") {
+		return nil, ProcessInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_process_info", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherProcessInfo(ctx, input.SortBy, input.Limit)
+	LogToolCall(ctx, "get_process_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -150,7 +168,18 @@ func HandleGetTopIOProcesses(
 	req *mcp.CallToolRequest,
 	input GetTopIOProcessesInput,
 ) (*mcp.CallToolResult, TopIOProcessesOutput, error) {
+	if config.IsDisabled("get_top_io_processes") {
+		return nil, TopIOProcessesOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_top_io_processes", 15*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherTopIOProcesses(ctx, input.Limit)
+	LogToolCall(ctx, "get_top_io_processes",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

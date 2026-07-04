@@ -2,9 +2,12 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -110,7 +113,18 @@ func HandleGetSystemdUnits(
 	req *mcp.CallToolRequest,
 	_ GetSystemdUnitsInput,
 ) (*mcp.CallToolResult, SystemdUnitsOutput, error) {
+	if config.IsDisabled("get_systemd_units") {
+		return nil, SystemdUnitsOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_systemd_units", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherSystemdUnits(ctx)
+	LogToolCall(ctx, "get_systemd_units",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -122,7 +136,18 @@ func HandleGetServiceStatus(
 	req *mcp.CallToolRequest,
 	input GetServiceStatusInput,
 ) (*mcp.CallToolResult, ServiceStatusOutput, error) {
+	if config.IsDisabled("get_service_status") {
+		return nil, ServiceStatusOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_service_status", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherServiceStatus(ctx, input.Name, input.User)
+	LogToolCall(ctx, "get_service_status",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

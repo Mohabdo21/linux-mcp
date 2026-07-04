@@ -2,10 +2,13 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/host"
 )
@@ -22,7 +25,7 @@ type SystemInfoOutput struct {
 	Errors        []string `json:"errors,omitempty"`
 }
 
-func GatherSystemInfo() (SystemInfoOutput, error) {
+func GatherSystemInfo(ctx context.Context) (SystemInfoOutput, error) {
 	info, err := host.Info()
 	if err != nil {
 		return SystemInfoOutput{}, err
@@ -42,7 +45,18 @@ func HandleGetSystemInfo(
 	req *mcp.CallToolRequest,
 	_ GetSystemInfoInput,
 ) (*mcp.CallToolResult, SystemInfoOutput, error) {
-	out, err := GatherSystemInfo()
+	if config.IsDisabled("get_system_info") {
+		return nil, SystemInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_system_info", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherSystemInfo(ctx)
+	LogToolCall(ctx, "get_system_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -69,52 +83,62 @@ func HandleGetSystemSnapshot(
 	req *mcp.CallToolRequest,
 	_ GetSystemSnapshotInput,
 ) (*mcp.CallToolResult, SystemSnapshotOutput, error) {
+	if config.IsDisabled("get_system_snapshot") {
+		return nil, SystemSnapshotOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_system_snapshot", 120*time.Second)
+	defer cancel()
+
+	start := time.Now()
+
 	var snapshot SystemSnapshotOutput
 	var errs ErrList
 
-	if out, err := GatherSystemInfo(); err == nil {
+	if out, err := GatherSystemInfo(ctx); err == nil {
 		snapshot.System = out
 	} else {
 		errs.Add("system", err)
 	}
 
-	if out, err := GatherCPUInfo(); err == nil {
+	if out, err := GatherCPUInfo(ctx); err == nil {
 		snapshot.CPU = out
 	} else {
 		errs.Add("cpu", err)
 	}
 
-	if out, err := GatherCPUTemperature(); err == nil {
+	if out, err := GatherCPUTemperature(ctx); err == nil {
 		snapshot.Temperature = out
 	} else {
 		errs.Add("temperature", err)
 	}
 
-	if out, err := GatherMemoryInfo(); err == nil {
+	if out, err := GatherMemoryInfo(ctx); err == nil {
 		snapshot.Memory = out
 	} else {
 		errs.Add("memory", err)
 	}
 
-	if out, err := GatherDiskInfo(""); err == nil {
+	if out, err := GatherDiskInfo(ctx, ""); err == nil {
 		snapshot.Disk = out
 	} else {
 		errs.Add("disk", err)
 	}
 
-	if out, err := GatherNetworkInfo(); err == nil {
+	if out, err := GatherNetworkInfo(ctx); err == nil {
 		snapshot.Network = out
 	} else {
 		errs.Add("network", err)
 	}
 
-	if out, err := GatherLoadAverage(); err == nil {
+	if out, err := GatherLoadAverage(ctx); err == nil {
 		snapshot.LoadAverage = out
 	} else {
 		errs.Add("load_average", err)
 	}
 
-	if out, err := GatherProcessInfo("cpu", 10); err == nil {
+	if out, err := GatherProcessInfo(ctx, "cpu", 10); err == nil {
 		snapshot.Processes = out
 	} else {
 		errs.Add("processes", err)
@@ -128,6 +152,8 @@ func HandleGetSystemSnapshot(
 	}
 
 	snapshot.Errors = errs
+	LogToolCall(ctx, "get_system_snapshot",
+		time.Since(start), len(errs))
 	return nil, snapshot, nil
 }
 
@@ -140,7 +166,7 @@ type LoadAverageOutput struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
-func GatherLoadAverage() (LoadAverageOutput, error) {
+func GatherLoadAverage(ctx context.Context) (LoadAverageOutput, error) {
 	data, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
 		return LoadAverageOutput{}, err
@@ -160,7 +186,18 @@ func HandleGetLoadAverage(
 	req *mcp.CallToolRequest,
 	_ GetLoadAverageInput,
 ) (*mcp.CallToolResult, LoadAverageOutput, error) {
-	out, err := GatherLoadAverage()
+	if config.IsDisabled("get_load_average") {
+		return nil, LoadAverageOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_load_average", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherLoadAverage(ctx)
+	LogToolCall(ctx, "get_load_average",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

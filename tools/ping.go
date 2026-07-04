@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -91,10 +93,21 @@ func HandlePingHost(
 	req *mcp.CallToolRequest,
 	input PingHostInput,
 ) (*mcp.CallToolResult, PingOutput, error) {
+	if config.IsDisabled("ping_host") {
+		return nil, PingOutput{},
+			errors.New("tool disabled by configuration")
+	}
 	if input.Host == "" {
 		return nil, PingOutput{}, errors.New("host is required")
 	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "ping_host", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherPing(ctx, input.Host, input.Count, input.Timeout)
+	LogToolCall(ctx, "ping_host",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

@@ -7,7 +7,9 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -159,7 +161,18 @@ func HandleGetGPUInfo(
 	req *mcp.CallToolRequest,
 	_ GetGPUInfoInput,
 ) (*mcp.CallToolResult, GPUInfoOutput, error) {
+	if config.IsDisabled("get_gpu_info") {
+		return nil, GPUInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_gpu_info", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherGPUInfo(ctx)
+	LogToolCall(ctx, "get_gpu_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

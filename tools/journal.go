@@ -2,10 +2,13 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -86,14 +89,22 @@ func HandleGetJournalLogs(
 	req *mcp.CallToolRequest,
 	input GetJournalLogsInput,
 ) (*mcp.CallToolResult, JournalLogsOutput, error) {
+	if config.IsDisabled("get_journal_logs") {
+		return nil, JournalLogsOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_journal_logs", 20*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherJournalLogs(
-		ctx, input.Unit,
-		input.Priority,
-		input.Since,
-		input.Until,
-		input.Lines,
-		input.User,
+		ctx, input.Unit, input.Priority,
+		input.Since, input.Until,
+		input.Lines, input.User,
 	)
+	LogToolCall(ctx, "get_journal_logs",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

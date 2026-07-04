@@ -2,13 +2,16 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/disk"
 )
@@ -32,7 +35,10 @@ type DiskInfoOutput struct {
 	Errors     []string        `json:"errors,omitempty"`
 }
 
-func GatherDiskInfo(mountPoint string) (DiskInfoOutput, error) {
+func GatherDiskInfo(
+	ctx context.Context,
+	mountPoint string,
+) (DiskInfoOutput, error) {
 	partitions, err := disk.Partitions(false)
 	if err != nil {
 		return DiskInfoOutput{}, err
@@ -65,7 +71,18 @@ func HandleGetDiskInfo(
 	req *mcp.CallToolRequest,
 	input GetDiskInfoInput,
 ) (*mcp.CallToolResult, DiskInfoOutput, error) {
-	out, err := GatherDiskInfo(input.MountPoint)
+	if config.IsDisabled("get_disk_info") {
+		return nil, DiskInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_disk_info", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherDiskInfo(ctx, input.MountPoint)
+	LogToolCall(ctx, "get_disk_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -132,7 +149,18 @@ func HandleGetInodeUsage(
 	req *mcp.CallToolRequest,
 	input GetInodeUsageInput,
 ) (*mcp.CallToolResult, InodeUsageOutput, error) {
+	if config.IsDisabled("get_inode_usage") {
+		return nil, InodeUsageOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_inode_usage", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherInodeUsage(ctx, input.MountPoint)
+	LogToolCall(ctx, "get_inode_usage",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -264,7 +292,18 @@ func HandleGetMountOptions(
 	req *mcp.CallToolRequest,
 	input GetMountOptionsInput,
 ) (*mcp.CallToolResult, MountOptionsOutput, error) {
+	if config.IsDisabled("get_mount_options") {
+		return nil, MountOptionsOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_mount_options", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherMountOptions(ctx, input.MountPoint)
+	LogToolCall(ctx, "get_mount_options",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -276,7 +315,18 @@ func HandleGetLargestFiles(
 	req *mcp.CallToolRequest,
 	input GetLargestFilesInput,
 ) (*mcp.CallToolResult, LargestFilesOutput, error) {
+	if config.IsDisabled("get_largest_files") {
+		return nil, LargestFilesOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_largest_files", 30*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherLargestFiles(ctx, input.Path, input.Limit)
+	LogToolCall(ctx, "get_largest_files",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

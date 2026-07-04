@@ -2,10 +2,13 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	gnet "github.com/shirou/gopsutil/v4/net"
 )
@@ -29,7 +32,7 @@ type NetworkInfoOutput struct {
 	Errors     []string         `json:"errors,omitempty"`
 }
 
-func GatherNetworkInfo() (NetworkInfoOutput, error) {
+func GatherNetworkInfo(ctx context.Context) (NetworkInfoOutput, error) {
 	counters, err := gnet.IOCounters(true)
 	if err != nil {
 		return NetworkInfoOutput{}, err
@@ -56,7 +59,18 @@ func HandleGetNetworkInfo(
 	req *mcp.CallToolRequest,
 	_ GetNetworkInfoInput,
 ) (*mcp.CallToolResult, NetworkInfoOutput, error) {
-	out, err := GatherNetworkInfo()
+	if config.IsDisabled("get_network_info") {
+		return nil, NetworkInfoOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_network_info", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherNetworkInfo(ctx)
+	LogToolCall(ctx, "get_network_info",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -128,7 +142,10 @@ type ResolveDNSOutput struct {
 	Errors    []string `json:"errors,omitempty"`
 }
 
-func GatherDNSResolve(hostname string) (ResolveDNSOutput, error) {
+func GatherDNSResolve(
+	ctx context.Context,
+	hostname string,
+) (ResolveDNSOutput, error) {
 	addrs, err := net.LookupHost(hostname)
 	if err != nil {
 		return ResolveDNSOutput{Hostname: hostname}, err
@@ -141,12 +158,23 @@ func HandleResolveDNS(
 	req *mcp.CallToolRequest,
 	input ResolveDNSInput,
 ) (*mcp.CallToolResult, ResolveDNSOutput, error) {
+	if config.IsDisabled("resolve_dns") {
+		return nil, ResolveDNSOutput{},
+			errors.New("tool disabled by configuration")
+	}
 	if input.Hostname == "" {
 		return nil, ResolveDNSOutput{}, net.InvalidAddrError(
 			"hostname is required",
 		)
 	}
-	out, err := GatherDNSResolve(input.Hostname)
+	ctx, cancel := WithToolTimeout(
+		ctx, "resolve_dns", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherDNSResolve(ctx, input.Hostname)
+	LogToolCall(ctx, "resolve_dns",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -158,7 +186,18 @@ func HandleGetListeningPorts(
 	req *mcp.CallToolRequest,
 	input GetListeningPortsInput,
 ) (*mcp.CallToolResult, ListeningPortsOutput, error) {
+	if config.IsDisabled("get_listening_ports") {
+		return nil, ListeningPortsOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_listening_ports", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherListeningPorts(ctx, input.Protocol)
+	LogToolCall(ctx, "get_listening_ports",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

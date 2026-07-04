@@ -2,9 +2,12 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -245,7 +248,18 @@ func HandleGetInstalledPackages(
 	req *mcp.CallToolRequest,
 	input GetInstalledPackagesInput,
 ) (*mcp.CallToolResult, InstalledPackagesOutput, error) {
+	if config.IsDisabled("get_installed_packages") {
+		return nil, InstalledPackagesOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_installed_packages", 15*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherInstalledPackages(ctx, input.Name)
+	LogToolCall(ctx, "get_installed_packages",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -257,7 +271,18 @@ func HandleCheckUpdates(
 	req *mcp.CallToolRequest,
 	_ CheckUpdatesInput,
 ) (*mcp.CallToolResult, CheckUpdatesOutput, error) {
+	if config.IsDisabled("check_updates") {
+		return nil, CheckUpdatesOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "check_updates", 15*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherCheckUpdates(ctx)
+	LogToolCall(ctx, "check_updates",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}

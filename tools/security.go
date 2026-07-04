@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -162,7 +164,18 @@ func HandleGetLoggedInUsers(
 	req *mcp.CallToolRequest,
 	_ GetLoggedInUsersInput,
 ) (*mcp.CallToolResult, LoggedInUsersOutput, error) {
+	if config.IsDisabled("get_logged_in_users") {
+		return nil, LoggedInUsersOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_logged_in_users", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherLoggedInUsers(ctx)
+	LogToolCall(ctx, "get_logged_in_users",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
@@ -174,7 +187,18 @@ func HandleGetFailedLogins(
 	req *mcp.CallToolRequest,
 	input GetFailedLoginsInput,
 ) (*mcp.CallToolResult, FailedLoginsOutput, error) {
+	if config.IsDisabled("get_failed_logins") {
+		return nil, FailedLoginsOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_failed_logins", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
 	out, err := GatherFailedLogins(ctx, input.Lines)
+	LogToolCall(ctx, "get_failed_logins",
+		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
 	}
