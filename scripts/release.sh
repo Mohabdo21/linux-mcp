@@ -31,6 +31,11 @@ preflight_checks() {
 	info "Pre-flight checks passed"
 }
 
+push_branch() {
+	git push origin "$(git rev-parse --abbrev-ref HEAD)"
+	info "Branch pushed to origin"
+}
+
 resolve_version() {
 	local latest_tag
 	latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
@@ -112,14 +117,21 @@ build_binaries() {
 
 update_server_json() {
 	local version_no_v="${VERSION#v}"
-	local sha
+	local sha url
 	sha=$(openssl dgst -sha256 bin/linux-mcp | awk '{print $2}')
+	url="https://github.com/Mohabdo21/linux-mcp/releases/download/$VERSION/linux-mcp"
 	if [ -f server.json ]; then
-		jq --arg v "$version_no_v" --arg sha "$sha" \
-			'.version = $v | .packages[0].version = $v | .packages[0].fileSha256 = $sha' \
+		jq --arg v "$version_no_v" --arg sha "$sha" --arg url "$url" \
+			'.version = $v | .packages[0].version = $v | .packages[0].fileSha256 = $sha | .packages[0].identifier = $url' \
 			server.json >server.tmp && mv server.tmp server.json
 		info "Updated server.json to version $version_no_v"
 	fi
+}
+
+commit_server_json() {
+	git add server.json
+	git commit -m "chore: update server.json for $VERSION"
+	info "Committed server.json update"
 }
 
 tag_and_push() {
@@ -129,6 +141,7 @@ tag_and_push() {
 		tag_opts="-fa"
 		push_opts="--force"
 	fi
+	git push origin HEAD
 	git tag $tag_opts "$VERSION" -m "$VERSION"
 	git push origin "$VERSION" $push_opts
 }
@@ -160,10 +173,12 @@ publish_to_registry() {
 
 main() {
 	preflight_checks
+	push_branch
 	resolve_version
 	generate_changelog
 	build_binaries
 	update_server_json
+	commit_server_json
 	tag_and_push
 	create_release
 	publish_to_registry
