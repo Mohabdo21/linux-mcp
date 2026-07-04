@@ -27,6 +27,9 @@ preflight_checks() {
 	if ! command -v gh &>/dev/null; then
 		error "'gh' CLI not found. Install it: https://cli.github.com/"
 	fi
+	if [ -z "${MCP_GITHUB_TOKEN:-}" ]; then
+		error "MCP_GITHUB_TOKEN is not set. Create a PAT at https://github.com/settings/tokens/new (repo + read:user) and set it as an env var."
+	fi
 	git fetch --tags origin
 	info "Pre-flight checks passed"
 }
@@ -163,10 +166,8 @@ publish_to_registry() {
 	if ! command -v mcp-publisher &>/dev/null; then
 		error "mcp-publisher not found in PATH. Install it from https://github.com/modelcontextprotocol/registry"
 	fi
-	if [ ! -f .mcpregistry_github_token ] || [ ! -f .mcpregistry_registry_token ]; then
-		error "MCP Registry token files (.mcpregistry_github_token, .mcpregistry_registry_token) not found. Run 'mcp-publisher login' first."
-	fi
 	info "Publishing to MCP Registry..."
+	mcp-publisher login github --token "$MCP_GITHUB_TOKEN"
 	mcp-publisher publish
 	info "Published to MCP Registry successfully!"
 }
