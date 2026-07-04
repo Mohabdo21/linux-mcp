@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Mohabdo21/linux-mcp",
+  "title": "Linux MCP",
+  "description": "Linux MCP server for real-time system monitoring - CPU, memory, disk, network, processes, Docker.",
+  "repository": {
+    "url": "https://github.com/Mohabdo21/linux-mcp",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/Mohabdo21/linux-mcp/releases/download/v0.1.1/linux-mcp",
+      "fileSha256": "1481d6842d220f554cceb21059273c673c3150a58ed2ddcb3a55f939c4002f1c",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

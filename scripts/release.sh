@@ -110,6 +110,18 @@ build_binaries() {
 	make build build-static VERSION="$VERSION"
 }
 
+update_server_json() {
+	local version_no_v="${VERSION#v}"
+	local sha
+	sha=$(openssl dgst -sha256 bin/linux-mcp | awk '{print $2}')
+	if [ -f server.json ]; then
+		jq --arg v "$version_no_v" --arg sha "$sha" \
+			'.version = $v | .packages[0].version = $v | .packages[0].fileSha256 = $sha' \
+			server.json >server.tmp && mv server.tmp server.json
+		info "Updated server.json to version $version_no_v"
+	fi
+}
+
 tag_and_push() {
 	local tag_opts="-a"
 	local push_opts=""
@@ -139,6 +151,7 @@ main() {
 	resolve_version
 	generate_changelog
 	build_binaries
+	update_server_json
 	tag_and_push
 	create_release
 }

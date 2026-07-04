@@ -1,5 +1,7 @@
 # linux-mcp - Linux MCP Server
 
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-linux--mcp-000?style=flat-square&logo=github)](https://registry.modelcontextprotocol.io)
+
 A Linux system monitoring server built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Provides real-time system information - CPU, memory, disk, network, processes, Docker, and more - via MCP tools over STDIO transport.
 
 ## Features
@@ -25,6 +27,14 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Docker** (optional - only needed for Docker tools)
 
 ## Installation
+
+### Via MCP Registry (recommended)
+
+Discover and install from the [MCP Registry](https://registry.modelcontextprotocol.io):
+
+```bash
+mcp registry install io.github.Mohabdo21/linux-mcp
+```
 
 ### Build from source
 
@@ -153,6 +163,10 @@ The server can be configured via a JSON file loaded from `~/.config/linux-mcp/co
 | `disabled`  | List of tool names to disable at startup                  |
 
 The server also handles **SIGHUP** to reload the configuration file at runtime without restarting.
+
+## MCP Registry
+
+Published on the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.Mohabdo21/linux-mcp`.
 
 ## License
 
