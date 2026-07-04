@@ -7,16 +7,16 @@
     "url": "https://github.com/Mohabdo21/linux-mcp",
     "source": "github"
   },
-  "version": "0.1.7",
+  "version": "0.1.8",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/Mohabdo21/linux-mcp/releases/download/v0.1.7/linux-mcp",
+      "identifier": "https://github.com/Mohabdo21/linux-mcp/releases/download/v0.1.8/linux-mcp",
       "fileSha256": "ce075778fdb262e34560d19eee631c47c740c778df6491f67d707074df53eb36",
       "transport": {
         "type": "stdio"
       },
-      "version": "0.1.7"
+      "version": "0.1.8"
     }
   ]
 }
