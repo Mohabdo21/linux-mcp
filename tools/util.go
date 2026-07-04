@@ -1,9 +1,14 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
+
+	"github.com/Mohabdo21/linux-mcp/config"
 )
 
 func HumanSize(bytes int64) string {
@@ -58,4 +63,28 @@ func (e ErrList) Err() error {
 		return nil
 	}
 	return errors.New(strings.Join(e, "; "))
+}
+
+func WithToolTimeout(
+	ctx context.Context,
+	name string,
+	fallback time.Duration,
+) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(
+		ctx,
+		config.ToolTimeout(name, fallback),
+	)
+}
+
+func LogToolCall(
+	ctx context.Context,
+	tool string,
+	dur time.Duration,
+	errs int,
+) {
+	slog.LogAttrs(ctx, slog.LevelInfo, "tool call",
+		slog.String("tool", tool),
+		slog.Duration("duration", dur),
+		slog.Int("errors", errs),
+	)
 }
