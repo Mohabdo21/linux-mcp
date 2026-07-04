@@ -208,4 +208,17 @@ func RegisterTools(server *mcp.Server) {
 			"Supports an optional search parameter to filter devices " +
 			"by any field (bus, slot, class, vendor, device).",
 	}, HandleGetHardwareBusInfo)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_user_automation",
+		Description: "Aggregates and lists all scheduled background " +
+			"scripts or automation tasks running specifically under " +
+			"the current user account. Combines crontab entries and " +
+			"systemd user timers.",
+	}, HandleGetUserAutomation)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_desktop_session_info",
+		Description: "Returns metadata regarding the active graphic " +
+			"display protocol (Wayland/X11), desktop session " +
+			"identifiers, and related environment configuration.",
+	}, HandleGetDesktopSessionInfo)
 }

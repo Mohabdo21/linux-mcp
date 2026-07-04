@@ -1015,3 +1015,25 @@ func TestShellQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestGatherUserAutomation(t *testing.T) {
+	out, err := GatherUserAutomation(t.Context())
+	if err != nil {
+		t.Skipf("GatherUserAutomation() error: %v", err)
+	}
+	if out.CronJobs == nil {
+		t.Error("CronJobs should not be nil")
+	}
+	if out.SystemdTimers == nil {
+		t.Error("SystemdTimers should not be nil")
+	}
+}
+
+func TestGatherDesktopSessionInfo(t *testing.T) {
+	out, err := GatherDesktopSessionInfo(t.Context())
+	if err != nil {
+		t.Skipf("GatherDesktopSessionInfo() error: %v", err)
+	}
+	// These may be empty in non-desktop environments, so just check no error
+	_ = out
+}

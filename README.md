@@ -6,20 +6,21 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 
 ## Features
 
-- **System info** - hostname, OS, kernel version, architecture, uptime, load averages
-- **CPU** - usage percentage, model, frequency, physical/virtual core counts
-- **CPU temperature** - per-sensor temperature readings (when available)
-- **Memory** - RAM and swap usage, used/free/total with percentages
-- **Disk** - per-partition usage, mount options, inode usage, and largest files
-- **Network** - per-interface I/O statistics, listening ports, and DNS resolution
-- **Processes** - running processes sorted by CPU or memory, with configurable limits
-- **Docker** - full container lifecycle, image inspection, networks, volumes, disk usage, and system info (via Docker SDK)
-- **Services** - systemd service status and full unit inventory
-- **Security** - active user sessions and failed login detection
-- **Packages** - query installed packages and check for available updates (supports pacman and dpkg)
-- **System snapshot** - all of the above in a single call, with graceful degradation on individual failures
-- **Man pages** - retrieve system manual pages for any installed command
-- **Resources** - system data also available as readable MCP resources (`system:///info`, `system:///cpu`, etc.)
+- **System** - hostname, OS, kernel, architecture, uptime, load averages
+- **CPU** - usage, model, frequency, core counts, temperature sensors
+- **Memory** - RAM and swap usage with percentages
+- **Disk** - per-partition usage, inodes, mount options, largest files
+- **Network** - interface stats, listening ports, DNS, ping
+- **Processes** - running processes sorted by CPU or memory
+- **Docker** - containers, images, networks, volumes, disk usage, system info
+- **Services & automation** - systemd units, service status, user timers, crontab
+- **Security** - active user sessions, failed login detection
+- **Packages** - installed packages and available updates (pacman, dpkg)
+- **Hardware** - GPU info, PCI/USB bus devices
+- **Desktop session** - Wayland/X11 protocol, DE identifiers, runtime config
+- **Man pages** - system manual pages for any installed command
+- **Snapshot** - comprehensive system overview in a single call
+- **MCP Resources** - system data also accessible as readable resources
 
 ## Prerequisites
 
@@ -88,6 +89,7 @@ Add the following to your MCP client configuration:
 | `get_system_info`              | Returns hostname, OS, kernel version, architecture, and uptime                                                                    |
 | `get_cpu_info`                 | Returns CPU usage percentage, model, frequency, and core counts                                                                   |
 | `get_cpu_temperature`          | Returns current CPU temperature if sensor data is available                                                                       |
+| `get_desktop_session_info`     | Returns display protocol (Wayland/X11), desktop environment identifiers, and runtime configuration                                |
 | `get_memory_info`              | Returns memory usage including RAM and swap statistics                                                                            |
 | `get_disk_info`                | Returns disk usage for mounted partitions, optionally filtered by mount point                                                     |
 | `get_network_info`             | Returns network I/O statistics per interface                                                                                      |
@@ -111,6 +113,7 @@ Add the following to your MCP client configuration:
 | `get_listening_ports`          | Returns listening ports and their associated processes for security auditing and port conflict resolution                         |
 | `get_service_status`           | Returns detailed status of a systemd service; set `user=true` to query user-level service                                         |
 | `get_top_io_processes`         | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
+| `get_user_automation`          | Aggregates crontab entries and systemd user timers for a complete view of user-level scheduled tasks                              |
 | `get_failed_logins`            | Returns recent failed login attempts to detect brute-force attacks                                                                |
 | `get_gpu_info`                 | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
 | `get_hardware_bus_info`        | Lists detected PCI and USB devices for driver troubleshooting and hardware identification                                         |

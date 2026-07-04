@@ -183,10 +183,10 @@ main() {
 	push_branch
 	resolve_version
 	generate_changelog
-	build_binaries
 	update_server_json
 	commit_server_json
 	tag_and_push
+	build_binaries
 	create_release
 	publish_to_registry
 }

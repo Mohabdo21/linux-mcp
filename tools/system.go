@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -564,6 +565,166 @@ func HandleGetLoadAverage(
 	start := time.Now()
 	out, err := GatherLoadAverage(ctx)
 	LogToolCall(ctx, "get_load_average",
+		time.Since(start), len(out.Errors))
+	if err != nil {
+		out.Errors = append(out.Errors, err.Error())
+	}
+	return nil, out, nil
+}
+
+type GetUserAutomationInput struct{}
+
+type CronJob struct {
+	Schedule string `json:"schedule"`
+	Command  string `json:"command"`
+}
+
+type SystemdTimer struct {
+	Unit      string `json:"unit"`
+	Activates string `json:"activates"`
+	Next      string `json:"next,omitempty"`
+	Last      string `json:"last,omitempty"`
+}
+
+type UserAutomationOutput struct {
+	CronJobs      []CronJob      `json:"cron_jobs"`
+	SystemdTimers []SystemdTimer `json:"systemd_timers"`
+	Errors        []string       `json:"errors,omitempty"`
+}
+
+func GatherUserAutomation(
+	ctx context.Context,
+) (UserAutomationOutput, error) {
+	var out UserAutomationOutput
+	var errs ErrList
+
+	out.CronJobs = []CronJob{}
+	out.SystemdTimers = []SystemdTimer{}
+
+	crontab, err := exec.CommandContext(
+		ctx, "crontab", "-l",
+	).Output()
+	if err == nil {
+		for line := range strings.SplitSeq(
+			strings.TrimSpace(string(crontab)), "\n",
+		) {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.Fields(line)
+			if len(parts) < 6 {
+				continue
+			}
+			out.CronJobs = append(out.CronJobs, CronJob{
+				Schedule: strings.Join(parts[:5], " "),
+				Command:  strings.Join(parts[5:], " "),
+			})
+		}
+	} else {
+		errs.Add("crontab",
+			fmt.Errorf("crontab -l: %w", err))
+	}
+
+	timers, err := exec.CommandContext(
+		ctx, "systemctl", "--user",
+		"list-timers", "--output=json",
+	).Output()
+	if err == nil {
+		var rawTimers []struct {
+			Unit      string `json:"unit"`
+			Next      string `json:"next"`
+			Left      string `json:"left"`
+			Last      string `json:"last"`
+			Passed    string `json:"passed"`
+			Activates string `json:"activates"`
+		}
+		if err := json.Unmarshal(timers, &rawTimers); err == nil {
+			for _, t := range rawTimers {
+				out.SystemdTimers = append(
+					out.SystemdTimers, SystemdTimer{
+						Unit:      t.Unit,
+						Activates: t.Activates,
+						Next:      t.Next,
+						Last:      t.Last,
+					},
+				)
+			}
+		} else {
+			errs.Add("systemd-timers",
+				fmt.Errorf("parse json: %w", err))
+		}
+	} else {
+		errs.Add("systemd-timers",
+			fmt.Errorf("systemctl --user list-timers: %w", err))
+	}
+
+	out.Errors = errs
+	return out, errs.Err()
+}
+
+func HandleGetUserAutomation(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetUserAutomationInput,
+) (*mcp.CallToolResult, UserAutomationOutput, error) {
+	if config.IsDisabled("get_user_automation") {
+		return nil, UserAutomationOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_user_automation", 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherUserAutomation(ctx)
+	LogToolCall(ctx, "get_user_automation",
+		time.Since(start), len(out.Errors))
+	if err != nil {
+		out.Errors = append(out.Errors, err.Error())
+	}
+	return nil, out, nil
+}
+
+type GetDesktopSessionInfoInput struct{}
+
+type DesktopSessionOutput struct {
+	SessionType    string   `json:"session_type"`
+	CurrentDesktop string   `json:"current_desktop"`
+	RuntimeDir     string   `json:"runtime_dir"`
+	Display        string   `json:"display"`
+	WaylandDisplay string   `json:"wayland_display"`
+	Errors         []string `json:"errors,omitempty"`
+}
+
+func GatherDesktopSessionInfo(
+	ctx context.Context,
+) (DesktopSessionOutput, error) {
+	return DesktopSessionOutput{
+		SessionType:    os.Getenv("XDG_SESSION_TYPE"),
+		CurrentDesktop: os.Getenv("XDG_CURRENT_DESKTOP"),
+		RuntimeDir:     os.Getenv("XDG_RUNTIME_DIR"),
+		Display:        os.Getenv("DISPLAY"),
+		WaylandDisplay: os.Getenv("WAYLAND_DISPLAY"),
+	}, nil
+}
+
+func HandleGetDesktopSessionInfo(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetDesktopSessionInfoInput,
+) (*mcp.CallToolResult, DesktopSessionOutput, error) {
+	if config.IsDisabled("get_desktop_session_info") {
+		return nil, DesktopSessionOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_desktop_session_info", 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherDesktopSessionInfo(ctx)
+	LogToolCall(ctx, "get_desktop_session_info",
 		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
