@@ -186,7 +186,7 @@ func GatherLoadAverage(ctx context.Context) (LoadAverageOutput, error) {
 }
 
 type GetEnvironmentVariablesInput struct {
-	Search string `json:"search,omitempty" jsonschema:"optional search string to filter by name (matches prefix or substring)"`
+	Search string `json:"search,omitempty" jsonschema:"optional search string to filter by name (matches prefix or substring, case-insensitive)"`
 }
 
 type EnvironmentVariable struct {
@@ -210,9 +210,13 @@ func GatherEnvironmentVariables(
 		for i := 0; i < len(pair); i++ {
 			if pair[i] == '=' {
 				name := pair[:i]
-				if search != "" && !strings.HasPrefix(name, search) &&
-					!strings.Contains(name, search) {
-					continue
+				if search != "" {
+					s := strings.ToLower(search)
+					lower := strings.ToLower(name)
+					if !strings.HasPrefix(lower, s) &&
+						!strings.Contains(lower, s) {
+						continue
+					}
 				}
 				variables = append(variables, EnvironmentVariable{
 					Name:  name,
