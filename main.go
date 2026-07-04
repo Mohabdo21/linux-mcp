@@ -14,6 +14,8 @@ import (
 	"github.com/Mohabdo21/linux-mcp/tools"
 )
 
+var Version = "dev"
+
 func parseLogLevel(s string) slog.Level {
 	switch s {
 	case "debug":
@@ -45,13 +47,13 @@ func main() {
 	setupLogging()
 
 	slog.Info("server starting",
-		"version", "0.1.0",
+		"version", Version,
 		"log_level", config.Get().LogLevel,
 	)
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "linux-mcp",
-		Version: "0.1.0",
+		Version: Version,
 	}, nil)
 
 	tools.RegisterTools(server)
