@@ -55,6 +55,7 @@ func main() {
 	}, nil)
 
 	tools.RegisterTools(server)
+	tools.RegisterResources(server)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGHUP)
