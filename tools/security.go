@@ -111,7 +111,7 @@ func GatherFailedLogins(
 	if jErr != nil {
 		return jOut, errors.Join(lastbErr, jErr)
 	}
-	if lastbErr != nil && !errors.Is(lastbErr, exec.ErrNotFound) {
+	if !errors.Is(lastbErr, exec.ErrNotFound) {
 		return jOut, lastbErr
 	}
 	return jOut, nil
