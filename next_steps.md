@@ -1,0 +1,5 @@
+- i should use `https://github.com/docker/go-sdk` to manage Docker
+- No configuration file: Can't set timeouts, disable tools, or adjust logging
+- Minimal logging: right now we only logs fatal errors; no request/response or debug logs
+- No timeouts/context propagation:Long-running commands (ping, pidstat) can hang indefinitely
+- No security hardening: No rate limiting, input validation, or tool restrictions
