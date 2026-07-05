@@ -990,3 +990,21 @@ func TestGatherManPage(t *testing.T) {
 		}
 	})
 }
+
+func TestGatherPowerAnalytics(t *testing.T) {
+	out, err := GatherPowerAnalytics(t.Context())
+	skipOnErr(t, err, "GatherPowerAnalytics() error: %v", err)
+	checkNotNegative(t, out.BatteryPercent, "BatteryPercent")
+	checkNotNegative(t, out.DischargeRateWatts, "DischargeRateWatts")
+	checkNotNegative(t, out.CapacityDegradation, "CapacityDegradation")
+	t.Logf(
+		"AC Online: %v, Battery: %.0f%%, Discharge: %.2fW, Degradation: %.1f%%",
+		out.ACOnline,
+		out.BatteryPercent,
+		out.DischargeRateWatts,
+		out.CapacityDegradation,
+	)
+	if out.BatteryPercent > 0 {
+		t.Log("Battery detected and reporting")
+	}
+}

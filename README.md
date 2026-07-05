@@ -11,12 +11,12 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Memory** - RAM and swap usage with percentages
 - **Disk** - per-partition usage, inodes, mount options, largest files
 - **Network** - interface stats, listening ports, DNS, ping
-- **Processes** - running processes sorted by CPU or memory
+- **Processes** - running processes sorted by CPU or memory, open file descriptors per process
 - **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
 - **Services & automation** - systemd units, service status, user timers, crontab
 - **Security** - active user sessions, failed login detection
 - **Packages** - installed packages and available updates (pacman, dpkg)
-- **Hardware** - GPU info, PCI/USB bus devices
+- **Hardware** - GPU info, PCI/USB bus devices, power/battery analytics
 - **Desktop session** - Wayland/X11 protocol, DE identifiers, runtime config
 - **Man pages** - system manual pages for any installed command
 - **Snapshot** - comprehensive system overview in a single call
@@ -94,6 +94,7 @@ Add the following to your MCP client configuration:
 | `get_disk_info`                | Returns disk usage for mounted partitions, optionally filtered by mount point                                                     |
 | `get_network_info`             | Returns network I/O statistics per interface                                                                                      |
 | `get_process_info`             | Returns list of running processes, sortable by CPU or memory, with configurable limit                                             |
+| `get_process_fds`              | Lists open file descriptors (files, sockets, pipes) and total count for a specific process ID                                     |
 | `get_docker_info`              | Returns Docker containers and images if Docker is installed                                                                       |
 | `get_docker_container_details` | Returns detailed container state, config, env, mounts, and network settings                                                       |
 | `get_docker_container_logs`    | Returns log lines from a container with optional tail count and timestamps                                                        |
@@ -117,6 +118,7 @@ Add the following to your MCP client configuration:
 | `get_user_automation`          | Aggregates crontab entries and systemd user timers for a complete view of user-level scheduled tasks                              |
 | `get_failed_logins`            | Returns recent failed login attempts to detect brute-force attacks                                                                |
 | `get_gpu_info`                 | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
+| `get_power_analytics`          | Returns battery status, charge percentage, discharge rate, capacity degradation, and AC power state                               |
 | `get_hardware_bus_info`        | Lists detected PCI and USB devices for driver troubleshooting and hardware identification                                         |
 | `get_largest_files`            | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                        |
 | `ping_host`                    | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |

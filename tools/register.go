@@ -275,4 +275,10 @@ func RegisterTools(server *mcp.Server) {
 		"Returns metadata regarding the active graphic display protocol (Wayland/X11), desktop session identifiers, and related environment configuration.",
 		HandleGetDesktopSessionInfo,
 	)
+	registerTool(
+		server,
+		"get_power_analytics",
+		"Returns the active power state (AC vs Battery), current discharge rate in watts, current battery percentage, and overall capacity degradation",
+		HandleGetPowerAnalytics,
+	)
 }
