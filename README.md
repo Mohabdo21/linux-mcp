@@ -12,7 +12,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Disk** - per-partition usage, inodes, mount options, largest files
 - **Network** - interface stats, listening ports, DNS, ping
 - **Processes** - running processes sorted by CPU or memory
-- **Docker** - containers, images, networks, volumes, disk usage, system info
+- **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
 - **Services & automation** - systemd units, service status, user timers, crontab
 - **Security** - active user sessions, failed login detection
 - **Packages** - installed packages and available updates (pacman, dpkg)
@@ -97,14 +97,15 @@ Add the following to your MCP client configuration:
 | `get_docker_info`              | Returns Docker containers and images if Docker is installed                                                                       |
 | `get_docker_container_details` | Returns detailed container state, config, env, mounts, and network settings                                                       |
 | `get_docker_container_logs`    | Returns log lines from a container with optional tail count and timestamps                                                        |
-| `get_docker_container_stats`   | Returns live CPU, memory, network I/O, and PIDs for a container                                                                   |
+| `get_docker_container_stats`   | Returns live CPU, memory, network I/O, and PIDs for one or more containers (comma-separated names/IDs, or `all`)                  |
 | `get_docker_container_top`     | Returns running processes inside a Docker container                                                                               |
 | `get_docker_container_diff`    | Returns filesystem changes in a container since it was started                                                                    |
 | `get_docker_image_history`     | Returns layer history of a Docker image including commands, sizes, and creation times                                             |
 | `get_docker_image_details`     | Returns detailed image config, env, entrypoint, labels, and layers                                                                |
 | `get_docker_networks`          | Returns Docker networks with driver, scope, and configuration details                                                             |
-| `get_docker_volumes`           | Returns Docker volumes with driver, mountpoint, size, and label information                                                       |
+| `get_docker_stats_all`         | Returns CPU, memory, network I/O, and block I/O for all running containers; accepts optional container name/ID filter             |
 | `get_docker_system_info`       | Returns Docker daemon version, storage driver, runtimes, and resource counts                                                      |
+| `get_docker_system_snapshot`   | Returns a comprehensive Docker health snapshot combining containers, images, running stats, disk usage, and networks              |
 | `get_docker_disk_usage`        | Returns Docker disk usage for containers, images, volumes, and build cache                                                        |
 | `get_environment_variables`    | Returns all active environment variables as a sorted key-value map; useful for debugging PATH, API keys, and locale settings      |
 | `get_system_snapshot`          | Returns a comprehensive snapshot combining all tools                                                                              |
