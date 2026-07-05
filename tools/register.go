@@ -157,6 +157,12 @@ func RegisterTools(server *mcp.Server) {
 	)
 	registerTool(
 		server,
+		"get_network_connections",
+		"Returns all active network connections (TCP and UDP) including state, local/remote addresses, process info, and optional reverse DNS hostnames. Supports filtering by status (e.g. ESTABLISHED, LISTEN, TIME_WAIT) and type (tcp, udp). Optionally resolve_hostnames for remote addresses, group by PID, and limit results with max_connections.",
+		HandleGetNetworkConnections,
+	)
+	registerTool(
+		server,
 		"get_listening_ports",
 		"Returns listening ports and their associated processes for security auditing and port conflict resolution",
 		HandleGetListeningPorts,

@@ -52,6 +52,110 @@ func TestGatherBasicSystemInfo(t *testing.T) {
 		t.Logf("Found %d listening ports", len(out.Ports))
 	})
 
+	t.Run("NetworkConnections", func(t *testing.T) {
+		out, err := GatherNetworkConnections(
+			t.Context(),
+			"",
+			"",
+			false,
+			false,
+			0,
+		)
+		skipOnErr(t, err, "GatherNetworkConnections() error: %v", err)
+		if len(out.Connections) == 0 {
+			t.Error("Connections should not be empty")
+		}
+		t.Logf("Found %d active connections", len(out.Connections))
+		// Also test with status filter
+		est, err := GatherNetworkConnections(
+			t.Context(),
+			"ESTABLISHED",
+			"",
+			false,
+			false,
+			0,
+		)
+		skipOnErr(
+			t,
+			err,
+			"GatherNetworkConnections(ESTABLISHED) error: %v",
+			err,
+		)
+		t.Logf("Found %d ESTABLISHED connections", len(est.Connections))
+		// Verify process_name is populated for non-zero PIDs
+		if len(out.Connections) > 0 {
+			first := out.Connections[0]
+			if first.PID > 0 && first.ProcessName == "" {
+				t.Logf(
+					"PID %d has no process name (may be transient)",
+					first.PID,
+				)
+			}
+		}
+		// Test max_connections truncation
+		limited, err := GatherNetworkConnections(
+			t.Context(),
+			"",
+			"",
+			false,
+			false,
+			5,
+		)
+		skipOnErr(t, err, "GatherNetworkConnections(max=5) error: %v", err)
+		if len(limited.Connections) > 5 {
+			t.Errorf(
+				"Expected max 5 connections, got %d",
+				len(limited.Connections),
+			)
+		}
+		t.Logf("Limited to %d connections", len(limited.Connections))
+		// Test type filter
+		tcpConns, err := GatherNetworkConnections(
+			t.Context(),
+			"",
+			"tcp",
+			false,
+			false,
+			0,
+		)
+		skipOnErr(t, err, "GatherNetworkConnections(type=tcp) error: %v", err)
+		for _, c := range tcpConns.Connections {
+			if c.Type != "tcp" {
+				t.Errorf("Expected type tcp, got %s", c.Type)
+			}
+		}
+		t.Logf("Found %d TCP connections", len(tcpConns.Connections))
+		// Test grouping
+		grouped, err := GatherNetworkConnections(
+			t.Context(),
+			"",
+			"",
+			false,
+			true,
+			0,
+		)
+		skipOnErr(
+			t,
+			err,
+			"GatherNetworkConnections(grouped=true) error: %v",
+			err,
+		)
+		if len(grouped.Groups) > 0 && len(grouped.Connections) > 0 {
+			totalInGroups := 0
+			for _, g := range grouped.Groups {
+				totalInGroups += len(g.Connections)
+			}
+			if totalInGroups != len(grouped.Connections) {
+				t.Errorf(
+					"Grouped count %d != flat count %d",
+					totalInGroups,
+					len(grouped.Connections),
+				)
+			}
+		}
+		t.Logf("Grouped into %d groups", len(grouped.Groups))
+	})
+
 	t.Run("NetworkInfo", func(t *testing.T) {
 		out, err := GatherNetworkInfo(t.Context())
 		skipOnErr(t, err, "GatherNetworkInfo() error: %v", err)

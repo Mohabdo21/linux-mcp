@@ -2,12 +2,20 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"os"
 	"os/exec"
+	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	gnet "github.com/shirou/gopsutil/v4/net"
+)
+
+const (
+	maxNetworkConnections = 200
 )
 
 type GetNetworkInfoInput struct{}
@@ -153,6 +161,214 @@ func GatherDNSResolve(
 		return &ResolveDNSOutput{Hostname: hostname, Addresses: []string{}}, err
 	}
 	return &ResolveDNSOutput{Hostname: hostname, Addresses: addrs}, nil
+}
+
+type GetNetworkConnectionsInput struct {
+	Status           string `json:"status,omitempty"            jsonschema:"optional status filter (e.g. ESTABLISHED, LISTEN, TIME_WAIT)"`
+	Type             string `json:"type,omitempty"              jsonschema:"optional type filter: tcp, udp"`
+	ResolveHostnames bool   `json:"resolve_hostnames,omitempty" jsonschema:"optional: resolve remote hostnames via reverse DNS (default: false)"`
+	Grouped          bool   `json:"grouped,omitempty"           jsonschema:"optional: group connections by PID (default: false)"`
+	MaxConnections   int    `json:"max_connections,omitempty"   jsonschema:"optional: limit results (max: 200)"`
+}
+
+type NetworkConnection struct {
+	FD             uint32 `json:"fd"`
+	Family         string `json:"family"`
+	Type           string `json:"type"`
+	LocalAddr      string `json:"local_addr"`
+	LocalPort      uint32 `json:"local_port"`
+	RemoteAddr     string `json:"remote_addr"`
+	RemotePort     uint32 `json:"remote_port"`
+	Status         string `json:"status"`
+	PID            int32  `json:"pid"`
+	ProcessName    string `json:"process_name,omitempty"`
+	RemoteHostname string `json:"remote_hostname,omitempty"`
+}
+
+type ConnectionGroup struct {
+	PID         int32               `json:"pid"`
+	ProcessName string              `json:"process_name"`
+	Connections []NetworkConnection `json:"connections"`
+}
+
+type NetworkConnectionsOutput struct {
+	Connections []NetworkConnection `json:"connections"`
+	Groups      []ConnectionGroup   `json:"groups,omitempty"`
+	OutputErrors
+}
+
+func resolveProcessNames(pids map[int32]struct{}) map[int32]string {
+	names := make(map[int32]string, len(pids))
+	for pid := range pids {
+		if pid <= 0 {
+			continue
+		}
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
+		if err != nil {
+			continue
+		}
+		names[pid] = strings.TrimSpace(string(data))
+	}
+	return names
+}
+
+func resolveRemoteHostnames(
+	ctx context.Context,
+	addrs map[string]struct{},
+) map[string]string {
+	names := make(map[string]string, len(addrs))
+	for addr := range addrs {
+		hosts, err := net.LookupAddr(addr)
+		if err != nil || len(hosts) == 0 {
+			continue
+		}
+		names[addr] = strings.TrimRight(hosts[0], ".")
+	}
+	return names
+}
+
+func GatherNetworkConnections(
+	ctx context.Context,
+	status string,
+	connType string,
+	resolveHostnames bool,
+	grouped bool,
+	maxConnections int,
+) (*NetworkConnectionsOutput, error) {
+	conns, err := gnet.Connections("all")
+	if err != nil {
+		return nil, err
+	}
+
+	var filterType uint32
+	switch connType {
+	case "tcp":
+		filterType = syscall.SOCK_STREAM
+	case "udp":
+		filterType = syscall.SOCK_DGRAM
+	}
+
+	result := make([]NetworkConnection, 0, len(conns))
+	for _, c := range conns {
+		if status != "" && c.Status != status {
+			continue
+		}
+		if filterType != 0 && c.Type != filterType {
+			continue
+		}
+		family := "unknown"
+		switch c.Family {
+		case syscall.AF_INET:
+			family = "ipv4"
+		case syscall.AF_INET6:
+			family = "ipv6"
+		}
+		connTypeStr := "unknown"
+		switch c.Type {
+		case syscall.SOCK_STREAM:
+			connTypeStr = "tcp"
+		case syscall.SOCK_DGRAM:
+			connTypeStr = "udp"
+		}
+		nc := NetworkConnection{
+			FD:         c.Fd,
+			Family:     family,
+			Type:       connTypeStr,
+			LocalAddr:  c.Laddr.IP,
+			LocalPort:  c.Laddr.Port,
+			RemoteAddr: c.Raddr.IP,
+			RemotePort: c.Raddr.Port,
+			Status:     c.Status,
+			PID:        c.Pid,
+		}
+		result = append(result, nc)
+	}
+
+	// Resolve process names from unique PIDs.
+	pids := make(map[int32]struct{})
+	for i := range result {
+		pids[result[i].PID] = struct{}{}
+	}
+	procNames := resolveProcessNames(pids)
+	for i := range result {
+		if name, ok := procNames[result[i].PID]; ok {
+			result[i].ProcessName = name
+		}
+	}
+
+	// Resolve remote hostnames if requested.
+	if resolveHostnames {
+		addrs := make(map[string]struct{})
+		for i := range result {
+			ra := result[i].RemoteAddr
+			if ra != "" && ra != "0.0.0.0" && ra != "::" {
+				addrs[ra] = struct{}{}
+			}
+		}
+		hostnames := resolveRemoteHostnames(ctx, addrs)
+		for i := range result {
+			if name, ok := hostnames[result[i].RemoteAddr]; ok {
+				result[i].RemoteHostname = name
+			}
+		}
+	}
+
+	// Apply max connections truncation.
+	if maxConnections > 0 && len(result) > maxConnections {
+		result = result[:maxConnections]
+	}
+
+	// Group by PID if requested.
+	var groups []ConnectionGroup
+	if grouped {
+		pidGroups := make(map[int32][]NetworkConnection)
+		for _, conn := range result {
+			pidGroups[conn.PID] = append(pidGroups[conn.PID], conn)
+		}
+		for pid, groupConns := range pidGroups {
+			groups = append(groups, ConnectionGroup{
+				PID:         pid,
+				ProcessName: procNames[pid],
+				Connections: groupConns,
+			})
+		}
+		sort.Slice(groups, func(i, j int) bool {
+			return groups[i].PID < groups[j].PID
+		})
+	}
+
+	return &NetworkConnectionsOutput{
+		Connections: result,
+		Groups:      groups,
+	}, nil
+}
+
+func HandleGetNetworkConnections(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	input GetNetworkConnectionsInput,
+) (*mcp.CallToolResult, *NetworkConnectionsOutput, error) {
+	maxConn := input.MaxConnections
+	if maxConn < 0 {
+		maxConn = 0
+	} else if maxConn > maxNetworkConnections {
+		maxConn = maxNetworkConnections
+	}
+	return handleToolCall(
+		ctx,
+		"get_network_connections",
+		0,
+		func(ctx context.Context) (*NetworkConnectionsOutput, error) {
+			return GatherNetworkConnections(
+				ctx,
+				input.Status,
+				input.Type,
+				input.ResolveHostnames,
+				input.Grouped,
+				maxConn,
+			)
+		},
+	)
 }
 
 func HandleResolveDNS(
