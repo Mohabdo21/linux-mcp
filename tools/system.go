@@ -18,13 +18,42 @@ import (
 type GetSystemInfoInput struct{}
 
 type SystemInfoOutput struct {
-	Hostname      string `json:"hostname"`
-	OSName        string `json:"os_name"`
-	OSVersion     string `json:"os_version"`
-	KernelVersion string `json:"kernel_version"`
-	Architecture  string `json:"architecture"`
-	UptimeSeconds uint64 `json:"uptime_seconds"`
+	Hostname             string `json:"hostname"`
+	OSName               string `json:"os_name"`
+	OSVersion            string `json:"os_version"`
+	KernelVersion        string `json:"kernel_version"`
+	Architecture         string `json:"architecture"`
+	UptimeSeconds        uint64 `json:"uptime_seconds"`
+	Platform             string `json:"platform,omitempty"`
+	PlatformFamily       string `json:"platform_family,omitempty"`
+	BootTime             uint64 `json:"boot_time,omitempty"`
+	Procs                uint64 `json:"procs,omitempty"`
+	VirtualizationSystem string `json:"virtualization_system,omitempty"`
+	VirtualizationRole   string `json:"virtualization_role,omitempty"`
+	HostID               string `json:"host_id,omitempty"`
+	Manufacturer         string `json:"manufacturer,omitempty"`
+	ProductName          string `json:"product_name,omitempty"`
+	ProductVersion       string `json:"product_version,omitempty"`
+	BIOSVersion          string `json:"bios_version,omitempty"`
+	BIOSDate             string `json:"bios_date,omitempty"`
+	TPMVersion           string `json:"tpm_version,omitempty"`
 	OutputErrors
+}
+
+func readDMIField(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+func readTPMVersion(ctx context.Context) string {
+	data, err := os.ReadFile("/sys/class/tpm/tpm0/tpm_version_str")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 func GatherSystemInfo(ctx context.Context) (*SystemInfoOutput, error) {
@@ -33,12 +62,35 @@ func GatherSystemInfo(ctx context.Context) (*SystemInfoOutput, error) {
 		return nil, err
 	}
 	return &SystemInfoOutput{
-		Hostname:      info.Hostname,
-		OSName:        info.OS,
-		OSVersion:     info.PlatformVersion,
-		KernelVersion: info.KernelVersion,
-		Architecture:  info.KernelArch,
-		UptimeSeconds: info.Uptime,
+		Hostname:             info.Hostname,
+		OSName:               info.OS,
+		OSVersion:            info.PlatformVersion,
+		KernelVersion:        info.KernelVersion,
+		Architecture:         info.KernelArch,
+		UptimeSeconds:        info.Uptime,
+		Platform:             info.Platform,
+		PlatformFamily:       info.PlatformFamily,
+		BootTime:             info.BootTime,
+		Procs:                info.Procs,
+		VirtualizationSystem: info.VirtualizationSystem,
+		VirtualizationRole:   info.VirtualizationRole,
+		HostID:               info.HostID,
+		Manufacturer: readDMIField(
+			"/sys/devices/virtual/dmi/id/sys_vendor",
+		),
+		ProductName: readDMIField(
+			"/sys/devices/virtual/dmi/id/product_name",
+		),
+		ProductVersion: readDMIField(
+			"/sys/devices/virtual/dmi/id/product_version",
+		),
+		BIOSVersion: readDMIField(
+			"/sys/devices/virtual/dmi/id/bios_version",
+		),
+		BIOSDate: readDMIField(
+			"/sys/devices/virtual/dmi/id/bios_date",
+		),
+		TPMVersion: readTPMVersion(ctx),
 	}, nil
 }
 

@@ -14,7 +14,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		"get_system_info",
-		"Returns system information including hostname, OS, kernel version, architecture, and uptime",
+		"Returns system information including hostname, OS, kernel, architecture, uptime, platform details, process count, boot time, virtualization info, host UUID, hardware (DMI) product info, BIOS version, and TPM version",
 		HandleGetSystemInfo,
 	)
 	registerTool(

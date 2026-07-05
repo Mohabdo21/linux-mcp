@@ -84,52 +84,52 @@ Add the following to your MCP client configuration:
 
 ### Available tools
 
-| Tool                           | Description                                                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `get_system_info`              | Returns hostname, OS, kernel version, architecture, and uptime                                                                    |
-| `get_cpu_info`                 | Returns CPU usage percentage, model, frequency, and core counts                                                                   |
-| `get_cpu_temperature`          | Returns current CPU temperature if sensor data is available                                                                       |
-| `get_desktop_session_info`     | Returns display protocol (Wayland/X11), desktop environment identifiers, and runtime configuration                                |
-| `get_memory_info`              | Returns memory usage including RAM and swap statistics                                                                            |
-| `get_disk_info`                | Returns disk usage for mounted partitions, optionally filtered by mount point                                                     |
-| `get_network_info`             | Returns network I/O statistics per interface                                                                                      |
-| `get_process_info`             | Returns list of running processes, sortable by CPU or memory, with configurable limit                                             |
-| `get_process_fds`              | Lists open file descriptors (files, sockets, pipes) and total count for a specific process ID                                     |
-| `get_docker_info`              | Returns Docker containers and images if Docker is installed                                                                       |
-| `get_docker_container_details` | Returns detailed container state, config, env, mounts, and network settings                                                       |
-| `get_docker_container_logs`    | Returns log lines from a container with optional tail count and timestamps                                                        |
-| `get_docker_container_stats`   | Returns live CPU, memory, network I/O, and PIDs for one or more containers (comma-separated names/IDs, or `all`)                  |
-| `get_docker_container_top`     | Returns running processes inside a Docker container                                                                               |
-| `get_docker_container_diff`    | Returns filesystem changes in a container since it was started                                                                    |
-| `get_docker_image_history`     | Returns layer history of a Docker image including commands, sizes, and creation times                                             |
-| `get_docker_image_details`     | Returns detailed image config, env, entrypoint, labels, and layers                                                                |
-| `get_docker_networks`          | Returns Docker networks with driver, scope, and configuration details                                                             |
-| `get_docker_stats_all`         | Returns CPU, memory, network I/O, and block I/O for all running containers; accepts optional container name/ID filter             |
-| `get_docker_system_info`       | Returns Docker daemon version, storage driver, runtimes, and resource counts                                                      |
-| `get_docker_system_snapshot`   | Returns a comprehensive Docker health snapshot combining containers, images, running stats, disk usage, and networks              |
-| `get_docker_disk_usage`        | Returns Docker disk usage for containers, images, volumes, and build cache                                                        |
-| `get_environment_variables`    | Returns all active environment variables as a sorted key-value map; useful for debugging PATH, API keys, and locale settings      |
-| `get_system_snapshot`          | Returns a comprehensive snapshot combining all tools                                                                              |
-| `get_journal_logs`             | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal |
-| `get_inode_usage`              | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                               |
-| `get_listening_ports`          | Returns listening ports and their associated processes for security auditing and port conflict resolution                         |
-| `get_service_status`           | Returns detailed status of a systemd service; set `user=true` to query user-level service                                         |
-| `get_top_io_processes`         | Returns processes with the highest disk I/O activity to diagnose system lag                                                       |
-| `get_user_automation`          | Aggregates crontab entries and systemd user timers for a complete view of user-level scheduled tasks                              |
-| `get_failed_logins`            | Returns recent failed login attempts to detect brute-force attacks                                                                |
-| `get_gpu_info`                 | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                        |
-| `get_power_analytics`          | Returns battery status, charge percentage, discharge rate, capacity degradation, and AC power state                               |
-| `get_hardware_bus_info`        | Lists detected PCI and USB devices for driver troubleshooting and hardware identification                                         |
-| `get_largest_files`            | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                        |
-| `ping_host`                    | Send ICMP packets to a host and return latency, packet loss, and response times                                                   |
-| `get_installed_packages`       | Query installed packages (pacman -Q or dpkg -l), optionally filtered by name                                                      |
-| `check_updates`                | Count or list available package updates without applying them (pacman -Qu or apt list --upgradable)                               |
-| `get_load_average`             | Returns 1-, 5-, and 15-minute load averages as a universal system health check                                                    |
-| `get_logged_in_users`          | Returns active user sessions for security and workload awareness                                                                  |
-| `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit                                    |
-| `resolve_dns`                  | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                             |
-| `get_mount_options`            | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                              |
-| `get_systemd_units`            | Returns all systemd units and their states for full service inventory                                                             |
+| Tool                           | Description                                                                                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_system_info`              | Returns hostname, OS, kernel, architecture, uptime, platform details, process count, boot time, virtualization info, host UUID, hardware (DMI) product info, BIOS version, and TPM version |
+| `get_cpu_info`                 | Returns CPU usage percentage, model, frequency, and core counts                                                                                                                            |
+| `get_cpu_temperature`          | Returns current CPU temperature if sensor data is available                                                                                                                                |
+| `get_desktop_session_info`     | Returns display protocol (Wayland/X11), desktop environment identifiers, and runtime configuration                                                                                         |
+| `get_memory_info`              | Returns memory usage including RAM and swap statistics                                                                                                                                     |
+| `get_disk_info`                | Returns disk usage for mounted partitions, optionally filtered by mount point                                                                                                              |
+| `get_network_info`             | Returns network I/O statistics per interface                                                                                                                                               |
+| `get_process_info`             | Returns list of running processes, sortable by CPU or memory, with configurable limit                                                                                                      |
+| `get_process_fds`              | Lists open file descriptors (files, sockets, pipes) and total count for a specific process ID                                                                                              |
+| `get_docker_info`              | Returns Docker containers and images if Docker is installed                                                                                                                                |
+| `get_docker_container_details` | Returns detailed container state, config, env, mounts, and network settings                                                                                                                |
+| `get_docker_container_logs`    | Returns log lines from a container with optional tail count and timestamps                                                                                                                 |
+| `get_docker_container_stats`   | Returns live CPU, memory, network I/O, and PIDs for one or more containers (comma-separated names/IDs, or `all`)                                                                           |
+| `get_docker_container_top`     | Returns running processes inside a Docker container                                                                                                                                        |
+| `get_docker_container_diff`    | Returns filesystem changes in a container since it was started                                                                                                                             |
+| `get_docker_image_history`     | Returns layer history of a Docker image including commands, sizes, and creation times                                                                                                      |
+| `get_docker_image_details`     | Returns detailed image config, env, entrypoint, labels, and layers                                                                                                                         |
+| `get_docker_networks`          | Returns Docker networks with driver, scope, and configuration details                                                                                                                      |
+| `get_docker_stats_all`         | Returns CPU, memory, network I/O, and block I/O for all running containers; accepts optional container name/ID filter                                                                      |
+| `get_docker_system_info`       | Returns Docker daemon version, storage driver, runtimes, and resource counts                                                                                                               |
+| `get_docker_system_snapshot`   | Returns a comprehensive Docker health snapshot combining containers, images, running stats, disk usage, and networks                                                                       |
+| `get_docker_disk_usage`        | Returns Docker disk usage for containers, images, volumes, and build cache                                                                                                                 |
+| `get_environment_variables`    | Returns all active environment variables as a sorted key-value map; useful for debugging PATH, API keys, and locale settings                                                               |
+| `get_system_snapshot`          | Returns a comprehensive snapshot combining all tools                                                                                                                                       |
+| `get_journal_logs`             | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal                                                          |
+| `get_inode_usage`              | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                                                                                        |
+| `get_listening_ports`          | Returns listening ports and their associated processes for security auditing and port conflict resolution                                                                                  |
+| `get_service_status`           | Returns detailed status of a systemd service; set `user=true` to query user-level service                                                                                                  |
+| `get_top_io_processes`         | Returns processes with the highest disk I/O activity to diagnose system lag                                                                                                                |
+| `get_user_automation`          | Aggregates crontab entries and systemd user timers for a complete view of user-level scheduled tasks                                                                                       |
+| `get_failed_logins`            | Returns recent failed login attempts to detect brute-force attacks                                                                                                                         |
+| `get_gpu_info`                 | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                                                                                 |
+| `get_power_analytics`          | Returns battery status, charge percentage, discharge rate, capacity degradation, and AC power state                                                                                        |
+| `get_hardware_bus_info`        | Lists detected PCI and USB devices for driver troubleshooting and hardware identification                                                                                                  |
+| `get_largest_files`            | Find the top N largest files/directories in a given path (like du -sh \| sort -hr \| head)                                                                                                 |
+| `ping_host`                    | Send ICMP packets to a host and return latency, packet loss, and response times                                                                                                            |
+| `get_installed_packages`       | Query installed packages (pacman -Q or dpkg -l), optionally filtered by name                                                                                                               |
+| `check_updates`                | Count or list available package updates without applying them (pacman -Qu or apt list --upgradable)                                                                                        |
+| `get_load_average`             | Returns 1-, 5-, and 15-minute load averages as a universal system health check                                                                                                             |
+| `get_logged_in_users`          | Returns active user sessions for security and workload awareness                                                                                                                           |
+| `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit                                                                                             |
+| `resolve_dns`                  | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                                                                                      |
+| `get_mount_options`            | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                                                                                       |
+| `get_systemd_units`            | Returns all systemd units and their states for full service inventory                                                                                                                      |
 
 ### Available resources
 

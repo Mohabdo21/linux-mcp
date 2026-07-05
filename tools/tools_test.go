@@ -17,6 +17,10 @@ func TestGatherBasicSystemInfo(t *testing.T) {
 		checkNotEmpty(t, out.KernelVersion, "KernelVersion")
 		checkNotEmpty(t, out.Architecture, "Architecture")
 		checkNotZeroUint64(t, out.UptimeSeconds, "UptimeSeconds")
+		checkNotEmpty(t, out.Platform, "Platform")
+		checkNotEmpty(t, out.PlatformFamily, "PlatformFamily")
+		checkNotZeroUint64(t, out.BootTime, "BootTime")
+		checkNotZeroUint64(t, out.Procs, "Procs")
 	})
 
 	t.Run("LoadAverage", func(t *testing.T) {
