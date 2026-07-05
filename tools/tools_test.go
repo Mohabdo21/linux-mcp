@@ -2,6 +2,7 @@ package tools
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -645,6 +646,34 @@ func TestGatherLargestFiles(t *testing.T) {
 		}
 	}
 	t.Logf("Found %d entries in %s", len(out.Entries), out.Path)
+}
+
+func TestGatherProcessFDs(t *testing.T) {
+	t.Run("CurrentProcess", func(t *testing.T) {
+		pid := int32(os.Getpid())
+		out, err := GatherProcessFDs(t.Context(), pid)
+		skipOnErr(t, err, "GatherProcessFDs() error: %v", err)
+		if len(out.FDs) == 0 {
+			t.Fatal("Expected at least some file descriptors")
+		}
+		if out.Name == "" {
+			t.Error("Process name should not be empty")
+		}
+		if out.PID != int(pid) {
+			t.Errorf("Expected PID %d, got %d", pid, out.PID)
+		}
+		t.Logf(
+			"Process %d (%s): %d file descriptors",
+			out.PID, out.Name, out.Count,
+		)
+	})
+
+	t.Run("InvalidPID", func(t *testing.T) {
+		_, err := GatherProcessFDs(t.Context(), -1)
+		if err == nil {
+			t.Error("Expected error for negative PID")
+		}
+	})
 }
 
 func TestGatherTopIOProcesses(t *testing.T) {

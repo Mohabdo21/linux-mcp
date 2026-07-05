@@ -5,7 +5,6 @@ import (
 	"net"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	gnet "github.com/shirou/gopsutil/v4/net"
@@ -60,7 +59,7 @@ func HandleGetNetworkInfo(
 	return handleToolCall(
 		ctx,
 		"get_network_info",
-		5*time.Second,
+		0,
 		GatherNetworkInfo,
 	)
 }
@@ -128,7 +127,7 @@ func HandleGetListeningPorts(
 	return handleToolCall(
 		ctx,
 		"get_listening_ports",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*ListeningPortsOutput, error) {
 			return GatherListeningPorts(ctx, input.Protocol)
 		},
@@ -167,7 +166,7 @@ func HandleResolveDNS(
 	return handleToolCall(
 		ctx,
 		"resolve_dns",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*ResolveDNSOutput, error) {
 			return GatherDNSResolve(ctx, input.Hostname)
 		},

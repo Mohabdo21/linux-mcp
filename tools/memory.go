@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -51,7 +50,7 @@ func HandleGetMemoryInfo(
 	return handleToolCall(
 		ctx,
 		"get_memory_info",
-		5*time.Second,
+		0,
 		GatherMemoryInfo,
 	)
 }

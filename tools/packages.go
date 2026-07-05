@@ -4,7 +4,6 @@ import (
 	"context"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -249,7 +248,7 @@ func HandleGetInstalledPackages(
 	return handleToolCall(
 		ctx,
 		"get_installed_packages",
-		15*time.Second,
+		0,
 		func(ctx context.Context) (*InstalledPackagesOutput, error) {
 			return GatherInstalledPackages(ctx, input.Name)
 		},
@@ -264,7 +263,7 @@ func HandleCheckUpdates(
 	return handleToolCall(
 		ctx,
 		"check_updates",
-		15*time.Second,
+		0,
 		GatherCheckUpdates,
 	)
 }

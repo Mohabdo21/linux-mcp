@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -90,7 +89,7 @@ func HandleGetJournalLogs(
 	return handleToolCall(
 		ctx,
 		"get_journal_logs",
-		20*time.Second,
+		0,
 		func(ctx context.Context) (*JournalLogsOutput, error) {
 			return GatherJournalLogs(ctx, input.Unit, input.Priority,
 				input.Since, input.Until,

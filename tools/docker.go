@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	dockersdk "github.com/docker/go-sdk/client"
 	mobyclient "github.com/moby/moby/client"
@@ -176,7 +175,7 @@ func HandleGetDockerInfo(
 	return handleToolCall(
 		ctx,
 		"get_docker_info",
-		10*time.Second,
+		0,
 		GatherDockerInfo,
 	)
 }
@@ -319,7 +318,7 @@ func HandleGetContainerDetail(
 	return handleToolCall(
 		ctx,
 		"get_docker_container_details",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*DockerContainerDetailOutput, error) {
 			return GatherContainerDetail(ctx, input.ContainerID)
 		},
@@ -395,7 +394,7 @@ func HandleGetContainerLogs(
 	return handleToolCall(
 		ctx,
 		"get_docker_container_logs",
-		30*time.Second,
+		0,
 		func(ctx context.Context) (*DockerContainerLogsOutput, error) {
 			return GatherContainerLogs(
 				ctx,
@@ -558,7 +557,7 @@ func HandleGetContainerStats(
 		return handleToolCall(
 			ctx,
 			"get_docker_container_stats",
-			30*time.Second,
+			0,
 			func(ctx context.Context) (*DockerContainerStatsOutput, error) {
 				all, err := GatherDockerStatsAll(ctx, nil)
 				if err != nil {
@@ -578,7 +577,7 @@ func HandleGetContainerStats(
 		return handleToolCall(
 			ctx,
 			"get_docker_container_stats",
-			10*time.Second,
+			0,
 			func(ctx context.Context) (*DockerContainerStatsOutput, error) {
 				return GatherContainerStats(ctx, ids[0])
 			},
@@ -588,7 +587,7 @@ func HandleGetContainerStats(
 	return handleToolCall(
 		ctx,
 		"get_docker_container_stats",
-		30*time.Second,
+		0,
 		func(ctx context.Context) (*DockerContainerStatsOutput, error) {
 			all, err := GatherDockerStatsAll(ctx, ids)
 			if err != nil {
@@ -729,7 +728,7 @@ func HandleGetDockerStatsAll(
 	return handleToolCall(
 		ctx,
 		"get_docker_stats_all",
-		30*time.Second,
+		0,
 		func(ctx context.Context) (*DockerStatsAllOutput, error) {
 			return GatherDockerStatsAll(ctx, input.Containers)
 		},
@@ -788,7 +787,7 @@ func HandleGetContainerTop(
 	return handleToolCall(
 		ctx,
 		"get_docker_container_top",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*DockerContainerTopOutput, error) {
 			return GatherContainerTop(ctx, input.ContainerID, input.Args)
 		},
@@ -864,7 +863,7 @@ func HandleGetContainerDiff(
 	return handleToolCall(
 		ctx,
 		"get_docker_container_diff",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*DockerContainerDiffOutput, error) {
 			return GatherContainerDiff(ctx, input.ContainerID)
 		},
@@ -935,7 +934,7 @@ func HandleGetImageHistory(
 	return handleToolCall(
 		ctx,
 		"get_docker_image_history",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*DockerImageHistoryOutput, error) {
 			return GatherImageHistory(ctx, input.ImageID)
 		},
@@ -1032,7 +1031,7 @@ func HandleGetImageDetail(
 	return handleToolCall(
 		ctx,
 		"get_docker_image_details",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*DockerImageDetailOutput, error) {
 			return GatherImageDetail(ctx, input.ImageID)
 		},
@@ -1101,7 +1100,7 @@ func HandleGetDockerNetworks(
 	return handleToolCall(
 		ctx,
 		"get_docker_networks",
-		10*time.Second,
+		0,
 		GatherDockerNetworks,
 	)
 }
@@ -1164,7 +1163,7 @@ func HandleGetDockerVolumes(
 	return handleToolCall(
 		ctx,
 		"get_docker_volumes",
-		10*time.Second,
+		0,
 		GatherDockerVolumes,
 	)
 }
@@ -1269,7 +1268,7 @@ func HandleGetDockerSystemInfo(
 	return handleToolCall(
 		ctx,
 		"get_docker_system_info",
-		10*time.Second,
+		0,
 		GatherDockerSystemInfo,
 	)
 }
@@ -1348,7 +1347,7 @@ func HandleGetDockerDiskUsage(
 	return handleToolCall(
 		ctx,
 		"get_docker_disk_usage",
-		10*time.Second,
+		0,
 		GatherDockerDiskUsage,
 	)
 }
@@ -1372,7 +1371,7 @@ func HandleGetDockerSystemSnapshot(
 	return handleToolCall(
 		ctx,
 		"get_docker_system_snapshot",
-		60*time.Second,
+		0,
 		func(ctx context.Context) (*DockerSystemSnapshotOutput, error) {
 			var snapshot DockerSystemSnapshotOutput
 			var errs ErrList

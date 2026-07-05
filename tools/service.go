@@ -4,7 +4,6 @@ import (
 	"context"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -114,7 +113,7 @@ func HandleGetSystemdUnits(
 	return handleToolCall(
 		ctx,
 		"get_systemd_units",
-		10*time.Second,
+		0,
 		GatherSystemdUnits,
 	)
 }
@@ -127,7 +126,7 @@ func HandleGetServiceStatus(
 	return handleToolCall(
 		ctx,
 		"get_service_status",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*ServiceStatusOutput, error) {
 			return GatherServiceStatus(ctx, input.Name, input.User)
 		},

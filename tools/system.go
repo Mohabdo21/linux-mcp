@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/host"
@@ -51,7 +50,7 @@ func HandleGetSystemInfo(
 	return handleToolCall(
 		ctx,
 		"get_system_info",
-		5*time.Second,
+		0,
 		GatherSystemInfo,
 	)
 }
@@ -79,7 +78,7 @@ func HandleGetSystemSnapshot(
 	return handleToolCall(
 		ctx,
 		"get_system_snapshot",
-		120*time.Second,
+		0,
 		func(ctx context.Context) (*SystemSnapshotOutput, error) {
 			var snapshot SystemSnapshotOutput
 			var errs ErrList
@@ -227,7 +226,7 @@ func HandleGetEnvironmentVariables(
 	return handleToolCall(
 		ctx,
 		"get_environment_variables",
-		5*time.Second,
+		0,
 		func(ctx context.Context) (*EnvironmentVariablesOutput, error) {
 			return GatherEnvironmentVariables(ctx, input.Search)
 		},
@@ -509,7 +508,7 @@ func HandleGetHardwareBusInfo(
 	return handleToolCall(
 		ctx,
 		"get_hardware_bus_info",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*HardwareBusInfoOutput, error) {
 			return GatherHardwareBusInfo(ctx, input.Search)
 		},
@@ -524,7 +523,7 @@ func HandleGetLoadAverage(
 	return handleToolCall(
 		ctx,
 		"get_load_average",
-		5*time.Second,
+		0,
 		GatherLoadAverage,
 	)
 }
@@ -628,7 +627,7 @@ func HandleGetUserAutomation(
 	return handleToolCall(
 		ctx,
 		"get_user_automation",
-		10*time.Second,
+		0,
 		GatherUserAutomation,
 	)
 }
@@ -664,7 +663,7 @@ func HandleGetDesktopSessionInfo(
 	return handleToolCall(
 		ctx,
 		"get_desktop_session_info",
-		5*time.Second,
+		0,
 		GatherDesktopSessionInfo,
 	)
 }

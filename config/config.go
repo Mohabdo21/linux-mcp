@@ -38,30 +38,50 @@ func defaultConfig() *Config {
 	return &Config{
 		LogLevel: "info",
 		Timeouts: map[string]string{
-			"get_cpu_info":           "5s",
-			"get_cpu_temperature":    "5s",
-			"get_memory_info":        "5s",
-			"get_disk_info":          "10s",
-			"get_inode_usage":        "10s",
-			"get_network_info":       "5s",
-			"get_process_info":       "10s",
-			"get_docker_info":        "10s",
-			"get_system_snapshot":    "120s",
-			"get_journal_logs":       "20s",
-			"get_listening_ports":    "10s",
-			"get_service_status":     "10s",
-			"get_top_io_processes":   "15s",
-			"get_failed_logins":      "10s",
-			"get_gpu_info":           "5s",
-			"get_largest_files":      "30s",
-			"ping_host":              "10s",
-			"get_installed_packages": "15s",
-			"check_updates":          "15s",
-			"get_load_average":       "5s",
-			"get_logged_in_users":    "5s",
-			"resolve_dns":            "10s",
-			"get_mount_options":      "10s",
-			"get_systemd_units":      "10s",
+			"get_cpu_info":                 "5s",
+			"get_cpu_temperature":          "5s",
+			"get_memory_info":              "5s",
+			"get_disk_info":                "10s",
+			"get_inode_usage":              "10s",
+			"get_network_info":             "5s",
+			"get_system_info":              "5s",
+			"get_process_info":             "10s",
+			"get_process_fds":              "10s",
+			"get_environment_variables":    "5s",
+			"get_hardware_bus_info":        "10s",
+			"get_user_automation":          "10s",
+			"get_desktop_session_info":     "5s",
+			"get_man_page":                 "15s",
+			"get_docker_container_details": "10s",
+			"get_docker_container_logs":    "30s",
+			"get_docker_container_stats":   "30s",
+			"get_docker_container_top":     "10s",
+			"get_docker_container_diff":    "10s",
+			"get_docker_image_history":     "10s",
+			"get_docker_image_details":     "10s",
+			"get_docker_networks":          "10s",
+			"get_docker_volumes":           "10s",
+			"get_docker_system_info":       "10s",
+			"get_docker_disk_usage":        "10s",
+			"get_docker_stats_all":         "30s",
+			"get_docker_system_snapshot":   "60s",
+			"get_docker_info":              "10s",
+			"get_system_snapshot":          "120s",
+			"get_journal_logs":             "20s",
+			"get_listening_ports":          "10s",
+			"get_service_status":           "10s",
+			"get_top_io_processes":         "15s",
+			"get_failed_logins":            "10s",
+			"get_gpu_info":                 "5s",
+			"get_largest_files":            "30s",
+			"ping_host":                    "10s",
+			"get_installed_packages":       "15s",
+			"check_updates":                "15s",
+			"get_load_average":             "5s",
+			"get_logged_in_users":          "5s",
+			"resolve_dns":                  "10s",
+			"get_mount_options":            "10s",
+			"get_systemd_units":            "10s",
 		},
 		Disabled: []string{},
 	}
@@ -157,7 +177,15 @@ func ToolTimeout(name string, fallback time.Duration) time.Duration {
 			return d
 		}
 	}
-	return fallback
+	if fallback > 0 {
+		return fallback
+	}
+	if s, ok := defaultConfig().Timeouts[name]; ok {
+		if d, err := time.ParseDuration(s); err == nil {
+			return d
+		}
+	}
+	return 30 * time.Second
 }
 
 func IsDisabled(name string) bool {

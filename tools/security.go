@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -166,7 +165,7 @@ func HandleGetLoggedInUsers(
 	return handleToolCall(
 		ctx,
 		"get_logged_in_users",
-		5*time.Second,
+		0,
 		GatherLoggedInUsers,
 	)
 }
@@ -179,7 +178,7 @@ func HandleGetFailedLogins(
 	return handleToolCall(
 		ctx,
 		"get_failed_logins",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*FailedLoginsOutput, error) {
 			return GatherFailedLogins(ctx, input.Lines)
 		},

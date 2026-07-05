@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -61,7 +60,7 @@ func HandleGetCPUInfo(
 	_ *mcp.CallToolRequest,
 	_ GetCPUInfoInput,
 ) (*mcp.CallToolResult, *CPUInfoOutput, error) {
-	return handleToolCall(ctx, "get_cpu_info", 5*time.Second, GatherCPUInfo)
+	return handleToolCall(ctx, "get_cpu_info", 0, GatherCPUInfo)
 }
 
 type GetCPUTemperatureInput struct{}
@@ -104,7 +103,7 @@ func HandleGetCPUTemperature(
 	return handleToolCall(
 		ctx,
 		"get_cpu_temperature",
-		5*time.Second,
+		0,
 		GatherCPUTemperature,
 	)
 }

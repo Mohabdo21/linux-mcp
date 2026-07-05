@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -72,7 +71,7 @@ func HandleGetDiskInfo(
 	return handleToolCall(
 		ctx,
 		"get_disk_info",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*DiskInfoOutput, error) {
 			return GatherDiskInfo(ctx, input.MountPoint)
 		},
@@ -142,7 +141,7 @@ func HandleGetInodeUsage(
 	return handleToolCall(
 		ctx,
 		"get_inode_usage",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*InodeUsageOutput, error) {
 			return GatherInodeUsage(ctx, input.MountPoint)
 		},
@@ -229,7 +228,7 @@ func HandleGetLargestFiles(
 	return handleToolCall(
 		ctx,
 		"get_largest_files",
-		30*time.Second,
+		0,
 		func(ctx context.Context) (*LargestFilesOutput, error) {
 			return GatherLargestFiles(ctx, input.Path, input.Limit)
 		},
@@ -292,7 +291,7 @@ func HandleGetMountOptions(
 	return handleToolCall(
 		ctx,
 		"get_mount_options",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*MountOptionsOutput, error) {
 			return GatherMountOptions(ctx, input.MountPoint)
 		},

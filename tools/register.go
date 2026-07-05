@@ -169,6 +169,12 @@ func RegisterTools(server *mcp.Server) {
 	)
 	registerTool(
 		server,
+		"get_process_fds",
+		"Lists the open file descriptors (files, sockets, pipes) and total count for a specific process ID",
+		HandleGetProcessFDs,
+	)
+	registerTool(
+		server,
 		"get_top_io_processes",
 		"Returns processes with the highest disk I/O activity to diagnose system lag",
 		HandleGetTopIOProcesses,

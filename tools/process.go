@@ -2,11 +2,13 @@ package tools
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/process"
@@ -87,7 +89,7 @@ func HandleGetProcessInfo(
 	return handleToolCall(
 		ctx,
 		"get_process_info",
-		10*time.Second,
+		0,
 		func(ctx context.Context) (*ProcessInfoOutput, error) {
 			return GatherProcessInfo(ctx, input.SortBy, input.Limit)
 		},
@@ -153,6 +155,114 @@ func GatherTopIOProcesses(
 	return &TopIOProcessesOutput{Processes: procs}, nil
 }
 
+func classifyFD(target string) string {
+	switch {
+	case strings.HasPrefix(target, "socket:"):
+		return "socket"
+	case strings.HasPrefix(target, "pipe:"):
+		return "pipe"
+	case strings.HasPrefix(target, "anon_inode:"):
+		return "anon_inode"
+	default:
+		return "file"
+	}
+}
+
+type GetProcessFDsInput struct {
+	PID int32 `json:"pid" jsonschema:"process ID to list open file descriptors for"`
+}
+
+type ProcessFD struct {
+	FD     uint64 `json:"fd"`
+	Type   string `json:"type"`
+	Target string `json:"target"`
+}
+
+type ProcessFDsOutput struct {
+	PID   int         `json:"pid"`
+	Name  string      `json:"name"`
+	Count int         `json:"fd_count"`
+	FDs   []ProcessFD `json:"file_descriptors"`
+	OutputErrors
+}
+
+func GatherProcessFDs(
+	ctx context.Context,
+	pid int32,
+) (*ProcessFDsOutput, error) {
+	p, err := process.NewProcess(pid)
+	if err != nil {
+		return nil, fmt.Errorf("process %d: %w", pid, err)
+	}
+
+	name, _ := p.Name()
+
+	openFiles, _ := p.OpenFiles()
+
+	fdMap := make(map[uint64]ProcessFD)
+	for _, f := range openFiles {
+		fdMap[f.Fd] = ProcessFD{
+			FD:     f.Fd,
+			Type:   "file",
+			Target: f.Path,
+		}
+	}
+
+	fdDir := fmt.Sprintf("/proc/%d/fd", pid)
+	entries, readErr := os.ReadDir(fdDir)
+	if readErr == nil {
+		for _, entry := range entries {
+			fdNum, parseErr := strconv.ParseUint(entry.Name(), 10, 64)
+			if parseErr != nil {
+				continue
+			}
+			if _, exists := fdMap[fdNum]; exists {
+				continue
+			}
+			linkPath := filepath.Join(fdDir, entry.Name())
+			target, linkErr := os.Readlink(linkPath)
+			if linkErr != nil {
+				continue
+			}
+			fdMap[fdNum] = ProcessFD{
+				FD:     fdNum,
+				Type:   classifyFD(target),
+				Target: target,
+			}
+		}
+	}
+
+	result := make([]ProcessFD, 0, len(fdMap))
+	for _, fd := range fdMap {
+		result = append(result, fd)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].FD < result[j].FD
+	})
+
+	return &ProcessFDsOutput{
+		PID:   int(pid),
+		Name:  name,
+		Count: len(result),
+		FDs:   result,
+	}, nil
+}
+
+func HandleGetProcessFDs(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	input GetProcessFDsInput,
+) (*mcp.CallToolResult, *ProcessFDsOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_process_fds",
+		0,
+		func(ctx context.Context) (*ProcessFDsOutput, error) {
+			return GatherProcessFDs(ctx, input.PID)
+		},
+	)
+}
+
 func HandleGetTopIOProcesses(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
@@ -161,7 +271,7 @@ func HandleGetTopIOProcesses(
 	return handleToolCall(
 		ctx,
 		"get_top_io_processes",
-		15*time.Second,
+		0,
 		func(ctx context.Context) (*TopIOProcessesOutput, error) {
 			return GatherTopIOProcesses(ctx, input.Limit)
 		},
