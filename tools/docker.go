@@ -286,8 +286,16 @@ func GatherContainerDetail(
 	if c.Config != nil {
 		env = c.Config.Env
 	}
+	if env == nil {
+		env = []string{}
+	}
 
 	status, _ := state["status"].(string)
+
+	args := c.Args
+	if args == nil {
+		args = []string{}
+	}
 
 	return &DockerContainerDetailOutput{
 		Container: DockerContainerDetail{
@@ -298,7 +306,7 @@ func GatherContainerDetail(
 			State:   state,
 			Status:  status,
 			Path:    c.Path,
-			Args:    c.Args,
+			Args:    args,
 			Env:     env,
 			Mounts:  mounts,
 			Network: network,
@@ -371,7 +379,7 @@ func GatherContainerLogs(
 	}
 	defer func() { _ = result.Close() }()
 
-	var lines []string
+	lines := make([]string, 0)
 	scanner := bufio.NewScanner(result)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
@@ -770,9 +778,17 @@ func GatherContainerTop(
 		return nil, err
 	}
 
+	titles := result.Titles
+	if titles == nil {
+		titles = []string{}
+	}
+	procs := result.Processes
+	if procs == nil {
+		procs = [][]string{}
+	}
 	return &DockerContainerTopOutput{
-		Titles:    result.Titles,
-		Processes: result.Processes,
+		Titles:    titles,
+		Processes: procs,
 	}, nil
 }
 
@@ -1000,11 +1016,20 @@ func GatherImageDetail(
 		labels = result.Config.Labels
 	}
 
+	repoTags := result.RepoTags
+	if repoTags == nil {
+		repoTags = []string{}
+	}
+	repoDigests := result.RepoDigests
+	if repoDigests == nil {
+		repoDigests = []string{}
+	}
+
 	return &DockerImageDetailOutput{
 		Image: DockerImageDetail{
 			ID:           id,
-			RepoTags:     result.RepoTags,
-			RepoDigests:  result.RepoDigests,
+			RepoTags:     repoTags,
+			RepoDigests:  repoDigests,
 			Created:      result.Created,
 			Author:       result.Author,
 			Architecture: result.Architecture,
@@ -1380,14 +1405,19 @@ func HandleGetDockerSystemSnapshot(
 				snapshot.Info = *out
 			} else {
 				errs.Add("info", err)
-				snapshot.Info = DockerInfoOutput{}
+				snapshot.Info = DockerInfoOutput{
+					Containers: []DockerContainer{},
+					Images:     []DockerImage{},
+				}
 			}
 
 			if out, err := GatherDockerStatsAll(ctx, nil); err == nil {
 				snapshot.Stats = *out
 			} else {
 				errs.Add("stats", err)
-				snapshot.Stats = DockerStatsAllOutput{}
+				snapshot.Stats = DockerStatsAllOutput{
+					Containers: []DockerContainerStatEntry{},
+				}
 			}
 
 			if out, err := GatherDockerDiskUsage(ctx); err == nil {

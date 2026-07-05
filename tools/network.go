@@ -34,7 +34,7 @@ func GatherNetworkInfo(ctx context.Context) (*NetworkInfoOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	var result []InterfaceStats
+	result := make([]InterfaceStats, 0)
 	for _, c := range counters {
 		result = append(result, InterfaceStats{
 			Name:        c.Name,
@@ -89,7 +89,7 @@ func GatherListeningPorts(
 	if err != nil {
 		return nil, err
 	}
-	var ports []ListeningPort
+	ports := make([]ListeningPort, 0)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(string(out)), "\n",
 	) {
@@ -150,7 +150,7 @@ func GatherDNSResolve(
 ) (*ResolveDNSOutput, error) {
 	addrs, err := net.LookupHost(hostname)
 	if err != nil {
-		return &ResolveDNSOutput{Hostname: hostname}, err
+		return &ResolveDNSOutput{Hostname: hostname, Addresses: []string{}}, err
 	}
 	return &ResolveDNSOutput{Hostname: hostname, Addresses: addrs}, nil
 }

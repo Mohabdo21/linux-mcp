@@ -62,7 +62,7 @@ func GatherJournalLogs(
 	if err != nil {
 		return nil, err
 	}
-	var entries []JournalLogEntry
+	entries := make([]JournalLogEntry, 0)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(string(out)), "\n",
 	) {

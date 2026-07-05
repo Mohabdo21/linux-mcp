@@ -27,7 +27,7 @@ type FailedLoginsOutput struct {
 }
 
 func ParseLastbOutput(output string) []FailedLoginEntry {
-	var entries []FailedLoginEntry
+	entries := make([]FailedLoginEntry, 0)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(output), "\n",
 	) {
@@ -49,7 +49,7 @@ func ParseLastbOutput(output string) []FailedLoginEntry {
 }
 
 func ParseJournalctlFailedLogins(output string) []FailedLoginEntry {
-	var entries []FailedLoginEntry
+	entries := make([]FailedLoginEntry, 0)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(output), "\n",
 	) {
@@ -134,7 +134,7 @@ func GatherLoggedInUsers(ctx context.Context) (*LoggedInUsersOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	var users []LoggedInUser
+	users := make([]LoggedInUser, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		if line == "" {
 			continue

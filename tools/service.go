@@ -81,7 +81,7 @@ func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	var units []SystemdUnit
+	units := make([]SystemdUnit, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		if line == "" {
 			continue

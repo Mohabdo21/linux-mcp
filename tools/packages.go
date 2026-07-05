@@ -80,7 +80,7 @@ func gatherPacmanPackages(
 }
 
 func parsePacmanQOutput(output string) *InstalledPackagesOutput {
-	var pkgs []InstalledPackage
+	pkgs := make([]InstalledPackage, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, " ") {
@@ -119,7 +119,7 @@ func gatherDpkgPackages(
 }
 
 func parseDpkgLOutput(output string) *InstalledPackagesOutput {
-	var pkgs []InstalledPackage
+	pkgs := make([]InstalledPackage, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		if len(line) < 4 || line[:2] != "ii" {
 			continue
@@ -154,14 +154,14 @@ func gatherPacmanUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 	out, err := exec.CommandContext(ctx, "pacman", "-Qu").Output()
 	if err != nil {
 		if len(out) == 0 {
-			return &CheckUpdatesOutput{}, nil
+			return &CheckUpdatesOutput{Updates: []AvailableUpdate{}}, nil
 		}
 	}
 	return parsePacmanQuOutput(string(out)), nil
 }
 
 func parsePacmanQuOutput(output string) *CheckUpdatesOutput {
-	var updates []AvailableUpdate
+	updates := make([]AvailableUpdate, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -203,7 +203,7 @@ func gatherAptUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 }
 
 func parseAptListOutput(output string) *CheckUpdatesOutput {
-	var updates []AvailableUpdate
+	updates := make([]AvailableUpdate, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" ||

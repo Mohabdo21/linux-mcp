@@ -145,12 +145,18 @@ func HandleGetSystemSnapshot(
 				snapshot.CPU = *out
 			} else {
 				errs.Add("cpu", err)
+				snapshot.CPU = CPUInfoOutput{
+					Cores: []CPUDetails{},
+				}
 			}
 
 			if out, err := GatherCPUTemperature(ctx); err == nil {
 				snapshot.Temperature = *out
 			} else {
 				errs.Add("temperature", err)
+				snapshot.Temperature = CPUTemperatureOutput{
+					Temperatures: []TemperatureStat{},
+				}
 			}
 
 			if out, err := GatherMemoryInfo(ctx); err == nil {
@@ -163,12 +169,18 @@ func HandleGetSystemSnapshot(
 				snapshot.Disk = *out
 			} else {
 				errs.Add("disk", err)
+				snapshot.Disk = DiskInfoOutput{
+					Partitions: []DiskUsageStat{},
+				}
 			}
 
 			if out, err := GatherNetworkInfo(ctx); err == nil {
 				snapshot.Network = *out
 			} else {
 				errs.Add("network", err)
+				snapshot.Network = NetworkInfoOutput{
+					Interfaces: []InterfaceStats{},
+				}
 			}
 
 			if out, err := GatherLoadAverage(ctx); err == nil {
@@ -181,13 +193,19 @@ func HandleGetSystemSnapshot(
 				snapshot.Processes = *out
 			} else {
 				errs.Add("processes", err)
+				snapshot.Processes = ProcessInfoOutput{
+					Processes: []ProcessStat{},
+				}
 			}
 
 			if out, err := GatherDockerInfo(ctx); err == nil {
 				snapshot.Docker = *out
 			} else {
 				errs.Add("docker", err)
-				snapshot.Docker = DockerInfoOutput{}
+				snapshot.Docker = DockerInfoOutput{
+					Containers: []DockerContainer{},
+					Images:     []DockerImage{},
+				}
 			}
 
 			snapshot.Errors = errs

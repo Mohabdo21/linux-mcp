@@ -51,7 +51,7 @@ func GatherProcessInfo(
 		return nil, err
 	}
 
-	var result []ProcessStat
+	result := make([]ProcessStat, 0)
 	for _, p := range procs {
 		name, _ := p.Name()
 		cpu, _ := p.CPUPercent()
@@ -127,7 +127,7 @@ func GatherTopIOProcesses(
 	if err != nil {
 		return nil, err
 	}
-	var procs []IOProcessStat
+	procs := make([]IOProcessStat, 0)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(string(out)), "\n",
 	) {

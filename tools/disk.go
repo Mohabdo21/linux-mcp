@@ -41,7 +41,7 @@ func GatherDiskInfo(
 		return nil, err
 	}
 
-	var result []DiskUsageStat
+	result := make([]DiskUsageStat, 0)
 	for _, p := range partitions {
 		if mountPoint != "" && p.Mountpoint != mountPoint {
 			continue
@@ -105,7 +105,7 @@ func GatherInodeUsage(
 	if err != nil {
 		return nil, err
 	}
-	var mounts []InodeUsageStat
+	mounts := make([]InodeUsageStat, 0)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(string(out)), "\n",
 	) {
@@ -185,9 +185,12 @@ func GatherLargestFiles(
 	))
 	out, err := cmd.Output()
 	if err != nil {
-		return &LargestFilesOutput{Path: path}, nil
+		return &LargestFilesOutput{
+			Path:    path,
+			Entries: []LargestFileEntry{},
+		}, nil
 	}
-	var entries []LargestFileEntry
+	entries := make([]LargestFileEntry, 0, limit)
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(string(out)), "\n",
 	) {
@@ -261,7 +264,7 @@ func GatherMountOptions(
 	if err != nil {
 		return nil, err
 	}
-	var mounts []MountEntry
+	mounts := make([]MountEntry, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		if line == "" {
 			continue

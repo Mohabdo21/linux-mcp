@@ -36,7 +36,7 @@ func GatherCPUInfo(ctx context.Context) (*CPUInfoOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cores []CPUDetails
+	cores := make([]CPUDetails, 0)
 	for _, c := range info {
 		cores = append(cores, CPUDetails{
 			ModelName: c.ModelName,
@@ -83,9 +83,12 @@ func GatherCPUTemperature(ctx context.Context) (*CPUTemperatureOutput, error) {
 		if err != nil {
 			msg = err.Error()
 		}
-		return &CPUTemperatureOutput{Message: msg}, err
+		return &CPUTemperatureOutput{
+			Message:      msg,
+			Temperatures: []TemperatureStat{},
+		}, err
 	}
-	var result []TemperatureStat
+	result := make([]TemperatureStat, 0)
 	for _, t := range temps {
 		result = append(result, TemperatureStat{
 			SensorKey:   t.SensorKey,
