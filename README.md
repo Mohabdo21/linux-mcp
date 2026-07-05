@@ -30,13 +30,20 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 
 ## Installation
 
-### Via MCP Registry (recommended)
+### Via MCP Registry
 
-Discover and install from the [MCP Registry](https://registry.modelcontextprotocol.io):
+Discover the server on the [MCP Registry](https://registry.modelcontextprotocol.io) and install via your MCP client (VS Code one-click install, or manual config).
+
+### Download pre-built binary
+
+Download the latest binary from the [GitHub Releases](https://github.com/Mohabdo21/linux-mcp/releases) page:
 
 ```bash
-mcp registry install io.github.Mohabdo21/linux-mcp
+curl -LO https://github.com/Mohabdo21/linux-mcp/releases/latest/download/linux-mcp
+chmod +x linux-mcp
 ```
+
+A fully static build (no libc dependency) is also available as `linux-mcp_static`.
 
 ### Build from source
 
@@ -66,16 +73,16 @@ The server communicates over STDIO transport, following the MCP standard. It is 
 
 This starts the server and listens for MCP requests on STDIN/STDOUT.
 
-### Integration with OpenCode / Claude Desktop
+### Integration with OpenCode
 
-Add the following to your MCP client configuration:
+Add the following to your OpenCode configuration:
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "linux-mcp": {
       "type": "local",
-      "command": "/path/to/linux-mcp",
+      "command": ["/path/to/linux-mcp"],
       "enabled": true
     }
   }
@@ -107,6 +114,7 @@ Add the following to your MCP client configuration:
 | `get_docker_stats_all`         | Returns CPU, memory, network I/O, and block I/O for all running containers; accepts optional container name/ID filter                                                                       |
 | `get_docker_system_info`       | Returns Docker daemon version, storage driver, runtimes, and resource counts                                                                                                                |
 | `get_docker_system_snapshot`   | Returns a comprehensive Docker health snapshot combining containers, images, running stats, disk usage, and networks                                                                        |
+| `get_docker_volumes`           | Returns a list of Docker volumes with driver, mountpoint, size, and label information                                                                                                       |
 | `get_docker_disk_usage`        | Returns Docker disk usage for containers, images, volumes, and build cache                                                                                                                  |
 | `get_environment_variables`    | Returns all active environment variables as a sorted key-value map; useful for debugging PATH, API keys, and locale settings                                                                |
 | `get_system_snapshot`          | Returns a comprehensive snapshot combining all tools                                                                                                                                        |
@@ -188,6 +196,7 @@ Published on the [MCP Registry](https://registry.modelcontextprotocol.io) as `io
 ## Dependencies
 
 - [modelcontextprotocol/go-sdk](https://github.com/modelcontextprotocol/go-sdk) - MCP SDK for Go
-- [shirou/gopsutil](https://github.com/shirou/gopsutil) - System metrics (CPU, memory, disk, network, processes, sensors)
+- [shirou/gopsutil/v4](https://github.com/shirou/gopsutil) - System metrics (CPU, memory, disk, network, processes, sensors)
 - [docker/go-sdk](https://github.com/docker/go-sdk) - Docker Engine API client
+- [moby/moby/client](https://github.com/moby/moby) - Docker client library
 - [ip-api.com](https://ip-api.com) - Free IP geolocation API (used by `get_ip_info`)
