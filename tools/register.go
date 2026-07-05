@@ -287,4 +287,10 @@ func RegisterTools(server *mcp.Server) {
 		"Returns the active power state (AC vs Battery), current discharge rate in watts, current battery percentage, and overall capacity degradation",
 		HandleGetPowerAnalytics,
 	)
+	registerTool(
+		server,
+		"get_ip_info",
+		"Returns IP geolocation data, ASN/organization information, and known service provider tags (e.g. \"AWS\", \"Cloudflare\", \"GitHub\") for a given IP address or your own public IP. Uses the ip-api.com free geolocation service.",
+		HandleGetIPInfo,
+	)
 }

@@ -10,7 +10,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **CPU** - usage, model, frequency, core counts, temperature sensors
 - **Memory** - RAM and swap usage with percentages
 - **Disk** - per-partition usage, inodes, mount options, largest files
-- **Network** - interface stats, active connections, listening ports, DNS, ping
+- **Network** - interface stats, active connections, listening ports, DNS, ping, IP geolocation & ASN lookup
 - **Processes** - running processes sorted by CPU or memory, open file descriptors per process
 - **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
 - **Services & automation** - systemd units, service status, user timers, crontab
@@ -129,6 +129,7 @@ Add the following to your MCP client configuration:
 | `get_logged_in_users`          | Returns active user sessions for security and workload awareness                                                                                                                            |
 | `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit                                                                                              |
 | `resolve_dns`                  | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                                                                                       |
+| `get_ip_info`                  | Returns IP geolocation (country, city, region), ASN/organization, and detected service provider tags (e.g. "AWS", "Cloudflare", "GitHub"). Uses ip-api.com free geolocation API             |
 | `get_mount_options`            | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                                                                                        |
 | `get_systemd_units`            | Returns all systemd units and their states for full service inventory                                                                                                                       |
 
@@ -188,3 +189,4 @@ Published on the [MCP Registry](https://registry.modelcontextprotocol.io) as `io
 - [modelcontextprotocol/go-sdk](https://github.com/modelcontextprotocol/go-sdk) - MCP SDK for Go
 - [shirou/gopsutil](https://github.com/shirou/gopsutil) - System metrics (CPU, memory, disk, network, processes, sensors)
 - [docker/go-sdk](https://github.com/docker/go-sdk) - Docker Engine API client
+- [ip-api.com](https://ip-api.com) - Free IP geolocation API (used by `get_ip_info`)

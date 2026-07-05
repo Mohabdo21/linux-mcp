@@ -2,8 +2,10 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"sort"
@@ -385,6 +387,150 @@ func HandleResolveDNS(
 		0,
 		func(ctx context.Context) (*ResolveDNSOutput, error) {
 			return GatherDNSResolve(ctx, input.Hostname)
+		},
+	)
+}
+
+type GetIPInfoInput struct {
+	IP string `json:"ip,omitempty" jsonschema:"optional IP address to lookup (defaults to your public IP)"`
+}
+
+type IPInfoOutput struct {
+	IP          string   `json:"ip"`
+	ASN         string   `json:"asn,omitempty"`
+	Org         string   `json:"org,omitempty"`
+	Country     string   `json:"country,omitempty"`
+	City        string   `json:"city,omitempty"`
+	Region      string   `json:"region,omitempty"`
+	ServiceTags []string `json:"service_tags,omitempty"`
+	OutputErrors
+}
+
+type ipAPIResponse struct {
+	Status  string `json:"status"`
+	Country string `json:"country"`
+	City    string `json:"city"`
+	Region  string `json:"regionName"`
+	ISP     string `json:"isp"`
+	Org     string `json:"org"`
+	AS      string `json:"as"`
+	Query   string `json:"query"`
+}
+
+var serviceTagPatterns = []struct {
+	patterns []string
+	tag      string
+}{
+	{
+		[]string{
+			"AMAZON-02",
+			"AMAZON-08",
+			"AMAZON-09",
+			"AMAZON ",
+			"AWS",
+			"AMAZOW",
+		},
+		"AWS",
+	},
+	{[]string{"GOOGLE", "GOOGLE-FIBER", "GCP"}, "Google Cloud"},
+	{[]string{"CLOUDFLARE"}, "Cloudflare"},
+	{[]string{"GITHUB"}, "GitHub"},
+	{[]string{"MICROSOFT", "AZURE"}, "Azure"},
+	{[]string{"DIGITALOCEAN"}, "DigitalOcean"},
+	{[]string{"LINODE"}, "Linode"},
+	{[]string{"OVH"}, "OVH"},
+	{[]string{"HETZNER"}, "Hetzner"},
+	{[]string{"ORACLE-", "ORACLE"}, "Oracle Cloud"},
+	{[]string{"FASTLY"}, "Fastly"},
+}
+
+func detectServiceTags(isp, org, asn string) []string {
+	combined := strings.ToUpper(isp + " " + org + " " + asn)
+	seen := make(map[string]bool)
+	var tags []string
+	for _, entry := range serviceTagPatterns {
+		for _, p := range entry.patterns {
+			if strings.Contains(combined, p) {
+				if !seen[entry.tag] {
+					tags = append(tags, entry.tag)
+					seen[entry.tag] = true
+				}
+				break
+			}
+		}
+	}
+	return tags
+}
+
+func parseASN(asField string) string {
+	if asField == "" {
+		return ""
+	}
+	parts := strings.SplitN(asField, " ", 2)
+	return parts[0]
+}
+
+const ipAPIURL = "http://ip-api.com/json/"
+
+func GatherIPInfo(ctx context.Context, ip string) (*IPInfoOutput, error) {
+	url := ipAPIURL
+	if ip != "" {
+		if parsed := net.ParseIP(ip); parsed == nil {
+			return &IPInfoOutput{
+					IP: ip,
+				}, net.InvalidAddrError(
+					"invalid IP address",
+				)
+		}
+		url += ip
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "linux-mcp/1.0")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var apiResp ipAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil, err
+	}
+
+	if apiResp.Status != "success" {
+		return &IPInfoOutput{IP: apiResp.Query}, nil
+	}
+
+	asn := parseASN(apiResp.AS)
+	tags := detectServiceTags(apiResp.ISP, apiResp.Org, apiResp.AS)
+
+	return &IPInfoOutput{
+		IP:          apiResp.Query,
+		ASN:         asn,
+		Org:         apiResp.Org,
+		Country:     apiResp.Country,
+		City:        apiResp.City,
+		Region:      apiResp.Region,
+		ServiceTags: tags,
+	}, nil
+}
+
+func HandleGetIPInfo(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	input GetIPInfoInput,
+) (*mcp.CallToolResult, *IPInfoOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_ip_info",
+		0,
+		func(ctx context.Context) (*IPInfoOutput, error) {
+			return GatherIPInfo(ctx, input.IP)
 		},
 	)
 }
