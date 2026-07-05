@@ -440,7 +440,7 @@ func HandleGetContainerLogs(
 // --- Container Stats ---
 
 type GetDockerContainerStatsInput struct {
-	ContainerID string `json:"container_id" jsonschema:"container name or ID"`
+	ContainerIDs string `json:"container_ids" jsonschema:"container name(s) or ID(s), comma-separated, or 'all' for all running containers"`
 }
 
 type DockerContainerStats struct {
@@ -455,8 +455,8 @@ type DockerContainerStats struct {
 }
 
 type DockerContainerStatsOutput struct {
-	Stats  DockerContainerStats `json:"stats"`
-	Errors []string             `json:"errors,omitempty"`
+	Containers []DockerContainerStatEntry `json:"containers"`
+	Errors     []string                   `json:"errors,omitempty"`
 }
 
 func GatherContainerStats(
@@ -555,8 +555,14 @@ func GatherContainerStats(
 		}
 	}
 
+	shortID := containerID
+	if len(shortID) > 12 {
+		shortID = shortID[:12]
+	}
+
 	return DockerContainerStatsOutput{
-		Stats: DockerContainerStats{
+		Containers: []DockerContainerStatEntry{{
+			ID:            shortID,
 			CPUPercent:    cpuPercent,
 			MemoryUsage:   stats.MemoryStats.Usage,
 			MemoryLimit:   stats.MemoryStats.Limit,
@@ -565,7 +571,7 @@ func GatherContainerStats(
 			Network:       networkMap,
 			BlockRead:     blkRead,
 			BlockWrite:    blkWrite,
-		},
+		}},
 	}, nil
 }
 
@@ -578,17 +584,201 @@ func HandleGetContainerStats(
 		return nil, DockerContainerStatsOutput{},
 			errors.New("tool disabled by configuration")
 	}
-	if input.ContainerID == "" {
+	if input.ContainerIDs == "" {
 		return nil, DockerContainerStatsOutput{},
-			errors.New("container_id is required")
+			errors.New("container_ids is required")
 	}
+
+	if input.ContainerIDs == "all" {
+		ctx, cancel := WithToolTimeout(
+			ctx, "get_docker_container_stats", 30*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		all, err := GatherDockerStatsAll(ctx, nil)
+		out := DockerContainerStatsOutput(all)
+		LogToolCall(ctx, "get_docker_container_stats",
+			time.Since(start), len(out.Errors))
+		if err != nil {
+			out.Errors = append(out.Errors, err.Error())
+		}
+		return nil, out, nil
+	}
+
+	ids := strings.Split(input.ContainerIDs, ",")
+	for i := range ids {
+		ids[i] = strings.TrimSpace(ids[i])
+	}
+
+	if len(ids) == 1 {
+		ctx, cancel := WithToolTimeout(
+			ctx, "get_docker_container_stats", 10*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		out, err := GatherContainerStats(ctx, ids[0])
+		LogToolCall(ctx, "get_docker_container_stats",
+			time.Since(start), len(out.Errors))
+		if err != nil {
+			out.Errors = append(out.Errors, err.Error())
+		}
+		return nil, out, nil
+	}
+
 	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_container_stats", 10*time.Second)
+		ctx, "get_docker_container_stats", 30*time.Second)
 	defer cancel()
 
 	start := time.Now()
-	out, err := GatherContainerStats(ctx, input.ContainerID)
+	all, err := GatherDockerStatsAll(ctx, ids)
+	out := DockerContainerStatsOutput(all)
 	LogToolCall(ctx, "get_docker_container_stats",
+		time.Since(start), len(out.Errors))
+	if err != nil {
+		out.Errors = append(out.Errors, err.Error())
+	}
+	return nil, out, nil
+}
+
+// --- All Containers Stats (bulk) ---
+
+type GetDockerStatsAllInput struct {
+	Containers []string `json:"containers,omitempty" jsonschema:"optional list of container names or IDs to filter"`
+}
+
+type DockerContainerStatEntry struct {
+	ID            string                       `json:"id"`
+	Name          string                       `json:"name"`
+	CPUPercent    float64                      `json:"cpu_percent"`
+	MemoryUsage   uint64                       `json:"memory_usage"`
+	MemoryLimit   uint64                       `json:"memory_limit"`
+	MemoryPercent float64                      `json:"memory_percent"`
+	PIDs          uint64                       `json:"pids"`
+	Network       map[string]map[string]uint64 `json:"network,omitempty"`
+	BlockRead     uint64                       `json:"block_read"`
+	BlockWrite    uint64                       `json:"block_write"`
+	Error         string                       `json:"error,omitempty"`
+}
+
+type DockerStatsAllOutput struct {
+	Containers []DockerContainerStatEntry `json:"containers"`
+	Errors     []string                   `json:"errors,omitempty"`
+}
+
+func GatherDockerStatsAll(
+	ctx context.Context,
+	containers []string,
+) (DockerStatsAllOutput, error) {
+	cli, err := newDockerClient(ctx)
+	if err != nil {
+		return DockerStatsAllOutput{}, err
+	}
+	defer func() { _ = cli.Close() }()
+
+	running, err := cli.ContainerList(
+		ctx,
+		mobyclient.ContainerListOptions{All: false},
+	)
+	if err != nil {
+		return DockerStatsAllOutput{}, err
+	}
+
+	filterSet := map[string]bool{}
+	for _, f := range containers {
+		filterSet[f] = true
+	}
+
+	type target struct{ id, name string }
+	var targets []target
+	for _, c := range running.Items {
+		name := ""
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/")
+		}
+		shortID := c.ID
+		if len(shortID) > 12 {
+			shortID = shortID[:12]
+		}
+		if len(filterSet) > 0 && !filterSet[c.ID] && !filterSet[shortID] &&
+			!filterSet[name] {
+			continue
+		}
+		targets = append(targets, target{id: c.ID, name: name})
+	}
+
+	type statResult struct {
+		id    string
+		name  string
+		entry DockerContainerStatEntry
+		err   error
+	}
+	ch := make(chan statResult, len(targets))
+	for _, t := range targets {
+		go func(containerID, containerName string) {
+			out, err := GatherContainerStats(ctx, containerID)
+			if err != nil {
+				ch <- statResult{id: containerID, name: containerName, err: err}
+			} else if len(out.Containers) > 0 {
+				ch <- statResult{
+					id: containerID, name: containerName, entry: out.Containers[0],
+				}
+			}
+		}(t.id, t.name)
+	}
+
+	entries := make([]DockerContainerStatEntry, 0, len(targets))
+	var errs []string
+	for range targets {
+		r := <-ch
+		shortID := r.id
+		if len(shortID) > 12 {
+			shortID = shortID[:12]
+		}
+		entry := DockerContainerStatEntry{
+			ID:   shortID,
+			Name: r.name,
+		}
+		if r.err != nil {
+			entry.Error = r.err.Error()
+			errs = append(
+				errs,
+				fmt.Sprintf("%s (%s): %v", r.name, shortID, r.err),
+			)
+		} else {
+			entry.CPUPercent = r.entry.CPUPercent
+			entry.MemoryUsage = r.entry.MemoryUsage
+			entry.MemoryLimit = r.entry.MemoryLimit
+			entry.MemoryPercent = r.entry.MemoryPercent
+			entry.PIDs = r.entry.PIDs
+			entry.Network = r.entry.Network
+			entry.BlockRead = r.entry.BlockRead
+			entry.BlockWrite = r.entry.BlockWrite
+		}
+		entries = append(entries, entry)
+	}
+
+	return DockerStatsAllOutput{
+		Containers: entries,
+		Errors:     errs,
+	}, nil
+}
+
+func HandleGetDockerStatsAll(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	input GetDockerStatsAllInput,
+) (*mcp.CallToolResult, DockerStatsAllOutput, error) {
+	if config.IsDisabled("get_docker_stats_all") {
+		return nil, DockerStatsAllOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_docker_stats_all", 30*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	out, err := GatherDockerStatsAll(ctx, input.Containers)
+	LogToolCall(ctx, "get_docker_stats_all",
 		time.Since(start), len(out.Errors))
 	if err != nil {
 		out.Errors = append(out.Errors, err.Error())
@@ -1285,4 +1475,60 @@ func HandleGetDockerDiskUsage(
 		out.Errors = append(out.Errors, err.Error())
 	}
 	return nil, out, nil
+}
+
+// --- Docker System Snapshot ---
+
+type GetDockerSystemSnapshotInput struct{}
+
+type DockerSystemSnapshotOutput struct {
+	Info      DockerInfoOutput      `json:"info"`
+	Stats     DockerStatsAllOutput  `json:"stats"`
+	DiskUsage DockerDiskUsageOutput `json:"disk_usage"`
+	Errors    ErrList               `json:"errors,omitempty"`
+}
+
+func HandleGetDockerSystemSnapshot(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	_ GetDockerSystemSnapshotInput,
+) (*mcp.CallToolResult, DockerSystemSnapshotOutput, error) {
+	if config.IsDisabled("get_docker_system_snapshot") {
+		return nil, DockerSystemSnapshotOutput{},
+			errors.New("tool disabled by configuration")
+	}
+	ctx, cancel := WithToolTimeout(
+		ctx, "get_docker_system_snapshot", 60*time.Second)
+	defer cancel()
+
+	start := time.Now()
+
+	var snapshot DockerSystemSnapshotOutput
+	var errs ErrList
+
+	if out, err := GatherDockerInfo(ctx); err == nil {
+		snapshot.Info = out
+	} else {
+		errs.Add("info", err)
+		snapshot.Info = DockerInfoOutput{}
+	}
+
+	if out, err := GatherDockerStatsAll(ctx, nil); err == nil {
+		snapshot.Stats = out
+	} else {
+		errs.Add("stats", err)
+		snapshot.Stats = DockerStatsAllOutput{}
+	}
+
+	if out, err := GatherDockerDiskUsage(ctx); err == nil {
+		snapshot.DiskUsage = out
+	} else {
+		errs.Add("disk_usage", err)
+		snapshot.DiskUsage = DockerDiskUsageOutput{}
+	}
+
+	snapshot.Errors = errs
+	LogToolCall(ctx, "get_docker_system_snapshot",
+		time.Since(start), len(errs))
+	return nil, snapshot, nil
 }

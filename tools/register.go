@@ -97,6 +97,18 @@ func RegisterTools(server *mcp.Server) {
 			"containers, images, volumes, and build cache",
 	}, HandleGetDockerDiskUsage)
 	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_stats_all",
+		Description: "Returns CPU, memory, network I/O, and block I/O " +
+			"for all running containers in a single call. " +
+			"Accepts an optional list of container names or IDs to filter.",
+	}, HandleGetDockerStatsAll)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "get_docker_system_snapshot",
+		Description: "Returns a comprehensive Docker health snapshot " +
+			"combining containers, images, running stats, disk usage, " +
+			"and networks in a single call.",
+	}, HandleGetDockerSystemSnapshot)
+	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_system_snapshot",
 		Description: "Returns a comprehensive snapshot of system " +
 			"status combining all tools",

@@ -305,9 +305,13 @@ func TestGatherContainerStats(t *testing.T) {
 	if err != nil {
 		t.Skipf("GatherContainerStats() error: %v", err)
 	}
+	if len(out.Containers) == 0 {
+		t.Fatal("Expected at least one container stat entry")
+	}
+	c := out.Containers[0]
 	t.Logf("Container %s: CPU=%.1f%% Memory=%d/%d PIDs=%d",
-		statsID, out.Stats.CPUPercent, out.Stats.MemoryUsage,
-		out.Stats.MemoryLimit, out.Stats.PIDs)
+		statsID, c.CPUPercent, c.MemoryUsage,
+		c.MemoryLimit, c.PIDs)
 }
 
 func TestGatherContainerTop(t *testing.T) {
@@ -443,6 +447,55 @@ func TestGatherDockerDiskUsage(t *testing.T) {
 		out.Images.TotalCount,
 		out.Images.TotalSize,
 	)
+}
+
+func TestGatherDockerStatsAll(t *testing.T) {
+	out, err := GatherDockerStatsAll(t.Context(), nil)
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+	t.Logf(
+		"Got stats for %d running container(s)",
+		len(out.Containers),
+	)
+	for _, c := range out.Containers {
+		if c.Error != "" {
+			t.Logf("  %s (%s): error=%s", c.Name, c.ID, c.Error)
+		} else {
+			t.Logf(
+				"  %s (%s): CPU=%.1f%% Mem=%d/%d Net=%d blk=%d/%d",
+				c.Name, c.ID, c.CPUPercent, c.MemoryUsage,
+				c.MemoryLimit, len(c.Network),
+				c.BlockRead, c.BlockWrite,
+			)
+		}
+	}
+}
+
+func TestGatherDockerSystemSnapshot(t *testing.T) {
+	ctx := t.Context()
+	result, snapshot, err := HandleGetDockerSystemSnapshot(
+		ctx,
+		nil,
+		GetDockerSystemSnapshotInput{},
+	)
+	if err != nil {
+		t.Fatalf("get_docker_system_snapshot error: %v", err)
+	}
+	if result != nil {
+		t.Error("CallToolResult should be nil (structured output path)")
+	}
+	t.Logf(
+		"Containers=%d Images=%d Stats=%d DiskContainers=%d/%d",
+		len(snapshot.Info.Containers),
+		len(snapshot.Info.Images),
+		len(snapshot.Stats.Containers),
+		snapshot.DiskUsage.Containers.ActiveCount,
+		snapshot.DiskUsage.Containers.TotalCount,
+	)
+	if len(snapshot.Errors) > 0 {
+		t.Logf("Errors: %v", snapshot.Errors)
+	}
 }
 
 func TestGatherSystemSnapshot(t *testing.T) {
