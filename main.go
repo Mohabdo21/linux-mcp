@@ -39,6 +39,10 @@ func setupLogging() {
 	slog.SetDefault(slog.New(handler))
 }
 
+func init() {
+	_ = os.Setenv("JSONSCHEMAGODEBUG", "typeschemasnull=1")
+}
+
 func main() {
 	if err := config.Load(); err != nil {
 		log.Printf("Config load error (using defaults): %v", err)
