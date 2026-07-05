@@ -10,7 +10,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **CPU** - usage, model, frequency, core counts, temperature sensors
 - **Memory** - RAM and swap usage with percentages
 - **Disk** - per-partition usage, inodes, mount options, largest files
-- **Network** - interface stats, listening ports, DNS, ping
+- **Network** - interface stats, active connections, listening ports, DNS, ping
 - **Processes** - running processes sorted by CPU or memory, open file descriptors per process
 - **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
 - **Services & automation** - systemd units, service status, user timers, crontab
@@ -112,6 +112,7 @@ Add the following to your MCP client configuration:
 | `get_system_snapshot`          | Returns a comprehensive snapshot combining all tools                                                                                                                                       |
 | `get_journal_logs`             | Reads systemd journal logs with optional filtering by unit, priority, and time range; set `user=true` to query user-level journal                                                          |
 | `get_inode_usage`              | Returns inode usage for mounted filesystems to diagnose "disk full" errors when df shows free space                                                                                        |
+| `get_network_connections`      | Returns all active TCP/UDP connections with state, addresses, process info, and optional reverse DNS hostnames; supports filtering by status and type, grouping by PID, and result limiting |
 | `get_listening_ports`          | Returns listening ports and their associated processes for security auditing and port conflict resolution                                                                                  |
 | `get_service_status`           | Returns detailed status of a systemd service; set `user=true` to query user-level service                                                                                                  |
 | `get_top_io_processes`         | Returns processes with the highest disk I/O activity to diagnose system lag                                                                                                                |
