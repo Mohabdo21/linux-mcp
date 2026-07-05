@@ -289,6 +289,12 @@ func RegisterTools(server *mcp.Server) {
 	)
 	registerTool(
 		server,
+		"get_user_info",
+		"Lists system users parsed from /etc/passwd and /etc/group including username, UID, GID, home directory, shell, and supplementary group memberships. Supports optional username filtering.",
+		HandleGetUserInfo,
+	)
+	registerTool(
+		server,
 		"get_ip_info",
 		"Returns IP geolocation data, ASN/organization information, and known service provider tags (e.g. \"AWS\", \"Cloudflare\", \"GitHub\") for a given IP address or your own public IP. Uses the ip-api.com free geolocation service.",
 		HandleGetIPInfo,

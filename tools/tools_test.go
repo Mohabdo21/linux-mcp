@@ -991,6 +991,50 @@ func TestGatherDesktopSessionInfo(t *testing.T) {
 	_ = out
 }
 
+func TestGatherUserInfo(t *testing.T) {
+	t.Run("AllUsers", func(t *testing.T) {
+		out, err := GatherUserInfo(t.Context(), "")
+		skipOnErr(t, err, "GatherUserInfo() error: %v", err)
+		if len(out.Users) == 0 {
+			t.Error("Users should not be empty")
+		}
+		root := out.Users[0]
+		if root.Username != "root" {
+			t.Errorf("expected first user 'root', got %q", root.Username)
+		}
+		if root.UID != 0 {
+			t.Errorf("expected root UID 0, got %d", root.UID)
+		}
+		t.Logf("Found %d users", len(out.Users))
+	})
+
+	t.Run("SearchFilter", func(t *testing.T) {
+		out, err := GatherUserInfo(t.Context(), "root")
+		skipOnErr(t, err, "GatherUserInfo() error: %v", err)
+		if len(out.Users) == 0 {
+			t.Error("expected at least one user matching 'root'")
+		}
+		for _, u := range out.Users {
+			if !strings.Contains(strings.ToLower(u.Username), "root") {
+				t.Errorf("user %q does not match search 'root'", u.Username)
+			}
+		}
+	})
+
+	t.Run("GroupMembership", func(t *testing.T) {
+		out, err := GatherUserInfo(t.Context(), "root")
+		skipOnErr(t, err, "GatherUserInfo() error: %v", err)
+		if len(out.Users) == 0 {
+			t.Skip("no root user found")
+		}
+		root := out.Users[0]
+		if len(root.Groups) == 0 {
+			t.Log("root has no supplementary groups (unusual but possible)")
+		}
+		t.Logf("root groups: %v", root.Groups)
+	})
+}
+
 func TestGatherManPage(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
 		out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
