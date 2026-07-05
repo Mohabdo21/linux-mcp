@@ -130,6 +130,7 @@ Add the following to your MCP client configuration:
 | `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit                                                                                              |
 | `resolve_dns`                  | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                                                                                       |
 | `get_ip_info`                  | Returns IP geolocation (country, city, region), ASN/organization, and detected service provider tags (e.g. "AWS", "Cloudflare", "GitHub"). Uses ip-api.com free geolocation API             |
+| `get_user_info`                | Lists system users parsed from /etc/passwd and /etc/group including username, UID, GID, home directory, shell, and supplementary group memberships. Supports optional username filtering.   |
 | `get_mount_options`            | Returns mount point options (rw/ro, etc.) for filesystem diagnostics                                                                                                                        |
 | `get_systemd_units`            | Returns all systemd units and their states for full service inventory                                                                                                                       |
 
