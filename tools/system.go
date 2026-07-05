@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/host"
 )
@@ -21,21 +19,21 @@ import (
 type GetSystemInfoInput struct{}
 
 type SystemInfoOutput struct {
-	Hostname      string   `json:"hostname"`
-	OSName        string   `json:"os_name"`
-	OSVersion     string   `json:"os_version"`
-	KernelVersion string   `json:"kernel_version"`
-	Architecture  string   `json:"architecture"`
-	UptimeSeconds uint64   `json:"uptime_seconds"`
-	Errors        []string `json:"errors,omitempty"`
+	Hostname      string `json:"hostname"`
+	OSName        string `json:"os_name"`
+	OSVersion     string `json:"os_version"`
+	KernelVersion string `json:"kernel_version"`
+	Architecture  string `json:"architecture"`
+	UptimeSeconds uint64 `json:"uptime_seconds"`
+	OutputErrors
 }
 
-func GatherSystemInfo(ctx context.Context) (SystemInfoOutput, error) {
+func GatherSystemInfo(ctx context.Context) (*SystemInfoOutput, error) {
 	info, err := host.Info()
 	if err != nil {
-		return SystemInfoOutput{}, err
+		return nil, err
 	}
-	return SystemInfoOutput{
+	return &SystemInfoOutput{
 		Hostname:      info.Hostname,
 		OSName:        info.OS,
 		OSVersion:     info.PlatformVersion,
@@ -47,25 +45,15 @@ func GatherSystemInfo(ctx context.Context) (SystemInfoOutput, error) {
 
 func HandleGetSystemInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetSystemInfoInput,
-) (*mcp.CallToolResult, SystemInfoOutput, error) {
-	if config.IsDisabled("get_system_info") {
-		return nil, SystemInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_system_info", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherSystemInfo(ctx)
-	LogToolCall(ctx, "get_system_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *SystemInfoOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_system_info",
+		5*time.Second,
+		GatherSystemInfo,
+	)
 }
 
 type GetSystemSnapshotInput struct{}
@@ -80,110 +68,105 @@ type SystemSnapshotOutput struct {
 	LoadAverage LoadAverageOutput    `json:"load_average"`
 	Processes   ProcessInfoOutput    `json:"processes"`
 	Docker      DockerInfoOutput     `json:"docker"`
-	Errors      ErrList              `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func HandleGetSystemSnapshot(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetSystemSnapshotInput,
-) (*mcp.CallToolResult, SystemSnapshotOutput, error) {
-	if config.IsDisabled("get_system_snapshot") {
-		return nil, SystemSnapshotOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_system_snapshot", 120*time.Second)
-	defer cancel()
+) (*mcp.CallToolResult, *SystemSnapshotOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_system_snapshot",
+		120*time.Second,
+		func(ctx context.Context) (*SystemSnapshotOutput, error) {
+			var snapshot SystemSnapshotOutput
+			var errs ErrList
 
-	start := time.Now()
+			if out, err := GatherSystemInfo(ctx); err == nil {
+				snapshot.System = *out
+			} else {
+				errs.Add("system", err)
+			}
 
-	var snapshot SystemSnapshotOutput
-	var errs ErrList
+			if out, err := GatherCPUInfo(ctx); err == nil {
+				snapshot.CPU = *out
+			} else {
+				errs.Add("cpu", err)
+			}
 
-	if out, err := GatherSystemInfo(ctx); err == nil {
-		snapshot.System = out
-	} else {
-		errs.Add("system", err)
-	}
+			if out, err := GatherCPUTemperature(ctx); err == nil {
+				snapshot.Temperature = *out
+			} else {
+				errs.Add("temperature", err)
+			}
 
-	if out, err := GatherCPUInfo(ctx); err == nil {
-		snapshot.CPU = out
-	} else {
-		errs.Add("cpu", err)
-	}
+			if out, err := GatherMemoryInfo(ctx); err == nil {
+				snapshot.Memory = *out
+			} else {
+				errs.Add("memory", err)
+			}
 
-	if out, err := GatherCPUTemperature(ctx); err == nil {
-		snapshot.Temperature = out
-	} else {
-		errs.Add("temperature", err)
-	}
+			if out, err := GatherDiskInfo(ctx, ""); err == nil {
+				snapshot.Disk = *out
+			} else {
+				errs.Add("disk", err)
+			}
 
-	if out, err := GatherMemoryInfo(ctx); err == nil {
-		snapshot.Memory = out
-	} else {
-		errs.Add("memory", err)
-	}
+			if out, err := GatherNetworkInfo(ctx); err == nil {
+				snapshot.Network = *out
+			} else {
+				errs.Add("network", err)
+			}
 
-	if out, err := GatherDiskInfo(ctx, ""); err == nil {
-		snapshot.Disk = out
-	} else {
-		errs.Add("disk", err)
-	}
+			if out, err := GatherLoadAverage(ctx); err == nil {
+				snapshot.LoadAverage = *out
+			} else {
+				errs.Add("load_average", err)
+			}
 
-	if out, err := GatherNetworkInfo(ctx); err == nil {
-		snapshot.Network = out
-	} else {
-		errs.Add("network", err)
-	}
+			if out, err := GatherProcessInfo(ctx, "cpu", 10); err == nil {
+				snapshot.Processes = *out
+			} else {
+				errs.Add("processes", err)
+			}
 
-	if out, err := GatherLoadAverage(ctx); err == nil {
-		snapshot.LoadAverage = out
-	} else {
-		errs.Add("load_average", err)
-	}
+			if out, err := GatherDockerInfo(ctx); err == nil {
+				snapshot.Docker = *out
+			} else {
+				errs.Add("docker", err)
+				snapshot.Docker = DockerInfoOutput{}
+			}
 
-	if out, err := GatherProcessInfo(ctx, "cpu", 10); err == nil {
-		snapshot.Processes = out
-	} else {
-		errs.Add("processes", err)
-	}
-
-	if out, err := GatherDockerInfo(ctx); err == nil {
-		snapshot.Docker = out
-	} else {
-		errs.Add("docker", err)
-		snapshot.Docker = DockerInfoOutput{}
-	}
-
-	snapshot.Errors = errs
-	LogToolCall(ctx, "get_system_snapshot",
-		time.Since(start), len(errs))
-	return nil, snapshot, nil
+			snapshot.Errors = errs
+			return &snapshot, nil
+		},
+	)
 }
 
 type GetLoadAverageInput struct{}
 
 type LoadAverageOutput struct {
-	Load1  float64  `json:"load_1"`
-	Load5  float64  `json:"load_5"`
-	Load15 float64  `json:"load_15"`
-	Errors []string `json:"errors,omitempty"`
+	Load1  float64 `json:"load_1"`
+	Load5  float64 `json:"load_5"`
+	Load15 float64 `json:"load_15"`
+	OutputErrors
 }
 
-func GatherLoadAverage(ctx context.Context) (LoadAverageOutput, error) {
+func GatherLoadAverage(ctx context.Context) (*LoadAverageOutput, error) {
 	data, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
-		return LoadAverageOutput{}, err
+		return nil, err
 	}
 	fields := strings.Fields(string(data))
 	if len(fields) < 3 {
-		return LoadAverageOutput{}, nil
+		return &LoadAverageOutput{}, nil
 	}
 	load1, _ := strconv.ParseFloat(fields[0], 64)
 	load5, _ := strconv.ParseFloat(fields[1], 64)
 	load15, _ := strconv.ParseFloat(fields[2], 64)
-	return LoadAverageOutput{Load1: load1, Load5: load5, Load15: load15}, nil
+	return &LoadAverageOutput{Load1: load1, Load5: load5, Load15: load15}, nil
 }
 
 type GetEnvironmentVariablesInput struct {
@@ -198,13 +181,13 @@ type EnvironmentVariable struct {
 type EnvironmentVariablesOutput struct {
 	Variables []EnvironmentVariable `json:"variables"`
 	Count     int                   `json:"count"`
-	Errors    []string              `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherEnvironmentVariables(
 	ctx context.Context,
 	search string,
-) (EnvironmentVariablesOutput, error) {
+) (*EnvironmentVariablesOutput, error) {
 	env := os.Environ()
 	variables := make([]EnvironmentVariable, 0, len(env))
 	for _, pair := range env {
@@ -230,7 +213,7 @@ func GatherEnvironmentVariables(
 	sort.Slice(variables, func(i, j int) bool {
 		return variables[i].Name < variables[j].Name
 	})
-	return EnvironmentVariablesOutput{
+	return &EnvironmentVariablesOutput{
 		Variables: variables,
 		Count:     len(variables),
 	}, nil
@@ -238,25 +221,17 @@ func GatherEnvironmentVariables(
 
 func HandleGetEnvironmentVariables(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetEnvironmentVariablesInput,
-) (*mcp.CallToolResult, EnvironmentVariablesOutput, error) {
-	if config.IsDisabled("get_environment_variables") {
-		return nil, EnvironmentVariablesOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_environment_variables", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherEnvironmentVariables(ctx, input.Search)
-	LogToolCall(ctx, "get_environment_variables",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *EnvironmentVariablesOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_environment_variables",
+		5*time.Second,
+		func(ctx context.Context) (*EnvironmentVariablesOutput, error) {
+			return GatherEnvironmentVariables(ctx, input.Search)
+		},
+	)
 }
 
 type GetHardwareBusInfoInput struct {
@@ -274,7 +249,7 @@ type BusDevice struct {
 type HardwareBusInfoOutput struct {
 	PCIDevices []BusDevice `json:"pci_devices"`
 	USBDevices []BusDevice `json:"usb_devices"`
-	Errors     []string    `json:"errors,omitempty"`
+	OutputErrors
 }
 
 const (
@@ -496,7 +471,7 @@ func filterDevices(devices []BusDevice, search string) []BusDevice {
 func GatherHardwareBusInfo(
 	ctx context.Context,
 	search string,
-) (HardwareBusInfoOutput, error) {
+) (*HardwareBusInfoOutput, error) {
 	var out HardwareBusInfoOutput
 	var errs ErrList
 
@@ -523,53 +498,35 @@ func GatherHardwareBusInfo(
 	}
 
 	out.Errors = errs
-	return out, errs.Err()
+	return &out, out.Err()
 }
 
 func HandleGetHardwareBusInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetHardwareBusInfoInput,
-) (*mcp.CallToolResult, HardwareBusInfoOutput, error) {
-	if config.IsDisabled("get_hardware_bus_info") {
-		return nil, HardwareBusInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_hardware_bus_info", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherHardwareBusInfo(ctx, input.Search)
-	LogToolCall(ctx, "get_hardware_bus_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *HardwareBusInfoOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_hardware_bus_info",
+		10*time.Second,
+		func(ctx context.Context) (*HardwareBusInfoOutput, error) {
+			return GatherHardwareBusInfo(ctx, input.Search)
+		},
+	)
 }
 
 func HandleGetLoadAverage(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetLoadAverageInput,
-) (*mcp.CallToolResult, LoadAverageOutput, error) {
-	if config.IsDisabled("get_load_average") {
-		return nil, LoadAverageOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_load_average", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherLoadAverage(ctx)
-	LogToolCall(ctx, "get_load_average",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *LoadAverageOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_load_average",
+		5*time.Second,
+		GatherLoadAverage,
+	)
 }
 
 type GetUserAutomationInput struct{}
@@ -589,12 +546,12 @@ type SystemdTimer struct {
 type UserAutomationOutput struct {
 	CronJobs      []CronJob      `json:"cron_jobs"`
 	SystemdTimers []SystemdTimer `json:"systemd_timers"`
-	Errors        []string       `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherUserAutomation(
 	ctx context.Context,
-) (UserAutomationOutput, error) {
+) (*UserAutomationOutput, error) {
 	var out UserAutomationOutput
 	var errs ErrList
 
@@ -660,47 +617,37 @@ func GatherUserAutomation(
 	}
 
 	out.Errors = errs
-	return out, errs.Err()
+	return &out, out.Err()
 }
 
 func HandleGetUserAutomation(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetUserAutomationInput,
-) (*mcp.CallToolResult, UserAutomationOutput, error) {
-	if config.IsDisabled("get_user_automation") {
-		return nil, UserAutomationOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_user_automation", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherUserAutomation(ctx)
-	LogToolCall(ctx, "get_user_automation",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *UserAutomationOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_user_automation",
+		10*time.Second,
+		GatherUserAutomation,
+	)
 }
 
 type GetDesktopSessionInfoInput struct{}
 
 type DesktopSessionOutput struct {
-	SessionType    string   `json:"session_type"`
-	CurrentDesktop string   `json:"current_desktop"`
-	RuntimeDir     string   `json:"runtime_dir"`
-	Display        string   `json:"display"`
-	WaylandDisplay string   `json:"wayland_display"`
-	Errors         []string `json:"errors,omitempty"`
+	SessionType    string `json:"session_type"`
+	CurrentDesktop string `json:"current_desktop"`
+	RuntimeDir     string `json:"runtime_dir"`
+	Display        string `json:"display"`
+	WaylandDisplay string `json:"wayland_display"`
+	OutputErrors
 }
 
 func GatherDesktopSessionInfo(
 	ctx context.Context,
-) (DesktopSessionOutput, error) {
-	return DesktopSessionOutput{
+) (*DesktopSessionOutput, error) {
+	return &DesktopSessionOutput{
 		SessionType:    os.Getenv("XDG_SESSION_TYPE"),
 		CurrentDesktop: os.Getenv("XDG_CURRENT_DESKTOP"),
 		RuntimeDir:     os.Getenv("XDG_RUNTIME_DIR"),
@@ -711,23 +658,13 @@ func GatherDesktopSessionInfo(
 
 func HandleGetDesktopSessionInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDesktopSessionInfoInput,
-) (*mcp.CallToolResult, DesktopSessionOutput, error) {
-	if config.IsDisabled("get_desktop_session_info") {
-		return nil, DesktopSessionOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_desktop_session_info", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDesktopSessionInfo(ctx)
-	LogToolCall(ctx, "get_desktop_session_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DesktopSessionOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_desktop_session_info",
+		5*time.Second,
+		GatherDesktopSessionInfo,
+	)
 }

@@ -2,13 +2,11 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -28,13 +26,13 @@ type JournalLogEntry struct {
 
 type JournalLogsOutput struct {
 	Entries []JournalLogEntry `json:"entries"`
-	Errors  []string          `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherJournalLogs(
 	ctx context.Context, unit, priority, since, until string,
 	lines int, user bool,
-) (JournalLogsOutput, error) {
+) (*JournalLogsOutput, error) {
 	if lines <= 0 {
 		lines = 50
 	}
@@ -63,7 +61,7 @@ func GatherJournalLogs(
 	cmd := exec.CommandContext(ctx, "journalctl", args...)
 	out, err := cmd.Output()
 	if err != nil {
-		return JournalLogsOutput{}, err
+		return nil, err
 	}
 	var entries []JournalLogEntry
 	for line := range strings.SplitSeq(
@@ -81,32 +79,22 @@ func GatherJournalLogs(
 			Message:   parts[2],
 		})
 	}
-	return JournalLogsOutput{Entries: entries}, nil
+	return &JournalLogsOutput{Entries: entries}, nil
 }
 
 func HandleGetJournalLogs(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetJournalLogsInput,
-) (*mcp.CallToolResult, JournalLogsOutput, error) {
-	if config.IsDisabled("get_journal_logs") {
-		return nil, JournalLogsOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_journal_logs", 20*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherJournalLogs(
-		ctx, input.Unit, input.Priority,
-		input.Since, input.Until,
-		input.Lines, input.User,
+) (*mcp.CallToolResult, *JournalLogsOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_journal_logs",
+		20*time.Second,
+		func(ctx context.Context) (*JournalLogsOutput, error) {
+			return GatherJournalLogs(ctx, input.Unit, input.Priority,
+				input.Since, input.Until,
+				input.Lines, input.User)
+		},
 	)
-	LogToolCall(ctx, "get_journal_logs",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
 }

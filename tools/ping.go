@@ -10,7 +10,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -48,21 +47,21 @@ type PingHostInput struct {
 }
 
 type PingOutput struct {
-	Host               string   `json:"host"`
-	PacketsTransmitted int      `json:"packets_transmitted"`
-	PacketsReceived    int      `json:"packets_received"`
-	PacketLossPercent  float64  `json:"packet_loss_percent"`
-	MinLatencyMs       float64  `json:"min_latency_ms"`
-	AvgLatencyMs       float64  `json:"avg_latency_ms"`
-	MaxLatencyMs       float64  `json:"max_latency_ms"`
-	Errors             []string `json:"errors,omitempty"`
+	Host               string  `json:"host"`
+	PacketsTransmitted int     `json:"packets_transmitted"`
+	PacketsReceived    int     `json:"packets_received"`
+	PacketLossPercent  float64 `json:"packet_loss_percent"`
+	MinLatencyMs       float64 `json:"min_latency_ms"`
+	AvgLatencyMs       float64 `json:"avg_latency_ms"`
+	MaxLatencyMs       float64 `json:"max_latency_ms"`
+	OutputErrors
 }
 
 func GatherPing(
 	ctx context.Context,
 	host string,
 	count, timeout int,
-) (PingOutput, error) {
+) (*PingOutput, error) {
 	if count <= 0 {
 		count = 4
 	}
@@ -79,7 +78,7 @@ func GatherPing(
 	)
 	out, err := cmd.Output()
 	output := string(out)
-	result := PingOutput{Host: host}
+	result := &PingOutput{Host: host}
 	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, "packets transmitted") {
 			_, _ = fmt.Sscanf(
@@ -112,33 +111,25 @@ func GatherPing(
 		}
 	}
 	if err != nil && output == "" {
-		return PingOutput{}, err
+		return nil, err
 	}
 	return result, nil
 }
 
 func HandlePingHost(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input PingHostInput,
-) (*mcp.CallToolResult, PingOutput, error) {
-	if config.IsDisabled("ping_host") {
-		return nil, PingOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *PingOutput, error) {
 	if !validHost(input.Host) {
-		return nil, PingOutput{}, errInvalidHost
+		return nil, nil, errInvalidHost
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "ping_host", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherPing(ctx, input.Host, input.Count, input.Timeout)
-	LogToolCall(ctx, "ping_host",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"ping_host",
+		10*time.Second,
+		func(ctx context.Context) (*PingOutput, error) {
+			return GatherPing(ctx, input.Host, input.Count, input.Timeout)
+		},
+	)
 }

@@ -2,12 +2,10 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -17,12 +15,12 @@ type GetServiceStatusInput struct {
 }
 
 type ServiceStatusOutput struct {
-	Name   string   `json:"name"`
-	Loaded string   `json:"loaded,omitempty"`
-	Active string   `json:"active,omitempty"`
-	PID    string   `json:"pid,omitempty"`
-	Output string   `json:"output"`
-	Errors []string `json:"errors,omitempty"`
+	Name   string `json:"name"`
+	Loaded string `json:"loaded,omitempty"`
+	Active string `json:"active,omitempty"`
+	PID    string `json:"pid,omitempty"`
+	Output string `json:"output"`
+	OutputErrors
 }
 
 func ExtractField(output, prefix string) string {
@@ -37,7 +35,7 @@ func ExtractField(output, prefix string) string {
 
 func GatherServiceStatus(
 	ctx context.Context, name string, user bool,
-) (ServiceStatusOutput, error) {
+) (*ServiceStatusOutput, error) {
 	args := []string{"status", name, "--no-pager", "-l"}
 	if user {
 		args = append([]string{"--user"}, args...)
@@ -48,7 +46,7 @@ func GatherServiceStatus(
 	loaded := ExtractField(output, "Loaded:")
 	active := ExtractField(output, "Active:")
 	pid := ExtractField(output, "Main PID:")
-	return ServiceStatusOutput{
+	return &ServiceStatusOutput{
 		Name:   name,
 		Loaded: strings.TrimSpace(loaded),
 		Active: strings.TrimSpace(active),
@@ -68,11 +66,11 @@ type SystemdUnit struct {
 }
 
 type SystemdUnitsOutput struct {
-	Units  []SystemdUnit `json:"units"`
-	Errors []string      `json:"errors,omitempty"`
+	Units []SystemdUnit `json:"units"`
+	OutputErrors
 }
 
-func GatherSystemdUnits(ctx context.Context) (SystemdUnitsOutput, error) {
+func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
 	cmd := exec.CommandContext(ctx,
 		"systemctl",
 		"list-units",
@@ -82,7 +80,7 @@ func GatherSystemdUnits(ctx context.Context) (SystemdUnitsOutput, error) {
 	)
 	out, err := cmd.Output()
 	if err != nil {
-		return SystemdUnitsOutput{}, err
+		return nil, err
 	}
 	var units []SystemdUnit
 	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
@@ -105,51 +103,33 @@ func GatherSystemdUnits(ctx context.Context) (SystemdUnitsOutput, error) {
 			Description: desc,
 		})
 	}
-	return SystemdUnitsOutput{Units: units}, nil
+	return &SystemdUnitsOutput{Units: units}, nil
 }
 
 func HandleGetSystemdUnits(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetSystemdUnitsInput,
-) (*mcp.CallToolResult, SystemdUnitsOutput, error) {
-	if config.IsDisabled("get_systemd_units") {
-		return nil, SystemdUnitsOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_systemd_units", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherSystemdUnits(ctx)
-	LogToolCall(ctx, "get_systemd_units",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *SystemdUnitsOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_systemd_units",
+		10*time.Second,
+		GatherSystemdUnits,
+	)
 }
 
 func HandleGetServiceStatus(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetServiceStatusInput,
-) (*mcp.CallToolResult, ServiceStatusOutput, error) {
-	if config.IsDisabled("get_service_status") {
-		return nil, ServiceStatusOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_service_status", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherServiceStatus(ctx, input.Name, input.User)
-	LogToolCall(ctx, "get_service_status",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *ServiceStatusOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_service_status",
+		10*time.Second,
+		func(ctx context.Context) (*ServiceStatusOutput, error) {
+			return GatherServiceStatus(ctx, input.Name, input.User)
+		},
+	)
 }

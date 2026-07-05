@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -22,10 +22,10 @@ type GetManPageInput struct {
 }
 
 type ManPageOutput struct {
-	Command   string   `json:"command"`
-	Content   string   `json:"content"`
-	Truncated bool     `json:"truncated,omitempty"`
-	Errors    []string `json:"errors,omitempty"`
+	Command   string `json:"command"`
+	Content   string `json:"content"`
+	Truncated bool   `json:"truncated,omitempty"`
+	OutputErrors
 }
 
 func cleanManOutput(raw string) string {
@@ -50,9 +50,9 @@ func GatherManPage(
 	search string,
 	contextLines int,
 	offset int,
-) (ManPageOutput, error) {
+) (*ManPageOutput, error) {
 	if _, err := exec.LookPath("man"); err != nil {
-		return ManPageOutput{}, errors.New("man command not found")
+		return nil, errors.New("man command not found")
 	}
 	cmd := exec.CommandContext(ctx, "man", "-P", "cat", command)
 	out, err := cmd.Output()
@@ -64,11 +64,11 @@ func GatherManPage(
 			}
 			if strings.Contains(msg, "No manual entry") ||
 				strings.Contains(string(out), "No manual entry") {
-				return ManPageOutput{},
+				return nil,
 					errors.New("No manual page found for '" + command + "'")
 			}
 		}
-		return ManPageOutput{}, err
+		return nil, err
 	}
 	content := string(out)
 	if cleanSpecialChars {
@@ -116,7 +116,7 @@ func GatherManPage(
 		truncated = true
 	}
 
-	return ManPageOutput{
+	return &ManPageOutput{
 		Command:   command,
 		Content:   strings.Join(lines, "\n"),
 		Truncated: truncated,
@@ -127,14 +127,9 @@ func HandleGetManPage(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
 	input GetManPageInput,
-) (*mcp.CallToolResult, ManPageOutput, error) {
-	if config.IsDisabled("get_man_page") {
-		return nil, ManPageOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *ManPageOutput, error) {
 	if input.Command == "" {
-		return nil, ManPageOutput{},
-			errors.New("command is required")
+		return nil, nil, fmt.Errorf("command is required")
 	}
 	maxLines := input.MaxLines
 	if maxLines <= 0 {
@@ -145,15 +140,13 @@ func HandleGetManPage(
 	if input.Search != "" && contextLines <= 0 {
 		contextLines = 2
 	}
-	ctx, cancel := WithToolTimeout(ctx, "get_man_page", 15*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherManPage(ctx, input.Command, maxLines, true,
-		input.Search, contextLines, input.Offset)
-	LogToolCall(ctx, "get_man_page", time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_man_page",
+		15*time.Second,
+		func(ctx context.Context) (*ManPageOutput, error) {
+			return GatherManPage(ctx, input.Command, maxLines, true,
+				input.Search, contextLines, input.Offset)
+		},
+	)
 }

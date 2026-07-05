@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +11,6 @@ import (
 	dockersdk "github.com/docker/go-sdk/client"
 	mobyclient "github.com/moby/moby/client"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -35,7 +33,7 @@ type DockerImage struct {
 type DockerInfoOutput struct {
 	Containers []DockerContainer `json:"containers"`
 	Images     []DockerImage     `json:"images"`
-	Errors     []string          `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func newDockerClient(ctx context.Context) (dockersdk.SDKClient, error) {
@@ -111,10 +109,10 @@ func ListDockerImages(ctx context.Context) ([]DockerImage, error) {
 	return images, nil
 }
 
-func GatherDockerInfo(ctx context.Context) (DockerInfoOutput, error) {
+func GatherDockerInfo(ctx context.Context) (*DockerInfoOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerInfoOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -123,12 +121,12 @@ func GatherDockerInfo(ctx context.Context) (DockerInfoOutput, error) {
 		mobyclient.ContainerListOptions{All: true},
 	)
 	if err != nil {
-		return DockerInfoOutput{}, err
+		return nil, err
 	}
 
 	images, err := cli.ImageList(ctx, mobyclient.ImageListOptions{})
 	if err != nil {
-		return DockerInfoOutput{}, err
+		return nil, err
 	}
 
 	containerList := make([]DockerContainer, 0, len(containers.Items))
@@ -165,32 +163,22 @@ func GatherDockerInfo(ctx context.Context) (DockerInfoOutput, error) {
 		})
 	}
 
-	return DockerInfoOutput{
+	return &DockerInfoOutput{
 		Containers: containerList, Images: imageList,
 	}, nil
 }
 
 func HandleGetDockerInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDockerInfoInput,
-) (*mcp.CallToolResult, DockerInfoOutput, error) {
-	if config.IsDisabled("get_docker_info") {
-		return nil, DockerInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_info", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDockerInfo(ctx)
-	LogToolCall(ctx, "get_docker_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DockerInfoOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_info",
+		10*time.Second,
+		GatherDockerInfo,
+	)
 }
 
 // --- Container Detail (Inspect) ---
@@ -224,16 +212,16 @@ type DockerContainerDetail struct {
 
 type DockerContainerDetailOutput struct {
 	Container DockerContainerDetail `json:"container"`
-	Errors    []string              `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherContainerDetail(
 	ctx context.Context,
 	containerID string,
-) (DockerContainerDetailOutput, error) {
+) (*DockerContainerDetailOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerContainerDetailOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -243,7 +231,7 @@ func GatherContainerDetail(
 		mobyclient.ContainerInspectOptions{},
 	)
 	if err != nil {
-		return DockerContainerDetailOutput{}, err
+		return nil, err
 	}
 	c := result.Container
 
@@ -302,7 +290,7 @@ func GatherContainerDetail(
 
 	status, _ := state["status"].(string)
 
-	return DockerContainerDetailOutput{
+	return &DockerContainerDetailOutput{
 		Container: DockerContainerDetail{
 			ID:      id,
 			Name:    name,
@@ -322,29 +310,20 @@ func GatherContainerDetail(
 
 func HandleGetContainerDetail(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerContainerDetailInput,
-) (*mcp.CallToolResult, DockerContainerDetailOutput, error) {
-	if config.IsDisabled("get_docker_container_details") {
-		return nil, DockerContainerDetailOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerContainerDetailOutput, error) {
 	if input.ContainerID == "" {
-		return nil, DockerContainerDetailOutput{},
-			errors.New("container_id is required")
+		return nil, nil, fmt.Errorf("container_id is required")
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_container_details", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherContainerDetail(ctx, input.ContainerID)
-	LogToolCall(ctx, "get_docker_container_details",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_docker_container_details",
+		10*time.Second,
+		func(ctx context.Context) (*DockerContainerDetailOutput, error) {
+			return GatherContainerDetail(ctx, input.ContainerID)
+		},
+	)
 }
 
 // --- Container Logs ---
@@ -356,8 +335,8 @@ type GetDockerContainerLogsInput struct {
 }
 
 type DockerContainerLogsOutput struct {
-	Logs   []string `json:"logs"`
-	Errors []string `json:"errors,omitempty"`
+	Logs []string `json:"logs"`
+	OutputErrors
 }
 
 func GatherContainerLogs(
@@ -365,10 +344,10 @@ func GatherContainerLogs(
 	containerID string,
 	tail int,
 	timestamps bool,
-) (DockerContainerLogsOutput, error) {
+) (*DockerContainerLogsOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerContainerLogsOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -389,7 +368,7 @@ func GatherContainerLogs(
 		},
 	)
 	if err != nil {
-		return DockerContainerLogsOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = result.Close() }()
 
@@ -399,42 +378,33 @@ func GatherContainerLogs(
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return DockerContainerLogsOutput{}, err
+		return nil, err
 	}
 
-	return DockerContainerLogsOutput{Logs: lines}, nil
+	return &DockerContainerLogsOutput{Logs: lines}, nil
 }
 
 func HandleGetContainerLogs(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerContainerLogsInput,
-) (*mcp.CallToolResult, DockerContainerLogsOutput, error) {
-	if config.IsDisabled("get_docker_container_logs") {
-		return nil, DockerContainerLogsOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerContainerLogsOutput, error) {
 	if input.ContainerID == "" {
-		return nil, DockerContainerLogsOutput{},
-			errors.New("container_id is required")
+		return nil, nil, fmt.Errorf("container_id is required")
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_container_logs", 30*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherContainerLogs(
+	return handleToolCall(
 		ctx,
-		input.ContainerID,
-		input.Tail,
-		input.Timestamps,
+		"get_docker_container_logs",
+		30*time.Second,
+		func(ctx context.Context) (*DockerContainerLogsOutput, error) {
+			return GatherContainerLogs(
+				ctx,
+				input.ContainerID,
+				input.Tail,
+				input.Timestamps,
+			)
+		},
 	)
-	LogToolCall(ctx, "get_docker_container_logs",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
 }
 
 // --- Container Stats ---
@@ -456,16 +426,16 @@ type DockerContainerStats struct {
 
 type DockerContainerStatsOutput struct {
 	Containers []DockerContainerStatEntry `json:"containers"`
-	Errors     []string                   `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherContainerStats(
 	ctx context.Context,
 	containerID string,
-) (DockerContainerStatsOutput, error) {
+) (*DockerContainerStatsOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerContainerStatsOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -477,7 +447,7 @@ func GatherContainerStats(
 		},
 	)
 	if err != nil {
-		return DockerContainerStatsOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = result.Body.Close() }()
 
@@ -518,7 +488,7 @@ func GatherContainerStats(
 	}
 
 	if err := json.NewDecoder(result.Body).Decode(&stats); err != nil {
-		return DockerContainerStatsOutput{}, err
+		return nil, err
 	}
 
 	cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
@@ -560,7 +530,7 @@ func GatherContainerStats(
 		shortID = shortID[:12]
 	}
 
-	return DockerContainerStatsOutput{
+	return &DockerContainerStatsOutput{
 		Containers: []DockerContainerStatEntry{{
 			ID:            shortID,
 			CPUPercent:    cpuPercent,
@@ -577,32 +547,26 @@ func GatherContainerStats(
 
 func HandleGetContainerStats(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerContainerStatsInput,
-) (*mcp.CallToolResult, DockerContainerStatsOutput, error) {
-	if config.IsDisabled("get_docker_container_stats") {
-		return nil, DockerContainerStatsOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerContainerStatsOutput, error) {
 	if input.ContainerIDs == "" {
-		return nil, DockerContainerStatsOutput{},
-			errors.New("container_ids is required")
+		return nil, nil, fmt.Errorf("container_ids is required")
 	}
 
 	if input.ContainerIDs == "all" {
-		ctx, cancel := WithToolTimeout(
-			ctx, "get_docker_container_stats", 30*time.Second)
-		defer cancel()
-
-		start := time.Now()
-		all, err := GatherDockerStatsAll(ctx, nil)
-		out := DockerContainerStatsOutput(all)
-		LogToolCall(ctx, "get_docker_container_stats",
-			time.Since(start), len(out.Errors))
-		if err != nil {
-			out.Errors = append(out.Errors, err.Error())
-		}
-		return nil, out, nil
+		return handleToolCall(
+			ctx,
+			"get_docker_container_stats",
+			30*time.Second,
+			func(ctx context.Context) (*DockerContainerStatsOutput, error) {
+				all, err := GatherDockerStatsAll(ctx, nil)
+				if err != nil {
+					return nil, err
+				}
+				return (*DockerContainerStatsOutput)(all), nil
+			},
+		)
 	}
 
 	ids := strings.Split(input.ContainerIDs, ",")
@@ -611,33 +575,28 @@ func HandleGetContainerStats(
 	}
 
 	if len(ids) == 1 {
-		ctx, cancel := WithToolTimeout(
-			ctx, "get_docker_container_stats", 10*time.Second)
-		defer cancel()
-
-		start := time.Now()
-		out, err := GatherContainerStats(ctx, ids[0])
-		LogToolCall(ctx, "get_docker_container_stats",
-			time.Since(start), len(out.Errors))
-		if err != nil {
-			out.Errors = append(out.Errors, err.Error())
-		}
-		return nil, out, nil
+		return handleToolCall(
+			ctx,
+			"get_docker_container_stats",
+			10*time.Second,
+			func(ctx context.Context) (*DockerContainerStatsOutput, error) {
+				return GatherContainerStats(ctx, ids[0])
+			},
+		)
 	}
 
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_container_stats", 30*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	all, err := GatherDockerStatsAll(ctx, ids)
-	out := DockerContainerStatsOutput(all)
-	LogToolCall(ctx, "get_docker_container_stats",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_docker_container_stats",
+		30*time.Second,
+		func(ctx context.Context) (*DockerContainerStatsOutput, error) {
+			all, err := GatherDockerStatsAll(ctx, ids)
+			if err != nil {
+				return nil, err
+			}
+			return (*DockerContainerStatsOutput)(all), nil
+		},
+	)
 }
 
 // --- All Containers Stats (bulk) ---
@@ -662,16 +621,16 @@ type DockerContainerStatEntry struct {
 
 type DockerStatsAllOutput struct {
 	Containers []DockerContainerStatEntry `json:"containers"`
-	Errors     []string                   `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherDockerStatsAll(
 	ctx context.Context,
 	containers []string,
-) (DockerStatsAllOutput, error) {
+) (*DockerStatsAllOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerStatsAllOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -680,7 +639,7 @@ func GatherDockerStatsAll(
 		mobyclient.ContainerListOptions{All: false},
 	)
 	if err != nil {
-		return DockerStatsAllOutput{}, err
+		return nil, err
 	}
 
 	filterSet := map[string]bool{}
@@ -757,33 +716,24 @@ func GatherDockerStatsAll(
 		entries = append(entries, entry)
 	}
 
-	return DockerStatsAllOutput{
-		Containers: entries,
-		Errors:     errs,
-	}, nil
+	out := &DockerStatsAllOutput{Containers: entries}
+	out.Errors = errs
+	return out, nil
 }
 
 func HandleGetDockerStatsAll(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerStatsAllInput,
-) (*mcp.CallToolResult, DockerStatsAllOutput, error) {
-	if config.IsDisabled("get_docker_stats_all") {
-		return nil, DockerStatsAllOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_stats_all", 30*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDockerStatsAll(ctx, input.Containers)
-	LogToolCall(ctx, "get_docker_stats_all",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DockerStatsAllOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_stats_all",
+		30*time.Second,
+		func(ctx context.Context) (*DockerStatsAllOutput, error) {
+			return GatherDockerStatsAll(ctx, input.Containers)
+		},
+	)
 }
 
 // --- Container Top (Processes) ---
@@ -796,17 +746,17 @@ type GetDockerContainerTopInput struct {
 type DockerContainerTopOutput struct {
 	Titles    []string   `json:"titles"`
 	Processes [][]string `json:"processes"`
-	Errors    []string   `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherContainerTop(
 	ctx context.Context,
 	containerID string,
 	args []string,
-) (DockerContainerTopOutput, error) {
+) (*DockerContainerTopOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerContainerTopOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -818,10 +768,10 @@ func GatherContainerTop(
 		},
 	)
 	if err != nil {
-		return DockerContainerTopOutput{}, err
+		return nil, err
 	}
 
-	return DockerContainerTopOutput{
+	return &DockerContainerTopOutput{
 		Titles:    result.Titles,
 		Processes: result.Processes,
 	}, nil
@@ -829,29 +779,20 @@ func GatherContainerTop(
 
 func HandleGetContainerTop(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerContainerTopInput,
-) (*mcp.CallToolResult, DockerContainerTopOutput, error) {
-	if config.IsDisabled("get_docker_container_top") {
-		return nil, DockerContainerTopOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerContainerTopOutput, error) {
 	if input.ContainerID == "" {
-		return nil, DockerContainerTopOutput{},
-			errors.New("container_id is required")
+		return nil, nil, fmt.Errorf("container_id is required")
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_container_top", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherContainerTop(ctx, input.ContainerID, input.Args)
-	LogToolCall(ctx, "get_docker_container_top",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_docker_container_top",
+		10*time.Second,
+		func(ctx context.Context) (*DockerContainerTopOutput, error) {
+			return GatherContainerTop(ctx, input.ContainerID, input.Args)
+		},
+	)
 }
 
 // --- Container Diff ---
@@ -867,7 +808,7 @@ type DockerFileChange struct {
 
 type DockerContainerDiffOutput struct {
 	Changes []DockerFileChange `json:"changes"`
-	Errors  []string           `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func tristateKind(kind uint8) string {
@@ -886,10 +827,10 @@ func tristateKind(kind uint8) string {
 func GatherContainerDiff(
 	ctx context.Context,
 	containerID string,
-) (DockerContainerDiffOutput, error) {
+) (*DockerContainerDiffOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerContainerDiffOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -899,7 +840,7 @@ func GatherContainerDiff(
 		mobyclient.ContainerDiffOptions{},
 	)
 	if err != nil {
-		return DockerContainerDiffOutput{}, err
+		return nil, err
 	}
 
 	changes := make([]DockerFileChange, 0, len(result.Changes))
@@ -909,34 +850,25 @@ func GatherContainerDiff(
 			Path: ch.Path,
 		})
 	}
-	return DockerContainerDiffOutput{Changes: changes}, nil
+	return &DockerContainerDiffOutput{Changes: changes}, nil
 }
 
 func HandleGetContainerDiff(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerContainerDiffInput,
-) (*mcp.CallToolResult, DockerContainerDiffOutput, error) {
-	if config.IsDisabled("get_docker_container_diff") {
-		return nil, DockerContainerDiffOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerContainerDiffOutput, error) {
 	if input.ContainerID == "" {
-		return nil, DockerContainerDiffOutput{},
-			errors.New("container_id is required")
+		return nil, nil, fmt.Errorf("container_id is required")
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_container_diff", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherContainerDiff(ctx, input.ContainerID)
-	LogToolCall(ctx, "get_docker_container_diff",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_docker_container_diff",
+		10*time.Second,
+		func(ctx context.Context) (*DockerContainerDiffOutput, error) {
+			return GatherContainerDiff(ctx, input.ContainerID)
+		},
+	)
 }
 
 // --- Image History ---
@@ -956,22 +888,22 @@ type DockerImageLayer struct {
 
 type DockerImageHistoryOutput struct {
 	Layers []DockerImageLayer `json:"layers"`
-	Errors []string           `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherImageHistory(
 	ctx context.Context,
 	imageID string,
-) (DockerImageHistoryOutput, error) {
+) (*DockerImageHistoryOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerImageHistoryOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
 	result, err := cli.ImageHistory(ctx, imageID)
 	if err != nil {
-		return DockerImageHistoryOutput{}, err
+		return nil, err
 	}
 
 	layers := make([]DockerImageLayer, 0, len(result.Items))
@@ -989,34 +921,25 @@ func GatherImageHistory(
 			Comment:   item.Comment,
 		})
 	}
-	return DockerImageHistoryOutput{Layers: layers}, nil
+	return &DockerImageHistoryOutput{Layers: layers}, nil
 }
 
 func HandleGetImageHistory(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerImageHistoryInput,
-) (*mcp.CallToolResult, DockerImageHistoryOutput, error) {
-	if config.IsDisabled("get_docker_image_history") {
-		return nil, DockerImageHistoryOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerImageHistoryOutput, error) {
 	if input.ImageID == "" {
-		return nil, DockerImageHistoryOutput{},
-			errors.New("image_id is required")
+		return nil, nil, fmt.Errorf("image_id is required")
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_image_history", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherImageHistory(ctx, input.ImageID)
-	LogToolCall(ctx, "get_docker_image_history",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_docker_image_history",
+		10*time.Second,
+		func(ctx context.Context) (*DockerImageHistoryOutput, error) {
+			return GatherImageHistory(ctx, input.ImageID)
+		},
+	)
 }
 
 // --- Image Detail (Inspect) ---
@@ -1043,23 +966,23 @@ type DockerImageDetail struct {
 }
 
 type DockerImageDetailOutput struct {
-	Image  DockerImageDetail `json:"image"`
-	Errors []string          `json:"errors,omitempty"`
+	Image DockerImageDetail `json:"image"`
+	OutputErrors
 }
 
 func GatherImageDetail(
 	ctx context.Context,
 	imageID string,
-) (DockerImageDetailOutput, error) {
+) (*DockerImageDetailOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerImageDetailOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
 	result, err := cli.ImageInspect(ctx, imageID)
 	if err != nil {
-		return DockerImageDetailOutput{}, err
+		return nil, err
 	}
 
 	id := result.ID
@@ -1078,7 +1001,7 @@ func GatherImageDetail(
 		labels = result.Config.Labels
 	}
 
-	return DockerImageDetailOutput{
+	return &DockerImageDetailOutput{
 		Image: DockerImageDetail{
 			ID:           id,
 			RepoTags:     result.RepoTags,
@@ -1100,29 +1023,20 @@ func GatherImageDetail(
 
 func HandleGetImageDetail(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDockerImageDetailInput,
-) (*mcp.CallToolResult, DockerImageDetailOutput, error) {
-	if config.IsDisabled("get_docker_image_details") {
-		return nil, DockerImageDetailOutput{},
-			errors.New("tool disabled by configuration")
-	}
+) (*mcp.CallToolResult, *DockerImageDetailOutput, error) {
 	if input.ImageID == "" {
-		return nil, DockerImageDetailOutput{},
-			errors.New("image_id is required")
+		return nil, nil, fmt.Errorf("image_id is required")
 	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_image_details", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherImageDetail(ctx, input.ImageID)
-	LogToolCall(ctx, "get_docker_image_details",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+	return handleToolCall(
+		ctx,
+		"get_docker_image_details",
+		10*time.Second,
+		func(ctx context.Context) (*DockerImageDetailOutput, error) {
+			return GatherImageDetail(ctx, input.ImageID)
+		},
+	)
 }
 
 // --- Networks ---
@@ -1143,19 +1057,19 @@ type DockerNetworkSummary struct {
 
 type DockerNetworksOutput struct {
 	Networks []DockerNetworkSummary `json:"networks"`
-	Errors   []string               `json:"errors,omitempty"`
+	OutputErrors
 }
 
-func GatherDockerNetworks(ctx context.Context) (DockerNetworksOutput, error) {
+func GatherDockerNetworks(ctx context.Context) (*DockerNetworksOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerNetworksOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
 	result, err := cli.NetworkList(ctx, mobyclient.NetworkListOptions{})
 	if err != nil {
-		return DockerNetworksOutput{}, err
+		return nil, err
 	}
 
 	networks := make([]DockerNetworkSummary, 0, len(result.Items))
@@ -1176,30 +1090,20 @@ func GatherDockerNetworks(ctx context.Context) (DockerNetworksOutput, error) {
 			Labels:     n.Labels,
 		})
 	}
-	return DockerNetworksOutput{Networks: networks}, nil
+	return &DockerNetworksOutput{Networks: networks}, nil
 }
 
 func HandleGetDockerNetworks(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDockerNetworksInput,
-) (*mcp.CallToolResult, DockerNetworksOutput, error) {
-	if config.IsDisabled("get_docker_networks") {
-		return nil, DockerNetworksOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_networks", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDockerNetworks(ctx)
-	LogToolCall(ctx, "get_docker_networks",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DockerNetworksOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_networks",
+		10*time.Second,
+		GatherDockerNetworks,
+	)
 }
 
 // --- Volumes ---
@@ -1218,19 +1122,19 @@ type DockerVolumeSummary struct {
 
 type DockerVolumesOutput struct {
 	Volumes []DockerVolumeSummary `json:"volumes"`
-	Errors  []string              `json:"errors,omitempty"`
+	OutputErrors
 }
 
-func GatherDockerVolumes(ctx context.Context) (DockerVolumesOutput, error) {
+func GatherDockerVolumes(ctx context.Context) (*DockerVolumesOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerVolumesOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
 	result, err := cli.VolumeList(ctx, mobyclient.VolumeListOptions{})
 	if err != nil {
-		return DockerVolumesOutput{}, err
+		return nil, err
 	}
 
 	volumes := make([]DockerVolumeSummary, 0, len(result.Items))
@@ -1249,30 +1153,20 @@ func GatherDockerVolumes(ctx context.Context) (DockerVolumesOutput, error) {
 			Labels:     v.Labels,
 		})
 	}
-	return DockerVolumesOutput{Volumes: volumes}, nil
+	return &DockerVolumesOutput{Volumes: volumes}, nil
 }
 
 func HandleGetDockerVolumes(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDockerVolumesInput,
-) (*mcp.CallToolResult, DockerVolumesOutput, error) {
-	if config.IsDisabled("get_docker_volumes") {
-		return nil, DockerVolumesOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_volumes", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDockerVolumes(ctx)
-	LogToolCall(ctx, "get_docker_volumes",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DockerVolumesOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_volumes",
+		10*time.Second,
+		GatherDockerVolumes,
+	)
 }
 
 // --- System Info ---
@@ -1305,22 +1199,22 @@ type DockerSystemInfoSummary struct {
 }
 
 type DockerSystemInfoOutput struct {
-	Info   DockerSystemInfoSummary `json:"info"`
-	Errors []string                `json:"errors,omitempty"`
+	Info DockerSystemInfoSummary `json:"info"`
+	OutputErrors
 }
 
 func GatherDockerSystemInfo(
 	ctx context.Context,
-) (DockerSystemInfoOutput, error) {
+) (*DockerSystemInfoOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerSystemInfoOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
 	result, err := cli.Info(ctx, mobyclient.InfoOptions{})
 	if err != nil {
-		return DockerSystemInfoOutput{}, err
+		return nil, err
 	}
 
 	sysInfo := result.Info
@@ -1339,7 +1233,7 @@ func GatherDockerSystemInfo(
 	swarm["control_available"] = sysInfo.Swarm.ControlAvailable
 	swarm["local_node_state"] = sysInfo.Swarm.LocalNodeState
 
-	return DockerSystemInfoOutput{
+	return &DockerSystemInfoOutput{
 		Info: DockerSystemInfoSummary{
 			ID:                id,
 			ServerVersion:     sysInfo.ServerVersion,
@@ -1369,25 +1263,15 @@ func GatherDockerSystemInfo(
 
 func HandleGetDockerSystemInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDockerSystemInfoInput,
-) (*mcp.CallToolResult, DockerSystemInfoOutput, error) {
-	if config.IsDisabled("get_docker_system_info") {
-		return nil, DockerSystemInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_system_info", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDockerSystemInfo(ctx)
-	LogToolCall(ctx, "get_docker_system_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DockerSystemInfoOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_system_info",
+		10*time.Second,
+		GatherDockerSystemInfo,
+	)
 }
 
 // --- Disk Usage ---
@@ -1406,13 +1290,15 @@ type DockerDiskUsageOutput struct {
 	Images     DockerDiskUsageCategory `json:"images"`
 	Volumes    DockerDiskUsageCategory `json:"volumes"`
 	BuildCache DockerDiskUsageCategory `json:"build_cache"`
-	Errors     []string                `json:"errors,omitempty"`
+	OutputErrors
 }
 
-func GatherDockerDiskUsage(ctx context.Context) (DockerDiskUsageOutput, error) {
+func GatherDockerDiskUsage(
+	ctx context.Context,
+) (*DockerDiskUsageOutput, error) {
 	cli, err := newDockerClient(ctx)
 	if err != nil {
-		return DockerDiskUsageOutput{}, err
+		return nil, err
 	}
 	defer func() { _ = cli.Close() }()
 
@@ -1423,10 +1309,10 @@ func GatherDockerDiskUsage(ctx context.Context) (DockerDiskUsageOutput, error) {
 		Volumes:    true,
 	})
 	if err != nil {
-		return DockerDiskUsageOutput{}, err
+		return nil, err
 	}
 
-	return DockerDiskUsageOutput{
+	return &DockerDiskUsageOutput{
 		Containers: DockerDiskUsageCategory{
 			ActiveCount: result.Containers.ActiveCount,
 			TotalCount:  result.Containers.TotalCount,
@@ -1456,25 +1342,15 @@ func GatherDockerDiskUsage(ctx context.Context) (DockerDiskUsageOutput, error) {
 
 func HandleGetDockerDiskUsage(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDockerDiskUsageInput,
-) (*mcp.CallToolResult, DockerDiskUsageOutput, error) {
-	if config.IsDisabled("get_docker_disk_usage") {
-		return nil, DockerDiskUsageOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_disk_usage", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDockerDiskUsage(ctx)
-	LogToolCall(ctx, "get_docker_disk_usage",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DockerDiskUsageOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_disk_usage",
+		10*time.Second,
+		GatherDockerDiskUsage,
+	)
 }
 
 // --- Docker System Snapshot ---
@@ -1485,50 +1361,45 @@ type DockerSystemSnapshotOutput struct {
 	Info      DockerInfoOutput      `json:"info"`
 	Stats     DockerStatsAllOutput  `json:"stats"`
 	DiskUsage DockerDiskUsageOutput `json:"disk_usage"`
-	Errors    ErrList               `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func HandleGetDockerSystemSnapshot(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetDockerSystemSnapshotInput,
-) (*mcp.CallToolResult, DockerSystemSnapshotOutput, error) {
-	if config.IsDisabled("get_docker_system_snapshot") {
-		return nil, DockerSystemSnapshotOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_docker_system_snapshot", 60*time.Second)
-	defer cancel()
+) (*mcp.CallToolResult, *DockerSystemSnapshotOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_docker_system_snapshot",
+		60*time.Second,
+		func(ctx context.Context) (*DockerSystemSnapshotOutput, error) {
+			var snapshot DockerSystemSnapshotOutput
+			var errs ErrList
 
-	start := time.Now()
+			if out, err := GatherDockerInfo(ctx); err == nil {
+				snapshot.Info = *out
+			} else {
+				errs.Add("info", err)
+				snapshot.Info = DockerInfoOutput{}
+			}
 
-	var snapshot DockerSystemSnapshotOutput
-	var errs ErrList
+			if out, err := GatherDockerStatsAll(ctx, nil); err == nil {
+				snapshot.Stats = *out
+			} else {
+				errs.Add("stats", err)
+				snapshot.Stats = DockerStatsAllOutput{}
+			}
 
-	if out, err := GatherDockerInfo(ctx); err == nil {
-		snapshot.Info = out
-	} else {
-		errs.Add("info", err)
-		snapshot.Info = DockerInfoOutput{}
-	}
+			if out, err := GatherDockerDiskUsage(ctx); err == nil {
+				snapshot.DiskUsage = *out
+			} else {
+				errs.Add("disk_usage", err)
+				snapshot.DiskUsage = DockerDiskUsageOutput{}
+			}
 
-	if out, err := GatherDockerStatsAll(ctx, nil); err == nil {
-		snapshot.Stats = out
-	} else {
-		errs.Add("stats", err)
-		snapshot.Stats = DockerStatsAllOutput{}
-	}
-
-	if out, err := GatherDockerDiskUsage(ctx); err == nil {
-		snapshot.DiskUsage = out
-	} else {
-		errs.Add("disk_usage", err)
-		snapshot.DiskUsage = DockerDiskUsageOutput{}
-	}
-
-	snapshot.Errors = errs
-	LogToolCall(ctx, "get_docker_system_snapshot",
-		time.Since(start), len(errs))
-	return nil, snapshot, nil
+			snapshot.Errors = errs
+			return &snapshot, nil
+		},
+	)
 }

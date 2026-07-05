@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -28,10 +27,10 @@ type GPUDevice struct {
 type GPUInfoOutput struct {
 	Vendor string      `json:"vendor"`
 	GPUs   []GPUDevice `json:"gpus"`
-	Errors []string    `json:"errors,omitempty"`
+	OutputErrors
 }
 
-func GatherNvidiaGPU(ctx context.Context) (GPUInfoOutput, error) {
+func GatherNvidiaGPU(ctx context.Context) (*GPUInfoOutput, error) {
 	cmd := exec.CommandContext(
 		ctx,
 		"nvidia-smi",
@@ -40,7 +39,7 @@ func GatherNvidiaGPU(ctx context.Context) (GPUInfoOutput, error) {
 	)
 	out, err := cmd.Output()
 	if err != nil {
-		return GPUInfoOutput{}, err
+		return nil, err
 	}
 	var gpus []GPUDevice
 	for line := range strings.SplitSeq(
@@ -74,20 +73,20 @@ func GatherNvidiaGPU(ctx context.Context) (GPUInfoOutput, error) {
 		})
 	}
 	if len(gpus) == 0 {
-		return GPUInfoOutput{}, errors.New("no NVIDIA GPUs found")
+		return nil, errors.New("no NVIDIA GPUs found")
 	}
-	return GPUInfoOutput{Vendor: "nvidia", GPUs: gpus}, nil
+	return &GPUInfoOutput{Vendor: "nvidia", GPUs: gpus}, nil
 }
 
-func GatherAMDGPU(ctx context.Context) (GPUInfoOutput, error) {
+func GatherAMDGPU(ctx context.Context) (*GPUInfoOutput, error) {
 	cmd := exec.CommandContext(ctx, "rocm-smi", "--json")
 	out, err := cmd.Output()
 	if err != nil {
-		return GPUInfoOutput{}, err
+		return nil, err
 	}
 	var raw map[string]any
 	if err := json.Unmarshal(out, &raw); err != nil {
-		return GPUInfoOutput{}, err
+		return nil, err
 	}
 	var gpus []GPUDevice
 	for key, val := range raw {
@@ -129,12 +128,12 @@ func GatherAMDGPU(ctx context.Context) (GPUInfoOutput, error) {
 		gpus = append(gpus, gpu)
 	}
 	if len(gpus) == 0 {
-		return GPUInfoOutput{}, errors.New("no AMD GPUs found")
+		return nil, errors.New("no AMD GPUs found")
 	}
-	return GPUInfoOutput{Vendor: "amd", GPUs: gpus}, nil
+	return &GPUInfoOutput{Vendor: "amd", GPUs: gpus}, nil
 }
 
-func GatherGPUInfo(ctx context.Context) (GPUInfoOutput, error) {
+func GatherGPUInfo(ctx context.Context) (*GPUInfoOutput, error) {
 	if _, err := exec.LookPath("nvidia-smi"); err == nil {
 		if out, err := GatherNvidiaGPU(ctx); err == nil {
 			return out, nil
@@ -146,35 +145,20 @@ func GatherGPUInfo(ctx context.Context) (GPUInfoOutput, error) {
 		}
 	}
 	if _, err := exec.LookPath("intel_gpu_top"); err == nil {
-		return GPUInfoOutput{
+		return &GPUInfoOutput{
 			Vendor: "intel",
 			GPUs:   []GPUDevice{{Name: "Intel GPU (detected)"}},
 		}, nil
 	}
-	return GPUInfoOutput{}, errors.New(
+	return nil, errors.New(
 		"no GPU tools found (tried nvidia-smi, rocm-smi, intel_gpu_top)",
 	)
 }
 
 func HandleGetGPUInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetGPUInfoInput,
-) (*mcp.CallToolResult, GPUInfoOutput, error) {
-	if config.IsDisabled("get_gpu_info") {
-		return nil, GPUInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_gpu_info", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherGPUInfo(ctx)
-	LogToolCall(ctx, "get_gpu_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *GPUInfoOutput, error) {
+	return handleToolCall(ctx, "get_gpu_info", 5*time.Second, GatherGPUInfo)
 }

@@ -2,10 +2,8 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/sensors"
@@ -23,21 +21,21 @@ type CPUInfoOutput struct {
 	UsagePercent      float64      `json:"usage_percent"`
 	PhysicalCoreCount int32        `json:"physical_core_count"`
 	Cores             []CPUDetails `json:"cores"`
-	Errors            []string     `json:"errors,omitempty"`
+	OutputErrors
 }
 
-func GatherCPUInfo(ctx context.Context) (CPUInfoOutput, error) {
+func GatherCPUInfo(ctx context.Context) (*CPUInfoOutput, error) {
 	info, err := cpu.Info()
 	if err != nil {
-		return CPUInfoOutput{}, err
+		return nil, err
 	}
 	percent, err := cpu.Percent(0, false)
 	if err != nil {
-		return CPUInfoOutput{}, err
+		return nil, err
 	}
 	physCount, err := cpu.Counts(true)
 	if err != nil {
-		return CPUInfoOutput{}, err
+		return nil, err
 	}
 	var cores []CPUDetails
 	for _, c := range info {
@@ -51,7 +49,7 @@ func GatherCPUInfo(ctx context.Context) (CPUInfoOutput, error) {
 	if len(percent) > 0 {
 		usage = percent[0]
 	}
-	return CPUInfoOutput{
+	return &CPUInfoOutput{
 		UsagePercent:      usage,
 		PhysicalCoreCount: int32(physCount),
 		Cores:             cores,
@@ -60,25 +58,10 @@ func GatherCPUInfo(ctx context.Context) (CPUInfoOutput, error) {
 
 func HandleGetCPUInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetCPUInfoInput,
-) (*mcp.CallToolResult, CPUInfoOutput, error) {
-	if config.IsDisabled("get_cpu_info") {
-		return nil, CPUInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_cpu_info", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherCPUInfo(ctx)
-	LogToolCall(ctx, "get_cpu_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *CPUInfoOutput, error) {
+	return handleToolCall(ctx, "get_cpu_info", 5*time.Second, GatherCPUInfo)
 }
 
 type GetCPUTemperatureInput struct{}
@@ -91,17 +74,17 @@ type TemperatureStat struct {
 type CPUTemperatureOutput struct {
 	Temperatures []TemperatureStat `json:"temperatures"`
 	Message      string            `json:"message,omitempty"`
-	Errors       []string          `json:"errors,omitempty"`
+	OutputErrors
 }
 
-func GatherCPUTemperature(ctx context.Context) (CPUTemperatureOutput, error) {
+func GatherCPUTemperature(ctx context.Context) (*CPUTemperatureOutput, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if len(temps) == 0 {
 		msg := "No temperature sensors available"
 		if err != nil {
 			msg = err.Error()
 		}
-		return CPUTemperatureOutput{Message: msg}, err
+		return &CPUTemperatureOutput{Message: msg}, err
 	}
 	var result []TemperatureStat
 	for _, t := range temps {
@@ -110,28 +93,18 @@ func GatherCPUTemperature(ctx context.Context) (CPUTemperatureOutput, error) {
 			Temperature: t.Temperature,
 		})
 	}
-	return CPUTemperatureOutput{Temperatures: result}, err
+	return &CPUTemperatureOutput{Temperatures: result}, err
 }
 
 func HandleGetCPUTemperature(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetCPUTemperatureInput,
-) (*mcp.CallToolResult, CPUTemperatureOutput, error) {
-	if config.IsDisabled("get_cpu_temperature") {
-		return nil, CPUTemperatureOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_cpu_temperature", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherCPUTemperature(ctx)
-	LogToolCall(ctx, "get_cpu_temperature",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *CPUTemperatureOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_cpu_temperature",
+		5*time.Second,
+		GatherCPUTemperature,
+	)
 }

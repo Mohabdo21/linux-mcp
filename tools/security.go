@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -25,7 +24,7 @@ type FailedLoginEntry struct {
 
 type FailedLoginsOutput struct {
 	Entries []FailedLoginEntry `json:"entries"`
-	Errors  []string           `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func ParseLastbOutput(output string) []FailedLoginEntry {
@@ -74,7 +73,7 @@ func ParseJournalctlFailedLogins(output string) []FailedLoginEntry {
 
 func GatherFailedLoginsJournalctl(
 	ctx context.Context, lines int,
-) (FailedLoginsOutput, error) {
+) (*FailedLoginsOutput, error) {
 	out, err := exec.CommandContext(ctx,
 		"journalctl", "-u", "sshd", "-u", "systemd-logind",
 		"--grep", "Failed password|authentication failure|Failed login",
@@ -83,14 +82,14 @@ func GatherFailedLoginsJournalctl(
 	).Output()
 	entries := ParseJournalctlFailedLogins(string(out))
 	if err != nil && errors.Is(err, exec.ErrNotFound) {
-		return FailedLoginsOutput{}, err
+		return nil, err
 	}
-	return FailedLoginsOutput{Entries: entries}, nil
+	return &FailedLoginsOutput{Entries: entries}, nil
 }
 
 func GatherFailedLogins(
 	ctx context.Context, lines int,
-) (FailedLoginsOutput, error) {
+) (*FailedLoginsOutput, error) {
 	if lines <= 0 {
 		lines = 20
 	}
@@ -98,13 +97,13 @@ func GatherFailedLogins(
 		ctx, "lastb", "-n", fmt.Sprintf("%d", lines),
 	).Output()
 	if lastbErr == nil {
-		return FailedLoginsOutput{
+		return &FailedLoginsOutput{
 			Entries: ParseLastbOutput(string(out)),
 		}, nil
 	}
 	if !errors.Is(lastbErr, exec.ErrNotFound) {
 		if entries := ParseLastbOutput(string(out)); len(entries) > 0 {
-			return FailedLoginsOutput{Entries: entries}, nil
+			return &FailedLoginsOutput{Entries: entries}, nil
 		}
 	}
 	jOut, jErr := GatherFailedLoginsJournalctl(ctx, lines)
@@ -127,14 +126,14 @@ type LoggedInUser struct {
 }
 
 type LoggedInUsersOutput struct {
-	Users  []LoggedInUser `json:"users"`
-	Errors []string       `json:"errors,omitempty"`
+	Users []LoggedInUser `json:"users"`
+	OutputErrors
 }
 
-func GatherLoggedInUsers(ctx context.Context) (LoggedInUsersOutput, error) {
+func GatherLoggedInUsers(ctx context.Context) (*LoggedInUsersOutput, error) {
 	out, err := exec.CommandContext(ctx, "who", "-u").Output()
 	if err != nil {
-		return LoggedInUsersOutput{}, err
+		return nil, err
 	}
 	var users []LoggedInUser
 	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
@@ -156,51 +155,33 @@ func GatherLoggedInUsers(ctx context.Context) (LoggedInUsersOutput, error) {
 			From:      from,
 		})
 	}
-	return LoggedInUsersOutput{Users: users}, nil
+	return &LoggedInUsersOutput{Users: users}, nil
 }
 
 func HandleGetLoggedInUsers(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ GetLoggedInUsersInput,
-) (*mcp.CallToolResult, LoggedInUsersOutput, error) {
-	if config.IsDisabled("get_logged_in_users") {
-		return nil, LoggedInUsersOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_logged_in_users", 5*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherLoggedInUsers(ctx)
-	LogToolCall(ctx, "get_logged_in_users",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *LoggedInUsersOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_logged_in_users",
+		5*time.Second,
+		GatherLoggedInUsers,
+	)
 }
 
 func HandleGetFailedLogins(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetFailedLoginsInput,
-) (*mcp.CallToolResult, FailedLoginsOutput, error) {
-	if config.IsDisabled("get_failed_logins") {
-		return nil, FailedLoginsOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_failed_logins", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherFailedLogins(ctx, input.Lines)
-	LogToolCall(ctx, "get_failed_logins",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *FailedLoginsOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_failed_logins",
+		10*time.Second,
+		func(ctx context.Context) (*FailedLoginsOutput, error) {
+			return GatherFailedLogins(ctx, input.Lines)
+		},
+	)
 }

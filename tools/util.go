@@ -49,7 +49,34 @@ func ParseProcessField(s string) string {
 	return s
 }
 
+// OutputErrors is embedded in output structs for error accumulation.
+type OutputErrors struct {
+	Errors []string `json:"errors,omitempty"`
+}
+
+func (o *OutputErrors) AppendError(s string) {
+	o.Errors = append(o.Errors, s)
+}
+
+func (o OutputErrors) ErrorCount() int {
+	return len(o.Errors)
+}
+
+func (o *OutputErrors) Add(context string, err error) {
+	if err != nil {
+		o.Errors = append(o.Errors, context+": "+err.Error())
+	}
+}
+
+func (o OutputErrors) Err() error {
+	if len(o.Errors) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(o.Errors, "; "))
+}
+
 // ErrList collects errors during graceful degradation.
+// Kept for internal use in Gather functions that need local error accumulation.
 type ErrList []string
 
 func (e *ErrList) Add(context string, err error) {
@@ -63,6 +90,14 @@ func (e ErrList) Err() error {
 		return nil
 	}
 	return errors.New(strings.Join(e, "; "))
+}
+
+func (e *ErrList) AppendError(s string) {
+	*e = append(*e, s)
+}
+
+func (e ErrList) ErrorCount() int {
+	return len(e)
 }
 
 func WithToolTimeout(

@@ -90,48 +90,35 @@ func handleReadResource(
 
 	switch path := u.Path; {
 	case path == "/info":
-		out, e := GatherSystemInfo(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherSystemInfo(ctx)
 	case path == "/cpu":
-		out, e := GatherCPUInfo(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherCPUInfo(ctx)
 	case path == "/memory":
-		out, e := GatherMemoryInfo(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherMemoryInfo(ctx)
 	case path == "/disk":
-		out, e := GatherDiskInfo(ctx, "")
-		data, nerr = &out, e
+		data, nerr = GatherDiskInfo(ctx, "")
 	case path == "/network":
-		out, e := GatherNetworkInfo(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherNetworkInfo(ctx)
 	case path == "/load":
-		out, e := GatherLoadAverage(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherLoadAverage(ctx)
 	case path == "/temperature":
-		out, e := GatherCPUTemperature(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherCPUTemperature(ctx)
 	case path == "/gpu":
-		out, e := GatherGPUInfo(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherGPUInfo(ctx)
 	case path == "/logged_in_users":
-		out, e := GatherLoggedInUsers(ctx)
-		data, nerr = &out, e
+		data, nerr = GatherLoggedInUsers(ctx)
 	case path == "/listening_ports":
-		out, e := GatherListeningPorts(ctx, "")
-		data, nerr = &out, e
+		data, nerr = GatherListeningPorts(ctx, "")
 	case path == "/failed_logins":
-		out, e := GatherFailedLogins(ctx, 20)
-		data, nerr = &out, e
+		data, nerr = GatherFailedLogins(ctx, 20)
 	case strings.HasPrefix(path, "/disk/"):
-		out, e := GatherDiskInfo(ctx, strings.TrimPrefix(path, "/disk/"))
-		data, nerr = &out, e
+		data, nerr = GatherDiskInfo(ctx, strings.TrimPrefix(path, "/disk/"))
 	case strings.HasPrefix(path, "/service/"):
-		out, e := GatherServiceStatus(
+		data, nerr = GatherServiceStatus(
 			ctx,
 			strings.TrimPrefix(path, "/service/"),
 			false,
 		)
-		data, nerr = &out, e
 	default:
 		return nil, mcp.ResourceNotFoundError(uri)
 	}

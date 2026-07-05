@@ -7,26 +7,62 @@ import (
 	"testing"
 )
 
-func TestGatherSystemInfo(t *testing.T) {
-	out, err := GatherSystemInfo(t.Context())
-	if err != nil {
-		t.Skipf("GatherSystemInfo() error: %v", err)
-	}
-	if out.Hostname == "" {
-		t.Error("Hostname should not be empty")
-	}
-	if out.OSName == "" {
-		t.Error("OSName should not be empty")
-	}
-	if out.KernelVersion == "" {
-		t.Error("KernelVersion should not be empty")
-	}
-	if out.Architecture == "" {
-		t.Error("Architecture should not be empty")
-	}
-	if out.UptimeSeconds == 0 {
-		t.Error("UptimeSeconds should not be 0")
-	}
+func TestGatherBasicSystemInfo(t *testing.T) {
+	t.Run("SystemInfo", func(t *testing.T) {
+		out, err := GatherSystemInfo(t.Context())
+		skipOnErr(t, err, "GatherSystemInfo() error: %v", err)
+		checkNotEmpty(t, out.Hostname, "Hostname")
+		checkNotEmpty(t, out.OSName, "OSName")
+		checkNotEmpty(t, out.KernelVersion, "KernelVersion")
+		checkNotEmpty(t, out.Architecture, "Architecture")
+		checkNotZeroUint64(t, out.UptimeSeconds, "UptimeSeconds")
+	})
+
+	t.Run("LoadAverage", func(t *testing.T) {
+		out, err := GatherLoadAverage(t.Context())
+		skipOnErr(t, err, "GatherLoadAverage() error: %v", err)
+		checkNotNegative(t, out.Load1, "Load1")
+		checkNotNegative(t, out.Load5, "Load5")
+		checkNotNegative(t, out.Load15, "Load15")
+	})
+
+	t.Run("LoggedInUsers", func(t *testing.T) {
+		out, err := GatherLoggedInUsers(t.Context())
+		skipOnErr(t, err, "GatherLoggedInUsers() error: %v", err)
+		t.Logf("Found %d logged-in users", len(out.Users))
+	})
+
+	t.Run("SystemdUnits", func(t *testing.T) {
+		out, err := GatherSystemdUnits(t.Context())
+		skipOnErr(t, err, "GatherSystemdUnits() error: %v", err)
+		if len(out.Units) == 0 {
+			t.Error("Units should not be empty")
+		}
+		t.Logf("Found %d systemd units", len(out.Units))
+	})
+
+	t.Run("ListeningPorts", func(t *testing.T) {
+		out, err := GatherListeningPorts(t.Context(), "")
+		skipOnErr(t, err, "GatherListeningPorts() error: %v", err)
+		t.Logf("Found %d listening ports", len(out.Ports))
+	})
+
+	t.Run("NetworkInfo", func(t *testing.T) {
+		out, err := GatherNetworkInfo(t.Context())
+		skipOnErr(t, err, "GatherNetworkInfo() error: %v", err)
+		if len(out.Interfaces) == 0 {
+			t.Fatal("Interfaces should not be empty")
+		}
+		found := false
+		for _, iface := range out.Interfaces {
+			if iface.Name == "lo" {
+				found = true
+			}
+		}
+		if !found {
+			t.Log("lo interface not found (expected on most systems)")
+		}
+	})
 }
 
 func TestGatherCPUInfo(t *testing.T) {
@@ -43,9 +79,7 @@ func TestGatherCPUInfo(t *testing.T) {
 			out.PhysicalCoreCount,
 		)
 	}
-	if out.UsagePercent < 0 {
-		t.Errorf("UsagePercent should be >= 0, got %f", out.UsagePercent)
-	}
+	checkNotNegative(t, out.UsagePercent, "UsagePercent")
 	for i, c := range out.Cores {
 		if c.ModelName == "" {
 			t.Errorf("Cores[%d].ModelName should not be empty", i)
@@ -123,117 +157,161 @@ func TestGatherDiskInfo(t *testing.T) {
 	}
 }
 
-func TestGatherDiskInfoWithFilter(t *testing.T) {
-	out, err := GatherDiskInfo(t.Context(), "/")
+func TestGatherFunctionsWithFilter(t *testing.T) {
+	t.Run("DiskInfo/root", func(t *testing.T) {
+		out, err := GatherDiskInfo(t.Context(), "/")
+		skipOnErr(t, err, "GatherDiskInfo(\"/\") error: %v", err)
+		if len(out.Partitions) == 0 {
+			t.Fatal("Expected at least / partition")
+		}
+		for _, p := range out.Partitions {
+			if p.MountPoint != "/" {
+				t.Errorf("Expected mount_point /, got %s", p.MountPoint)
+			}
+		}
+	})
+
+	t.Run("DiskInfo/nonexistent", func(t *testing.T) {
+		out, err := GatherDiskInfo(t.Context(), "/nonexistent")
+		if err != nil {
+			t.Fatalf(
+				"GatherDiskInfo(\"/nonexistent\") error: %v", err)
+		}
+		if len(out.Partitions) != 0 {
+			t.Errorf(
+				"Expected 0 partitions for non-matching filter, got %d",
+				len(out.Partitions),
+			)
+		}
+	})
+
+	t.Run("InodeUsage/root", func(t *testing.T) {
+		out, err := GatherInodeUsage(t.Context(), "/")
+		skipOnErr(t, err, "GatherInodeUsage(\"/\") error: %v", err)
+		if len(out.Mounts) == 0 {
+			t.Fatal("Expected at least / mount")
+		}
+		for _, m := range out.Mounts {
+			if m.MountedOn != "/" {
+				t.Errorf("Expected mounted_on /, got %s", m.MountedOn)
+			}
+		}
+	})
+
+	t.Run("MountOptions/root", func(t *testing.T) {
+		out, err := GatherMountOptions(t.Context(), "/")
+		skipOnErr(t, err, "GatherMountOptions(\"/\") error: %v", err)
+		if len(out.Mounts) == 0 {
+			t.Fatal("Expected at least / mount")
+		}
+		for _, m := range out.Mounts {
+			if m.Target != "/" {
+				t.Errorf("Expected target /, got %s", m.Target)
+			}
+		}
+	})
+}
+
+func TestGatherInodeUsage(t *testing.T) {
+	out, err := GatherInodeUsage(t.Context(), "")
 	if err != nil {
-		t.Skipf("GatherDiskInfo(\"/\") error: %v", err)
+		t.Skipf("GatherInodeUsage() error: %v", err)
 	}
-	if len(out.Partitions) == 0 {
-		t.Fatal("Expected at least / partition")
+	if len(out.Mounts) == 0 {
+		t.Fatal("Mounts should not be empty")
 	}
-	for _, p := range out.Partitions {
-		if p.MountPoint != "/" {
-			t.Errorf("Expected mount_point /, got %s", p.MountPoint)
+	for i, m := range out.Mounts {
+		if m.Filesystem == "" {
+			t.Errorf("Mounts[%d].Filesystem should not be empty", i)
+		}
+		if m.MountedOn == "" {
+			t.Errorf("Mounts[%d].MountedOn should not be empty", i)
 		}
 	}
 }
 
-func TestGatherDiskInfoWithNoMatch(t *testing.T) {
-	out, err := GatherDiskInfo(t.Context(), "/nonexistent")
+func TestGatherMountOptions(t *testing.T) {
+	out, err := GatherMountOptions(t.Context(), "")
 	if err != nil {
-		t.Fatalf("GatherDiskInfo(\"/nonexistent\") error: %v", err)
+		t.Skipf("GatherMountOptions() error: %v", err)
 	}
-	if len(out.Partitions) != 0 {
-		t.Errorf(
-			"Expected 0 partitions for non-matching filter, got %d",
-			len(out.Partitions),
-		)
+	if len(out.Mounts) == 0 {
+		t.Fatal("Mounts should not be empty")
 	}
-}
-
-func TestGatherNetworkInfo(t *testing.T) {
-	out, err := GatherNetworkInfo(t.Context())
-	if err != nil {
-		t.Skipf("GatherNetworkInfo() error: %v", err)
-	}
-	if len(out.Interfaces) == 0 {
-		t.Fatal("Interfaces should not be empty")
-	}
-	found := false
-	for _, iface := range out.Interfaces {
-		if iface.Name == "lo" {
-			found = true
-		}
-	}
-	if !found {
-		t.Log("lo interface not found (expected on most systems)")
-	}
-}
-
-func TestGatherProcessInfoDefaults(t *testing.T) {
-	out, err := GatherProcessInfo(t.Context(), "", 0)
-	if err != nil {
-		t.Skipf("GatherProcessInfo(\"\", 0) error: %v", err)
-	}
-	if len(out.Processes) == 0 {
-		t.Fatal("Processes should not be empty")
-	}
-	if len(out.Processes) > 10 {
-		t.Errorf(
-			"Expected at most 10 processes by default, got %d",
-			len(out.Processes),
-		)
-	}
-	for i := 1; i < len(out.Processes); i++ {
-		if out.Processes[i-1].CPUPercent < out.Processes[i].CPUPercent {
-			t.Error("Processes should be sorted by CPU descending")
-			break
+	for i, m := range out.Mounts {
+		if m.Target == "" {
+			t.Errorf("Mounts[%d].Target should not be empty", i)
 		}
 	}
 }
 
-func TestGatherProcessInfoSortByMemory(t *testing.T) {
-	out, err := GatherProcessInfo(t.Context(), "memory", 5)
-	if err != nil {
-		t.Skipf("GatherProcessInfo(\"memory\", 5) error: %v", err)
-	}
-	if len(out.Processes) > 5 {
-		t.Errorf("Expected at most 5 processes, got %d", len(out.Processes))
-	}
-	for i := 1; i < len(out.Processes); i++ {
-		if out.Processes[i-1].MemoryPercent <
-			out.Processes[i].MemoryPercent {
-			t.Error("Processes should be sorted by Memory descending")
-			break
+func TestGatherProcessInfo(t *testing.T) {
+	t.Run("Defaults", func(t *testing.T) {
+		out, err := GatherProcessInfo(t.Context(), "", 0)
+		skipOnErr(t, err,
+			"GatherProcessInfo(\"\", 0) error: %v", err)
+		if len(out.Processes) == 0 {
+			t.Fatal("Processes should not be empty")
 		}
-	}
-}
+		if len(out.Processes) > 10 {
+			t.Errorf(
+				"Expected at most 10 processes by default, got %d",
+				len(out.Processes),
+			)
+		}
+		for i := 1; i < len(out.Processes); i++ {
+			if out.Processes[i-1].CPUPercent <
+				out.Processes[i].CPUPercent {
+				t.Error("Processes should be sorted by CPU descending")
+				break
+			}
+		}
+	})
 
-func TestGatherProcessInfoLimitClamping(t *testing.T) {
-	out, err := GatherProcessInfo(t.Context(), "cpu", 200)
-	if err != nil {
-		t.Skipf("GatherProcessInfo(\"cpu\", 200) error: %v", err)
-	}
-	if len(out.Processes) > 100 {
-		t.Errorf("Expected limit clamped to 100, got %d", len(out.Processes))
-	}
-}
+	t.Run("SortByMemory", func(t *testing.T) {
+		out, err := GatherProcessInfo(t.Context(), "memory", 5)
+		skipOnErr(t, err,
+			"GatherProcessInfo(\"memory\", 5) error: %v", err)
+		if len(out.Processes) > 5 {
+			t.Errorf(
+				"Expected at most 5 processes, got %d",
+				len(out.Processes),
+			)
+		}
+		for i := 1; i < len(out.Processes); i++ {
+			if out.Processes[i-1].MemoryPercent <
+				out.Processes[i].MemoryPercent {
+				t.Error("Processes should be sorted by Memory descending")
+				break
+			}
+		}
+	})
 
-func TestGatherProcessInfoIncludesStatus(t *testing.T) {
-	out, err := GatherProcessInfo(t.Context(), "cpu", 5)
-	if err != nil {
-		t.Skipf("GatherProcessInfo(\"cpu\", 5) error: %v", err)
-	}
-	if len(out.Processes) > 0 && out.Processes[0].Status == "" {
-		t.Error("Process status should not be empty")
-	}
+	t.Run("LimitClamping", func(t *testing.T) {
+		out, err := GatherProcessInfo(t.Context(), "cpu", 200)
+		skipOnErr(t, err,
+			"GatherProcessInfo(\"cpu\", 200) error: %v", err)
+		if len(out.Processes) > 100 {
+			t.Errorf(
+				"Expected limit clamped to 100, got %d",
+				len(out.Processes),
+			)
+		}
+	})
+
+	t.Run("IncludesStatus", func(t *testing.T) {
+		out, err := GatherProcessInfo(t.Context(), "cpu", 5)
+		skipOnErr(t, err,
+			"GatherProcessInfo(\"cpu\", 5) error: %v", err)
+		if len(out.Processes) > 0 && out.Processes[0].Status == "" {
+			t.Error("Process status should not be empty")
+		}
+	})
 }
 
 func TestGatherDockerInfo(t *testing.T) {
 	out, err := GatherDockerInfo(t.Context())
-	if err != nil {
-		t.Skipf("GatherDockerInfo() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherDockerInfo() error: %v", err)
 	t.Logf(
 		"Found %d containers and %d images",
 		len(out.Containers),
@@ -242,17 +320,9 @@ func TestGatherDockerInfo(t *testing.T) {
 }
 
 func TestGatherContainerDetail(t *testing.T) {
-	containers, err := ListDockerContainers(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	if len(containers) == 0 {
-		t.Skip("No containers available to inspect")
-	}
+	containers := requireDockerContainers(t)
 	out, err := GatherContainerDetail(t.Context(), containers[0].ID)
-	if err != nil {
-		t.Skipf("GatherContainerDetail() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherContainerDetail() error: %v", err)
 	if out.Container.ID == "" {
 		t.Error("Container ID should not be empty")
 	}
@@ -268,17 +338,9 @@ func TestGatherContainerDetail(t *testing.T) {
 }
 
 func TestGatherContainerLogs(t *testing.T) {
-	containers, err := ListDockerContainers(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	if len(containers) == 0 {
-		t.Skip("No containers available to fetch logs")
-	}
+	containers := requireDockerContainers(t)
 	out, err := GatherContainerLogs(t.Context(), containers[0].ID, 5, false)
-	if err != nil {
-		t.Skipf("GatherContainerLogs() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherContainerLogs() error: %v", err)
 	t.Logf(
 		"Got %d log lines from container %s",
 		len(out.Logs),
@@ -287,24 +349,9 @@ func TestGatherContainerLogs(t *testing.T) {
 }
 
 func TestGatherContainerStats(t *testing.T) {
-	containers, err := ListDockerContainers(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	var statsID string
-	for _, c := range containers {
-		if strings.Contains(c.Status, "Up") {
-			statsID = c.ID
-			break
-		}
-	}
-	if statsID == "" {
-		t.Skip("No running container available for stats")
-	}
+	statsID := requireDockerRunningContainer(t)
 	out, err := GatherContainerStats(t.Context(), statsID)
-	if err != nil {
-		t.Skipf("GatherContainerStats() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherContainerStats() error: %v", err)
 	if len(out.Containers) == 0 {
 		t.Fatal("Expected at least one container stat entry")
 	}
@@ -315,24 +362,9 @@ func TestGatherContainerStats(t *testing.T) {
 }
 
 func TestGatherContainerTop(t *testing.T) {
-	containers, err := ListDockerContainers(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	var topID string
-	for _, c := range containers {
-		if strings.Contains(c.Status, "Up") {
-			topID = c.ID
-			break
-		}
-	}
-	if topID == "" {
-		t.Skip("No running container available for top")
-	}
+	topID := requireDockerRunningContainer(t)
 	out, err := GatherContainerTop(t.Context(), topID, nil)
-	if err != nil {
-		t.Skipf("GatherContainerTop() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherContainerTop() error: %v", err)
 	if len(out.Titles) == 0 {
 		t.Error("Titles should not be empty")
 	}
@@ -345,17 +377,9 @@ func TestGatherContainerTop(t *testing.T) {
 }
 
 func TestGatherContainerDiff(t *testing.T) {
-	containers, err := ListDockerContainers(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	if len(containers) == 0 {
-		t.Skip("No containers available for diff")
-	}
+	containers := requireDockerContainers(t)
 	out, err := GatherContainerDiff(t.Context(), containers[0].ID)
-	if err != nil {
-		t.Skipf("GatherContainerDiff() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherContainerDiff() error: %v", err)
 	t.Logf(
 		"Container %s: %d filesystem changes",
 		containers[0].ID,
@@ -364,17 +388,9 @@ func TestGatherContainerDiff(t *testing.T) {
 }
 
 func TestGatherImageHistory(t *testing.T) {
-	images, err := ListDockerImages(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	if len(images) == 0 {
-		t.Skip("No images available")
-	}
+	images := requireDockerImages(t)
 	out, err := GatherImageHistory(t.Context(), images[0].ID)
-	if err != nil {
-		t.Skipf("GatherImageHistory() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherImageHistory() error: %v", err)
 	if len(out.Layers) == 0 {
 		t.Error("Layers should not be empty")
 	}
@@ -382,17 +398,9 @@ func TestGatherImageHistory(t *testing.T) {
 }
 
 func TestGatherImageDetail(t *testing.T) {
-	images, err := ListDockerImages(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
-	if len(images) == 0 {
-		t.Skip("No images available")
-	}
+	images := requireDockerImages(t)
 	out, err := GatherImageDetail(t.Context(), images[0].ID)
-	if err != nil {
-		t.Skipf("GatherImageDetail() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherImageDetail() error: %v", err)
 	if out.Image.ID == "" {
 		t.Error("Image ID should not be empty")
 	}
@@ -403,9 +411,7 @@ func TestGatherImageDetail(t *testing.T) {
 
 func TestGatherDockerNetworks(t *testing.T) {
 	out, err := GatherDockerNetworks(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
+	skipOnErr(t, err, "Docker not available: %v", err)
 	if len(out.Networks) == 0 {
 		t.Error("Networks should not be empty on a Docker host")
 	}
@@ -414,17 +420,13 @@ func TestGatherDockerNetworks(t *testing.T) {
 
 func TestGatherDockerVolumes(t *testing.T) {
 	out, err := GatherDockerVolumes(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
+	skipOnErr(t, err, "Docker not available: %v", err)
 	t.Logf("Found %d Docker volumes", len(out.Volumes))
 }
 
 func TestGatherDockerSystemInfo(t *testing.T) {
 	out, err := GatherDockerSystemInfo(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
+	skipOnErr(t, err, "Docker not available: %v", err)
 	if out.Info.ServerVersion == "" {
 		t.Error("ServerVersion should not be empty")
 	}
@@ -435,9 +437,7 @@ func TestGatherDockerSystemInfo(t *testing.T) {
 
 func TestGatherDockerDiskUsage(t *testing.T) {
 	out, err := GatherDockerDiskUsage(t.Context())
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
+	skipOnErr(t, err, "Docker not available: %v", err)
 	t.Logf(
 		"Containers: %d active/%d total (%s), Images: %d active/%d total (%s)",
 		out.Containers.ActiveCount,
@@ -451,9 +451,7 @@ func TestGatherDockerDiskUsage(t *testing.T) {
 
 func TestGatherDockerStatsAll(t *testing.T) {
 	out, err := GatherDockerStatsAll(t.Context(), nil)
-	if err != nil {
-		t.Skipf("Docker not available: %v", err)
-	}
+	skipOnErr(t, err, "Docker not available: %v", err)
 	t.Logf(
 		"Got stats for %d running container(s)",
 		len(out.Containers),
@@ -562,145 +560,9 @@ func TestGatherJournalLogs(t *testing.T) {
 	t.Logf("Found %d journal entries", len(out.Entries))
 }
 
-func TestGatherInodeUsage(t *testing.T) {
-	out, err := GatherInodeUsage(t.Context(), "")
-	if err != nil {
-		t.Skipf("GatherInodeUsage() error: %v", err)
-	}
-	if len(out.Mounts) == 0 {
-		t.Fatal("Mounts should not be empty")
-	}
-	for i, m := range out.Mounts {
-		if m.Filesystem == "" {
-			t.Errorf("Mounts[%d].Filesystem should not be empty", i)
-		}
-		if m.MountedOn == "" {
-			t.Errorf("Mounts[%d].MountedOn should not be empty", i)
-		}
-	}
-}
-
-func TestGatherInodeUsageWithFilter(t *testing.T) {
-	out, err := GatherInodeUsage(t.Context(), "/")
-	if err != nil {
-		t.Skipf("GatherInodeUsage(\"/\") error: %v", err)
-	}
-	if len(out.Mounts) == 0 {
-		t.Fatal("Expected at least / mount")
-	}
-	for _, m := range out.Mounts {
-		if m.MountedOn != "/" {
-			t.Errorf("Expected mounted_on /, got %s", m.MountedOn)
-		}
-	}
-}
-
-func TestGatherListeningPorts(t *testing.T) {
-	out, err := GatherListeningPorts(t.Context(), "")
-	if err != nil {
-		t.Skipf("GatherListeningPorts() error: %v", err)
-	}
-	t.Logf("Found %d listening ports", len(out.Ports))
-}
-
-func TestGatherServiceStatus(t *testing.T) {
-	services := []string{
-		"systemd-journald.service", "dbus.service", "sshd",
-	}
-	var out ServiceStatusOutput
-	var err error
-	for _, name := range services {
-		out, err = GatherServiceStatus(t.Context(), name, false)
-		if err == nil {
-			break
-		}
-	}
-	if err != nil {
-		t.Skipf("No common service found: %v", err)
-	}
-	if out.Name == "" {
-		t.Error("Name should not be empty")
-	}
-	if out.Output == "" {
-		t.Error("Output should not be empty")
-	}
-	t.Logf("Service %s: %s", out.Name, out.Active)
-}
-
-func TestGatherTopIOProcesses(t *testing.T) {
-	out, err := GatherTopIOProcesses(t.Context(), 5)
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			t.Skip("pidstat not installed")
-		}
-		t.Fatalf("GatherTopIOProcesses() error: %v", err)
-	}
-	t.Logf("Found %d IO processes", len(out.Processes))
-}
-
-func TestGatherFailedLogins(t *testing.T) {
-	out, err := GatherFailedLogins(t.Context(), 5)
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			t.Skip("lastb not installed")
-		}
-		t.Skipf("GatherFailedLogins() error (likely permissions): %v", err)
-	}
-	t.Logf("Found %d failed login entries", len(out.Entries))
-}
-
-func TestSplitHostPort(t *testing.T) {
-	addr, port, ok := SplitHostPort("0.0.0.0:80")
-	if !ok || addr != "0.0.0.0" || port != "80" {
-		t.Errorf(
-			"SplitHostPort('0.0.0.0:80') = (%q, %q, %v)", addr, port, ok)
-	}
-	addr, port, ok = SplitHostPort("[::]:443")
-	if !ok || addr != "[::]" || port != "443" {
-		t.Errorf(
-			"SplitHostPort('[::]:443') = (%q, %q, %v)", addr, port, ok)
-	}
-}
-
-func TestParseProcessField(t *testing.T) {
-	result := ParseProcessField(
-		`users:(("sshd",pid=1234,fd=3))`)
-	if result != "sshd" {
-		t.Errorf("expected 'sshd', got %q", result)
-	}
-	result = ParseProcessField("plaintext")
-	if result != "plaintext" {
-		t.Errorf("expected 'plaintext', got %q", result)
-	}
-}
-
-func TestGatherLargestFiles(t *testing.T) {
-	out, err := GatherLargestFiles(t.Context(), ".", 5)
-	if err != nil {
-		t.Fatalf("GatherLargestFiles() error: %v", err)
-	}
-	if out.Path == "" {
-		t.Error("Path should not be empty")
-	}
-	for i, e := range out.Entries {
-		if e.Name == "" {
-			t.Errorf("Entries[%d].Name should not be empty", i)
-		}
-		if e.SizeBytes < 0 {
-			t.Errorf("Entries[%d].SizeBytes should be >= 0", i)
-		}
-		if e.SizeHuman == "" {
-			t.Errorf("Entries[%d].SizeHuman should not be empty", i)
-		}
-	}
-	t.Logf("Found %d entries in %s", len(out.Entries), out.Path)
-}
-
 func TestGatherGPUInfo(t *testing.T) {
 	out, err := GatherGPUInfo(t.Context())
-	if err != nil {
-		t.Skipf("No GPU tool found: %v", err)
-	}
+	skipOnErr(t, err, "No GPU tool found: %v", err)
 	if out.Vendor == "" {
 		t.Error("Vendor should not be empty")
 	}
@@ -763,228 +625,81 @@ func TestGatherCheckUpdates(t *testing.T) {
 	t.Logf("Found %d available updates", out.Total)
 }
 
-func TestGatherLoadAverage(t *testing.T) {
-	out, err := GatherLoadAverage(t.Context())
+func TestGatherLargestFiles(t *testing.T) {
+	out, err := GatherLargestFiles(t.Context(), ".", 5)
 	if err != nil {
-		t.Skipf("GatherLoadAverage() error: %v", err)
+		t.Fatalf("GatherLargestFiles() error: %v", err)
 	}
-	if out.Load1 < 0 {
-		t.Errorf("Load1 should be >= 0, got %f", out.Load1)
+	if out.Path == "" {
+		t.Error("Path should not be empty")
 	}
-	if out.Load5 < 0 {
-		t.Errorf("Load5 should be >= 0, got %f", out.Load5)
+	for i, e := range out.Entries {
+		if e.Name == "" {
+			t.Errorf("Entries[%d].Name should not be empty", i)
+		}
+		if e.SizeBytes < 0 {
+			t.Errorf("Entries[%d].SizeBytes should be >= 0", i)
+		}
+		if e.SizeHuman == "" {
+			t.Errorf("Entries[%d].SizeHuman should not be empty", i)
+		}
 	}
-	if out.Load15 < 0 {
-		t.Errorf("Load15 should be >= 0, got %f", out.Load15)
-	}
+	t.Logf("Found %d entries in %s", len(out.Entries), out.Path)
 }
 
-func TestGatherLoggedInUsers(t *testing.T) {
-	out, err := GatherLoggedInUsers(t.Context())
+func TestGatherTopIOProcesses(t *testing.T) {
+	out, err := GatherTopIOProcesses(t.Context(), 5)
 	if err != nil {
-		t.Skipf("GatherLoggedInUsers() error: %v", err)
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("pidstat not installed")
+		}
+		t.Fatalf("GatherTopIOProcesses() error: %v", err)
 	}
-	t.Logf("Found %d logged-in users", len(out.Users))
+	t.Logf("Found %d IO processes", len(out.Processes))
+}
+
+func TestGatherFailedLogins(t *testing.T) {
+	out, err := GatherFailedLogins(t.Context(), 5)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("lastb not installed")
+		}
+		t.Skipf("GatherFailedLogins() error (likely permissions): %v", err)
+	}
+	t.Logf("Found %d failed login entries", len(out.Entries))
 }
 
 func TestGatherDNSResolve(t *testing.T) {
 	out, err := GatherDNSResolve(t.Context(), "localhost")
-	if err != nil {
-		t.Skipf("GatherDNSResolve(\"localhost\") error: %v", err)
-	}
+	skipOnErr(t, err, "GatherDNSResolve(\"localhost\") error: %v", err)
 	if len(out.Addresses) == 0 {
 		t.Error("Expected at least one address for localhost")
 	}
 	t.Logf("localhost resolves to: %v", out.Addresses)
 }
 
-func TestGatherMountOptions(t *testing.T) {
-	out, err := GatherMountOptions(t.Context(), "")
-	if err != nil {
-		t.Skipf("GatherMountOptions() error: %v", err)
+func TestGatherServiceStatus(t *testing.T) {
+	services := []string{
+		"systemd-journald.service", "dbus.service", "sshd",
 	}
-	if len(out.Mounts) == 0 {
-		t.Fatal("Mounts should not be empty")
-	}
-	for i, m := range out.Mounts {
-		if m.Target == "" {
-			t.Errorf("Mounts[%d].Target should not be empty", i)
+	var out *ServiceStatusOutput
+	var err error
+	for _, name := range services {
+		out, err = GatherServiceStatus(t.Context(), name, false)
+		if err == nil {
+			break
 		}
 	}
-}
-
-func TestGatherMountOptionsWithFilter(t *testing.T) {
-	out, err := GatherMountOptions(t.Context(), "/")
 	if err != nil {
-		t.Skipf("GatherMountOptions(\"/\") error: %v", err)
+		t.Skipf("No common service found: %v", err)
 	}
-	if len(out.Mounts) == 0 {
-		t.Fatal("Expected at least / mount")
+	if out.Name == "" {
+		t.Error("Name should not be empty")
 	}
-	for _, m := range out.Mounts {
-		if m.Target != "/" {
-			t.Errorf("Expected target /, got %s", m.Target)
-		}
+	if out.Output == "" {
+		t.Error("Output should not be empty")
 	}
-}
-
-func TestGatherSystemdUnits(t *testing.T) {
-	out, err := GatherSystemdUnits(t.Context())
-	if err != nil {
-		t.Skipf("GatherSystemdUnits() error: %v", err)
-	}
-	if len(out.Units) == 0 {
-		t.Error("Units should not be empty")
-	}
-	t.Logf("Found %d systemd units", len(out.Units))
-}
-
-func TestHandleResolveDNSEmptyHostname(t *testing.T) {
-	_, _, err := HandleResolveDNS(t.Context(), nil, ResolveDNSInput{})
-	if err == nil {
-		t.Error("Expected error for empty hostname")
-	}
-}
-
-func TestHumanSize(t *testing.T) {
-	cases := []struct {
-		bytes int64
-		want  string
-	}{
-		{0, "0 B"},
-		{500, "500 B"},
-		{1024, "1.0 KB"},
-		{1536, "1.5 KB"},
-		{1048576, "1.0 MB"},
-		{1073741824, "1.0 GB"},
-	}
-	for _, c := range cases {
-		got := HumanSize(c.bytes)
-		if got != c.want {
-			t.Errorf("HumanSize(%d) = %q, want %q", c.bytes, got, c.want)
-		}
-	}
-}
-
-func TestGatherManPage(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	if out.Command != "ls" {
-		t.Errorf("expected command 'ls', got %q", out.Command)
-	}
-	if out.Content == "" {
-		t.Error("Content should not be empty")
-	}
-	if !strings.Contains(out.Content, "LS") {
-		t.Error("Content should contain 'LS' as man page header")
-	}
-}
-
-func TestGatherManPageNotFound(t *testing.T) {
-	_, err := GatherManPage(
-		t.Context(),
-		"nonexistent_command_xyz",
-		500,
-		true,
-		"",
-		0,
-		0,
-	)
-	if err == nil {
-		t.Fatal("expected error for nonexistent command")
-	}
-	if !strings.Contains(err.Error(), "No manual page found") {
-		t.Errorf("expected 'No manual page found' error, got: %v", err)
-	}
-}
-
-func TestGatherManPageMaxLines(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 5, true, "", 0, 0)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	lines := strings.Count(out.Content, "\n") + 1
-	if lines > 5 {
-		t.Errorf("expected at most 5 lines, got %d", lines)
-	}
-	if out.Truncated != true {
-		t.Error("expected Truncated to be true")
-	}
-}
-
-func TestGatherManPageCleanSpecialChars(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	if !strings.Contains(out.Content, "\x08") {
-		return
-	}
-	t.Error("Expected backspace characters to be cleaned")
-}
-
-func TestGatherManPageSearch(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 500, true, "FILE", 0, 0)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	if out.Content == "" {
-		t.Error("search results should not be empty when term exists")
-	}
-	if !strings.Contains(out.Content, "FILE") {
-		t.Error("search results should contain the search term")
-	}
-}
-
-func TestGatherManPageSearchNotFound(t *testing.T) {
-	out, err := GatherManPage(
-		t.Context(),
-		"ls",
-		500,
-		true,
-		"XYZZY_NONEXISTENT_123",
-		0,
-		0,
-	)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	if out.Content != "" {
-		t.Error("expected empty content for search with no matches")
-	}
-}
-
-func TestGatherManPageOffset(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 10, true, "", 0, 0)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	out2, err2 := GatherManPage(t.Context(), "ls", 10, true, "", 0, 10)
-	if err2 != nil {
-		t.Skipf("GatherManPage() error: %v", err2)
-	}
-	if out.Content == out2.Content {
-		t.Error("offset 0 and offset 10 should return different content")
-	}
-}
-
-func TestGatherManPageContextLines(t *testing.T) {
-	out, err := GatherManPage(t.Context(), "ls", 500, true, "FILE", 2, 0)
-	if err != nil {
-		t.Skipf("GatherManPage() error: %v", err)
-	}
-	if out.Content == "" {
-		t.Error("should return content with context lines")
-	}
-}
-
-func TestHandleManPageEmptyCommand(t *testing.T) {
-	_, _, err := HandleGetManPage(t.Context(), nil, GetManPageInput{})
-	if err == nil {
-		t.Error("expected error for empty command")
-	}
+	t.Logf("Service %s: %s", out.Name, out.Active)
 }
 
 func TestGatherEnvironmentVariables(t *testing.T) {
@@ -1051,6 +766,58 @@ func TestGatherHardwareBusInfo(t *testing.T) {
 	)
 }
 
+func TestSplitHostPort(t *testing.T) {
+	addr, port, ok := SplitHostPort("0.0.0.0:80")
+	if !ok || addr != "0.0.0.0" || port != "80" {
+		t.Errorf(
+			"SplitHostPort('0.0.0.0:80') = (%q, %q, %v)", addr, port, ok)
+	}
+	addr, port, ok = SplitHostPort("[::]:443")
+	if !ok || addr != "[::]" || port != "443" {
+		t.Errorf(
+			"SplitHostPort('[::]:443') = (%q, %q, %v)", addr, port, ok)
+	}
+}
+
+func TestParseProcessField(t *testing.T) {
+	result := ParseProcessField(
+		`users:(("sshd",pid=1234,fd=3))`)
+	if result != "sshd" {
+		t.Errorf("expected 'sshd', got %q", result)
+	}
+	result = ParseProcessField("plaintext")
+	if result != "plaintext" {
+		t.Errorf("expected 'plaintext', got %q", result)
+	}
+}
+
+func TestHandleResolveDNSEmptyHostname(t *testing.T) {
+	_, _, err := HandleResolveDNS(t.Context(), nil, ResolveDNSInput{})
+	if err == nil {
+		t.Error("Expected error for empty hostname")
+	}
+}
+
+func TestHumanSize(t *testing.T) {
+	cases := []struct {
+		bytes int64
+		want  string
+	}{
+		{0, "0 B"},
+		{500, "500 B"},
+		{1024, "1.0 KB"},
+		{1536, "1.5 KB"},
+		{1048576, "1.0 MB"},
+		{1073741824, "1.0 GB"},
+	}
+	for _, c := range cases {
+		got := HumanSize(c.bytes)
+		if got != c.want {
+			t.Errorf("HumanSize(%d) = %q, want %q", c.bytes, got, c.want)
+		}
+	}
+}
+
 func TestShellQuote(t *testing.T) {
 	cases := []struct {
 		input string
@@ -1071,9 +838,7 @@ func TestShellQuote(t *testing.T) {
 
 func TestGatherUserAutomation(t *testing.T) {
 	out, err := GatherUserAutomation(t.Context())
-	if err != nil {
-		t.Skipf("GatherUserAutomation() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherUserAutomation() error: %v", err)
 	if out.CronJobs == nil {
 		t.Error("CronJobs should not be nil")
 	}
@@ -1084,9 +849,115 @@ func TestGatherUserAutomation(t *testing.T) {
 
 func TestGatherDesktopSessionInfo(t *testing.T) {
 	out, err := GatherDesktopSessionInfo(t.Context())
-	if err != nil {
-		t.Skipf("GatherDesktopSessionInfo() error: %v", err)
-	}
+	skipOnErr(t, err, "GatherDesktopSessionInfo() error: %v", err)
 	// These may be empty in non-desktop environments, so just check no error
 	_ = out
+}
+
+func TestGatherManPage(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
+		out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		if out.Command != "ls" {
+			t.Errorf("expected command 'ls', got %q", out.Command)
+		}
+		if out.Content == "" {
+			t.Error("Content should not be empty")
+		}
+		if !strings.Contains(out.Content, "LS") {
+			t.Error("Content should contain 'LS' as man page header")
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		_, err := GatherManPage(
+			t.Context(),
+			"nonexistent_command_xyz",
+			500,
+			true,
+			"",
+			0,
+			0,
+		)
+		if err == nil {
+			t.Fatal("expected error for nonexistent command")
+		}
+		if !strings.Contains(err.Error(), "No manual page found") {
+			t.Errorf("expected 'No manual page found' error, got: %v", err)
+		}
+	})
+
+	t.Run("MaxLines", func(t *testing.T) {
+		out, err := GatherManPage(t.Context(), "ls", 5, true, "", 0, 0)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		lines := strings.Count(out.Content, "\n") + 1
+		if lines > 5 {
+			t.Errorf("expected at most 5 lines, got %d", lines)
+		}
+		if out.Truncated != true {
+			t.Error("expected Truncated to be true")
+		}
+	})
+
+	t.Run("CleanSpecialChars", func(t *testing.T) {
+		out, err := GatherManPage(t.Context(), "ls", 500, true, "", 0, 0)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		if !strings.Contains(out.Content, "\x08") {
+			return
+		}
+		t.Error("Expected backspace characters to be cleaned")
+	})
+
+	t.Run("Search", func(t *testing.T) {
+		out, err := GatherManPage(t.Context(), "ls", 500, true, "FILE", 0, 0)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		if out.Content == "" {
+			t.Error("search results should not be empty when term exists")
+		}
+		if !strings.Contains(out.Content, "FILE") {
+			t.Error("search results should contain the search term")
+		}
+	})
+
+	t.Run("SearchNotFound", func(t *testing.T) {
+		out, err := GatherManPage(
+			t.Context(),
+			"ls",
+			500,
+			true,
+			"XYZZY_NONEXISTENT_123",
+			0,
+			0,
+		)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		if out.Content != "" {
+			t.Error("expected empty content for search with no matches")
+		}
+	})
+
+	t.Run("Offset", func(t *testing.T) {
+		out, err := GatherManPage(t.Context(), "ls", 10, true, "", 0, 0)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		out2, err2 := GatherManPage(t.Context(), "ls", 10, true, "", 0, 10)
+		skipOnErr(t, err2, "GatherManPage() error: %v", err2)
+		if out.Content == out2.Content {
+			t.Error("offset 0 and offset 10 should return different content")
+		}
+	})
+
+	t.Run("ContextLines", func(t *testing.T) {
+		out, err := GatherManPage(
+			t.Context(), "ls", 500, true, "FILE", 2, 0)
+		skipOnErr(t, err, "GatherManPage() error: %v", err)
+		if out.Content == "" {
+			t.Error("should return content with context lines")
+		}
+	})
+
+	t.Run("EmptyCommand", func(t *testing.T) {
+		_, _, err := HandleGetManPage(t.Context(), nil, GetManPageInput{})
+		if err == nil {
+			t.Error("expected error for empty command")
+		}
+	})
 }

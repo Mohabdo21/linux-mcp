@@ -2,12 +2,10 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -23,7 +21,7 @@ type InstalledPackage struct {
 type InstalledPackagesOutput struct {
 	Packages []InstalledPackage `json:"packages"`
 	Total    int                `json:"total"`
-	Errors   []string           `json:"errors,omitempty"`
+	OutputErrors
 }
 
 type CheckUpdatesInput struct{}
@@ -37,7 +35,7 @@ type AvailableUpdate struct {
 type CheckUpdatesOutput struct {
 	Updates []AvailableUpdate `json:"updates"`
 	Total   int               `json:"total"`
-	Errors  []string          `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func detectPkgManager() string {
@@ -53,7 +51,7 @@ func detectPkgManager() string {
 func GatherInstalledPackages(
 	ctx context.Context,
 	name string,
-) (InstalledPackagesOutput, error) {
+) (*InstalledPackagesOutput, error) {
 	pm := detectPkgManager()
 	switch pm {
 	case "pacman":
@@ -61,14 +59,14 @@ func GatherInstalledPackages(
 	case "dpkg":
 		return gatherDpkgPackages(ctx, name)
 	default:
-		return InstalledPackagesOutput{}, exec.ErrNotFound
+		return nil, exec.ErrNotFound
 	}
 }
 
 func gatherPacmanPackages(
 	ctx context.Context,
 	name string,
-) (InstalledPackagesOutput, error) {
+) (*InstalledPackagesOutput, error) {
 	var args []string
 	if name == "" {
 		args = []string{"-Q"}
@@ -77,12 +75,12 @@ func gatherPacmanPackages(
 	}
 	out, err := exec.CommandContext(ctx, "pacman", args...).Output()
 	if err != nil {
-		return InstalledPackagesOutput{}, err
+		return nil, err
 	}
 	return parsePacmanQOutput(string(out)), nil
 }
 
-func parsePacmanQOutput(output string) InstalledPackagesOutput {
+func parsePacmanQOutput(output string) *InstalledPackagesOutput {
 	var pkgs []InstalledPackage
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -100,7 +98,7 @@ func parsePacmanQOutput(output string) InstalledPackagesOutput {
 			})
 		}
 	}
-	return InstalledPackagesOutput{
+	return &InstalledPackagesOutput{
 		Packages: pkgs,
 		Total:    len(pkgs),
 	}
@@ -109,19 +107,19 @@ func parsePacmanQOutput(output string) InstalledPackagesOutput {
 func gatherDpkgPackages(
 	ctx context.Context,
 	name string,
-) (InstalledPackagesOutput, error) {
+) (*InstalledPackagesOutput, error) {
 	args := []string{"-l"}
 	if name != "" {
 		args = []string{"-l", name}
 	}
 	out, err := exec.CommandContext(ctx, "dpkg", args...).Output()
 	if err != nil {
-		return InstalledPackagesOutput{}, err
+		return nil, err
 	}
 	return parseDpkgLOutput(string(out)), nil
 }
 
-func parseDpkgLOutput(output string) InstalledPackagesOutput {
+func parseDpkgLOutput(output string) *InstalledPackagesOutput {
 	var pkgs []InstalledPackage
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		if len(line) < 4 || line[:2] != "ii" {
@@ -135,13 +133,13 @@ func parseDpkgLOutput(output string) InstalledPackagesOutput {
 			})
 		}
 	}
-	return InstalledPackagesOutput{
+	return &InstalledPackagesOutput{
 		Packages: pkgs,
 		Total:    len(pkgs),
 	}
 }
 
-func GatherCheckUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
+func GatherCheckUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 	pm := detectPkgManager()
 	switch pm {
 	case "pacman":
@@ -149,21 +147,21 @@ func GatherCheckUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
 	case "dpkg":
 		return gatherAptUpdates(ctx)
 	default:
-		return CheckUpdatesOutput{}, exec.ErrNotFound
+		return nil, exec.ErrNotFound
 	}
 }
 
-func gatherPacmanUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
+func gatherPacmanUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 	out, err := exec.CommandContext(ctx, "pacman", "-Qu").Output()
 	if err != nil {
 		if len(out) == 0 {
-			return CheckUpdatesOutput{}, nil
+			return &CheckUpdatesOutput{}, nil
 		}
 	}
 	return parsePacmanQuOutput(string(out)), nil
 }
 
-func parsePacmanQuOutput(output string) CheckUpdatesOutput {
+func parsePacmanQuOutput(output string) *CheckUpdatesOutput {
 	var updates []AvailableUpdate
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -189,23 +187,23 @@ func parsePacmanQuOutput(output string) CheckUpdatesOutput {
 			}
 		}
 	}
-	return CheckUpdatesOutput{
+	return &CheckUpdatesOutput{
 		Updates: updates,
 		Total:   len(updates),
 	}
 }
 
-func gatherAptUpdates(ctx context.Context) (CheckUpdatesOutput, error) {
+func gatherAptUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 	out, err := exec.CommandContext(ctx, "apt", "list", "--upgradable").Output()
 	if err != nil {
 		if len(out) == 0 {
-			return CheckUpdatesOutput{}, err
+			return nil, err
 		}
 	}
 	return parseAptListOutput(string(out)), nil
 }
 
-func parseAptListOutput(output string) CheckUpdatesOutput {
+func parseAptListOutput(output string) *CheckUpdatesOutput {
 	var updates []AvailableUpdate
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -237,7 +235,7 @@ func parseAptListOutput(output string) CheckUpdatesOutput {
 			}
 		}
 	}
-	return CheckUpdatesOutput{
+	return &CheckUpdatesOutput{
 		Updates: updates,
 		Total:   len(updates),
 	}
@@ -245,46 +243,28 @@ func parseAptListOutput(output string) CheckUpdatesOutput {
 
 func HandleGetInstalledPackages(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetInstalledPackagesInput,
-) (*mcp.CallToolResult, InstalledPackagesOutput, error) {
-	if config.IsDisabled("get_installed_packages") {
-		return nil, InstalledPackagesOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_installed_packages", 15*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherInstalledPackages(ctx, input.Name)
-	LogToolCall(ctx, "get_installed_packages",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *InstalledPackagesOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_installed_packages",
+		15*time.Second,
+		func(ctx context.Context) (*InstalledPackagesOutput, error) {
+			return GatherInstalledPackages(ctx, input.Name)
+		},
+	)
 }
 
 func HandleCheckUpdates(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	_ CheckUpdatesInput,
-) (*mcp.CallToolResult, CheckUpdatesOutput, error) {
-	if config.IsDisabled("check_updates") {
-		return nil, CheckUpdatesOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "check_updates", 15*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherCheckUpdates(ctx)
-	LogToolCall(ctx, "check_updates",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *CheckUpdatesOutput, error) {
+	return handleToolCall(
+		ctx,
+		"check_updates",
+		15*time.Second,
+		GatherCheckUpdates,
+	)
 }

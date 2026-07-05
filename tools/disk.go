@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/disk"
 )
@@ -32,16 +30,16 @@ type DiskUsageStat struct {
 
 type DiskInfoOutput struct {
 	Partitions []DiskUsageStat `json:"partitions"`
-	Errors     []string        `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherDiskInfo(
 	ctx context.Context,
 	mountPoint string,
-) (DiskInfoOutput, error) {
+) (*DiskInfoOutput, error) {
 	partitions, err := disk.Partitions(false)
 	if err != nil {
-		return DiskInfoOutput{}, err
+		return nil, err
 	}
 
 	var result []DiskUsageStat
@@ -63,30 +61,22 @@ func GatherDiskInfo(
 			UsedPercent: usage.UsedPercent,
 		})
 	}
-	return DiskInfoOutput{Partitions: result}, nil
+	return &DiskInfoOutput{Partitions: result}, nil
 }
 
 func HandleGetDiskInfo(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetDiskInfoInput,
-) (*mcp.CallToolResult, DiskInfoOutput, error) {
-	if config.IsDisabled("get_disk_info") {
-		return nil, DiskInfoOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_disk_info", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherDiskInfo(ctx, input.MountPoint)
-	LogToolCall(ctx, "get_disk_info",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *DiskInfoOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_disk_info",
+		10*time.Second,
+		func(ctx context.Context) (*DiskInfoOutput, error) {
+			return GatherDiskInfo(ctx, input.MountPoint)
+		},
+	)
 }
 
 type GetInodeUsageInput struct {
@@ -104,17 +94,17 @@ type InodeUsageStat struct {
 
 type InodeUsageOutput struct {
 	Mounts []InodeUsageStat `json:"mounts"`
-	Errors []string         `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherInodeUsage(
 	ctx context.Context,
 	mountPoint string,
-) (InodeUsageOutput, error) {
+) (*InodeUsageOutput, error) {
 	cmd := exec.CommandContext(ctx, "df", "-i")
 	out, err := cmd.Output()
 	if err != nil {
-		return InodeUsageOutput{}, err
+		return nil, err
 	}
 	var mounts []InodeUsageStat
 	for line := range strings.SplitSeq(
@@ -141,30 +131,22 @@ func GatherInodeUsage(
 			MountedOn:   mounted,
 		})
 	}
-	return InodeUsageOutput{Mounts: mounts}, nil
+	return &InodeUsageOutput{Mounts: mounts}, nil
 }
 
 func HandleGetInodeUsage(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetInodeUsageInput,
-) (*mcp.CallToolResult, InodeUsageOutput, error) {
-	if config.IsDisabled("get_inode_usage") {
-		return nil, InodeUsageOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_inode_usage", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherInodeUsage(ctx, input.MountPoint)
-	LogToolCall(ctx, "get_inode_usage",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *InodeUsageOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_inode_usage",
+		10*time.Second,
+		func(ctx context.Context) (*InodeUsageOutput, error) {
+			return GatherInodeUsage(ctx, input.MountPoint)
+		},
+	)
 }
 
 type GetLargestFilesInput struct {
@@ -182,14 +164,14 @@ type LargestFileEntry struct {
 type LargestFilesOutput struct {
 	Path    string             `json:"path"`
 	Entries []LargestFileEntry `json:"entries"`
-	Errors  []string           `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherLargestFiles(
 	ctx context.Context,
 	path string,
 	limit int,
-) (LargestFilesOutput, error) {
+) (*LargestFilesOutput, error) {
 	if path == "" {
 		path = "."
 	}
@@ -204,7 +186,7 @@ func GatherLargestFiles(
 	))
 	out, err := cmd.Output()
 	if err != nil {
-		return LargestFilesOutput{Path: path}, nil
+		return &LargestFilesOutput{Path: path}, nil
 	}
 	var entries []LargestFileEntry
 	for line := range strings.SplitSeq(
@@ -236,7 +218,22 @@ func GatherLargestFiles(
 	if len(entries) > limit {
 		entries = entries[:limit]
 	}
-	return LargestFilesOutput{Path: path, Entries: entries}, nil
+	return &LargestFilesOutput{Path: path, Entries: entries}, nil
+}
+
+func HandleGetLargestFiles(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	input GetLargestFilesInput,
+) (*mcp.CallToolResult, *LargestFilesOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_largest_files",
+		30*time.Second,
+		func(ctx context.Context) (*LargestFilesOutput, error) {
+			return GatherLargestFiles(ctx, input.Path, input.Limit)
+		},
+	)
 }
 
 type GetMountOptionsInput struct {
@@ -252,18 +249,18 @@ type MountEntry struct {
 
 type MountOptionsOutput struct {
 	Mounts []MountEntry `json:"mounts"`
-	Errors []string     `json:"errors,omitempty"`
+	OutputErrors
 }
 
 func GatherMountOptions(
 	ctx context.Context,
 	mountPoint string,
-) (MountOptionsOutput, error) {
+) (*MountOptionsOutput, error) {
 	args := []string{"--noheadings", "-o", "SOURCE,TARGET,FSTYPE,OPTIONS"}
 	cmd := exec.CommandContext(ctx, "findmnt", args...)
 	out, err := cmd.Output()
 	if err != nil {
-		return MountOptionsOutput{}, err
+		return nil, err
 	}
 	var mounts []MountEntry
 	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
@@ -284,51 +281,20 @@ func GatherMountOptions(
 			Options: strings.Split(fields[3], ","),
 		})
 	}
-	return MountOptionsOutput{Mounts: mounts}, nil
+	return &MountOptionsOutput{Mounts: mounts}, nil
 }
 
 func HandleGetMountOptions(
 	ctx context.Context,
-	req *mcp.CallToolRequest,
+	_ *mcp.CallToolRequest,
 	input GetMountOptionsInput,
-) (*mcp.CallToolResult, MountOptionsOutput, error) {
-	if config.IsDisabled("get_mount_options") {
-		return nil, MountOptionsOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_mount_options", 10*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherMountOptions(ctx, input.MountPoint)
-	LogToolCall(ctx, "get_mount_options",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
-}
-
-func HandleGetLargestFiles(
-	ctx context.Context,
-	req *mcp.CallToolRequest,
-	input GetLargestFilesInput,
-) (*mcp.CallToolResult, LargestFilesOutput, error) {
-	if config.IsDisabled("get_largest_files") {
-		return nil, LargestFilesOutput{},
-			errors.New("tool disabled by configuration")
-	}
-	ctx, cancel := WithToolTimeout(
-		ctx, "get_largest_files", 30*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	out, err := GatherLargestFiles(ctx, input.Path, input.Limit)
-	LogToolCall(ctx, "get_largest_files",
-		time.Since(start), len(out.Errors))
-	if err != nil {
-		out.Errors = append(out.Errors, err.Error())
-	}
-	return nil, out, nil
+) (*mcp.CallToolResult, *MountOptionsOutput, error) {
+	return handleToolCall(
+		ctx,
+		"get_mount_options",
+		10*time.Second,
+		func(ctx context.Context) (*MountOptionsOutput, error) {
+			return GatherMountOptions(ctx, input.MountPoint)
+		},
+	)
 }
