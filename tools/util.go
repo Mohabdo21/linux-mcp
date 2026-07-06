@@ -49,6 +49,19 @@ func ParseProcessField(s string) string {
 	return s
 }
 
+func appendErr(errors *[]string, context string, err error) {
+	if err != nil {
+		*errors = append(*errors, context+": "+err.Error())
+	}
+}
+
+func joinErrs(errs []string) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(errs, "; "))
+}
+
 // OutputErrors is embedded in output structs for error accumulation.
 type OutputErrors struct {
 	Errors []string `json:"errors,omitempty"`
@@ -63,16 +76,11 @@ func (o OutputErrors) ErrorCount() int {
 }
 
 func (o *OutputErrors) Add(context string, err error) {
-	if err != nil {
-		o.Errors = append(o.Errors, context+": "+err.Error())
-	}
+	appendErr(&o.Errors, context, err)
 }
 
 func (o OutputErrors) Err() error {
-	if len(o.Errors) == 0 {
-		return nil
-	}
-	return errors.New(strings.Join(o.Errors, "; "))
+	return joinErrs(o.Errors)
 }
 
 // ErrList collects errors during graceful degradation.
@@ -80,16 +88,11 @@ func (o OutputErrors) Err() error {
 type ErrList []string
 
 func (e *ErrList) Add(context string, err error) {
-	if err != nil {
-		*e = append(*e, context+": "+err.Error())
-	}
+	appendErr((*[]string)(e), context, err)
 }
 
 func (e ErrList) Err() error {
-	if len(e) == 0 {
-		return nil
-	}
-	return errors.New(strings.Join(e, "; "))
+	return joinErrs(e)
 }
 
 func (e *ErrList) AppendError(s string) {
