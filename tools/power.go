@@ -11,8 +11,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type GetPowerAnalyticsInput struct{}
-
 type PowerAnalyticsOutput struct {
 	ACOnline            bool    `json:"ac_online"`
 	BatteryPercent      float64 `json:"battery_percent"`
@@ -136,7 +134,7 @@ func GatherPowerAnalytics(ctx context.Context) (*PowerAnalyticsOutput, error) {
 func HandleGetPowerAnalytics(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetPowerAnalyticsInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *PowerAnalyticsOutput, error) {
 	return handleToolCall(
 		ctx,

@@ -23,8 +23,6 @@ type InstalledPackagesOutput struct {
 	OutputErrors
 }
 
-type CheckUpdatesInput struct{}
-
 type AvailableUpdate struct {
 	Name    string `json:"name"`
 	Current string `json:"current,omitempty"`
@@ -258,7 +256,7 @@ func HandleGetInstalledPackages(
 func HandleCheckUpdates(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ CheckUpdatesInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *CheckUpdatesOutput, error) {
 	return handleToolCall(
 		ctx,

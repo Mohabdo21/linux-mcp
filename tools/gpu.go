@@ -11,8 +11,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type GetGPUInfoInput struct{}
-
 type GPUDevice struct {
 	Index         int     `json:"index"`
 	Name          string  `json:"name"`
@@ -157,7 +155,7 @@ func GatherGPUInfo(ctx context.Context) (*GPUInfoOutput, error) {
 func HandleGetGPUInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetGPUInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *GPUInfoOutput, error) {
 	return handleToolCall(ctx, "get_gpu_info", 0, GatherGPUInfo)
 }

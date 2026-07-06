@@ -584,7 +584,7 @@ func TestGatherDockerSystemSnapshot(t *testing.T) {
 	result, snapshot, err := HandleGetDockerSystemSnapshot(
 		ctx,
 		nil,
-		GetDockerSystemSnapshotInput{},
+		NoArgs{},
 	)
 	if err != nil {
 		t.Fatalf("get_docker_system_snapshot error: %v", err)
@@ -610,7 +610,7 @@ func TestGatherSystemSnapshot(t *testing.T) {
 	result, snapshot, err := HandleGetSystemSnapshot(
 		ctx,
 		nil,
-		GetSystemSnapshotInput{},
+		NoArgs{},
 	)
 	if err != nil {
 		t.Fatalf("get_system_snapshot error: %v", err)
@@ -647,7 +647,7 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 	result, snapshot, err := HandleGetSystemSnapshot(
 		t.Context(),
 		nil,
-		GetSystemSnapshotInput{},
+		NoArgs{},
 	)
 	if err != nil {
 		t.Fatalf("get_system_snapshot error: %v", err)

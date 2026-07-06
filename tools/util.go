@@ -12,6 +12,9 @@ import (
 	"github.com/Mohabdo21/linux-mcp/config"
 )
 
+// NoArgs is used for tools that accept no parameters.
+type NoArgs struct{}
+
 func HumanSize(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {

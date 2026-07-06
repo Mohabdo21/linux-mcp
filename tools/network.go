@@ -20,8 +20,6 @@ const (
 	maxNetworkConnections = 200
 )
 
-type GetNetworkInfoInput struct{}
-
 type InterfaceStats struct {
 	Name        string `json:"name"`
 	BytesSent   uint64 `json:"bytes_sent"`
@@ -64,7 +62,7 @@ func GatherNetworkInfo(ctx context.Context) (*NetworkInfoOutput, error) {
 func HandleGetNetworkInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetNetworkInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *NetworkInfoOutput, error) {
 	return handleToolCall(
 		ctx,

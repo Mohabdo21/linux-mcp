@@ -8,8 +8,6 @@ import (
 	"github.com/shirou/gopsutil/v4/sensors"
 )
 
-type GetCPUInfoInput struct{}
-
 type CPUDetails struct {
 	ModelName string  `json:"model_name"`
 	CoreCount int32   `json:"core_count"`
@@ -58,12 +56,10 @@ func GatherCPUInfo(ctx context.Context) (*CPUInfoOutput, error) {
 func HandleGetCPUInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetCPUInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *CPUInfoOutput, error) {
 	return handleToolCall(ctx, "get_cpu_info", 0, GatherCPUInfo)
 }
-
-type GetCPUTemperatureInput struct{}
 
 type TemperatureStat struct {
 	SensorKey   string  `json:"sensor_key"`
@@ -101,7 +97,7 @@ func GatherCPUTemperature(ctx context.Context) (*CPUTemperatureOutput, error) {
 func HandleGetCPUTemperature(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetCPUTemperatureInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *CPUTemperatureOutput, error) {
 	return handleToolCall(
 		ctx,

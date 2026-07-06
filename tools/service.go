@@ -54,8 +54,6 @@ func GatherServiceStatus(
 	}, err
 }
 
-type GetSystemdUnitsInput struct{}
-
 type SystemdUnit struct {
 	Unit        string `json:"unit"`
 	Load        string `json:"load"`
@@ -108,7 +106,7 @@ func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
 func HandleGetSystemdUnits(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetSystemdUnitsInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *SystemdUnitsOutput, error) {
 	return handleToolCall(
 		ctx,

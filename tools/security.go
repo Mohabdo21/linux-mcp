@@ -115,8 +115,6 @@ func GatherFailedLogins(
 	return jOut, nil
 }
 
-type GetLoggedInUsersInput struct{}
-
 type LoggedInUser struct {
 	Username  string `json:"username"`
 	Terminal  string `json:"terminal"`
@@ -160,7 +158,7 @@ func GatherLoggedInUsers(ctx context.Context) (*LoggedInUsersOutput, error) {
 func HandleGetLoggedInUsers(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetLoggedInUsersInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *LoggedInUsersOutput, error) {
 	return handleToolCall(
 		ctx,

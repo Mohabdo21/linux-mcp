@@ -13,8 +13,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type GetDockerInfoInput struct{}
-
 type DockerContainer struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -170,7 +168,7 @@ func GatherDockerInfo(ctx context.Context) (*DockerInfoOutput, error) {
 func HandleGetDockerInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerInfoOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1065,8 +1063,6 @@ func HandleGetImageDetail(
 
 // --- Networks ---
 
-type GetDockerNetworksInput struct{}
-
 type DockerNetworkSummary struct {
 	ID         string            `json:"id"`
 	Name       string            `json:"name"`
@@ -1120,7 +1116,7 @@ func GatherDockerNetworks(ctx context.Context) (*DockerNetworksOutput, error) {
 func HandleGetDockerNetworks(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerNetworksInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerNetworksOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1131,8 +1127,6 @@ func HandleGetDockerNetworks(
 }
 
 // --- Volumes ---
-
-type GetDockerVolumesInput struct{}
 
 type DockerVolumeSummary struct {
 	Name       string            `json:"name"`
@@ -1183,7 +1177,7 @@ func GatherDockerVolumes(ctx context.Context) (*DockerVolumesOutput, error) {
 func HandleGetDockerVolumes(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerVolumesInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerVolumesOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1194,8 +1188,6 @@ func HandleGetDockerVolumes(
 }
 
 // --- System Info ---
-
-type GetDockerSystemInfoInput struct{}
 
 type DockerSystemInfoSummary struct {
 	ID                string         `json:"id"`
@@ -1288,7 +1280,7 @@ func GatherDockerSystemInfo(
 func HandleGetDockerSystemInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerSystemInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerSystemInfoOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1299,8 +1291,6 @@ func HandleGetDockerSystemInfo(
 }
 
 // --- Disk Usage ---
-
-type GetDockerDiskUsageInput struct{}
 
 type DockerDiskUsageCategory struct {
 	ActiveCount int64  `json:"active_count"`
@@ -1367,7 +1357,7 @@ func GatherDockerDiskUsage(
 func HandleGetDockerDiskUsage(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerDiskUsageInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerDiskUsageOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1379,8 +1369,6 @@ func HandleGetDockerDiskUsage(
 
 // --- Docker System Snapshot ---
 
-type GetDockerSystemSnapshotInput struct{}
-
 type DockerSystemSnapshotOutput struct {
 	Info      DockerInfoOutput      `json:"info"`
 	Stats     DockerStatsAllOutput  `json:"stats"`
@@ -1391,7 +1379,7 @@ type DockerSystemSnapshotOutput struct {
 func HandleGetDockerSystemSnapshot(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerSystemSnapshotInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerSystemSnapshotOutput, error) {
 	return handleToolCall(
 		ctx,
