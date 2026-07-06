@@ -369,8 +369,8 @@ func HandleResolveDNS(
 	_ *mcp.CallToolRequest,
 	input ResolveDNSInput,
 ) (*mcp.CallToolResult, *ResolveDNSOutput, error) {
-	if input.Hostname == "" {
-		return nil, nil, net.InvalidAddrError("hostname is required")
+	if err := requireField(input.Hostname, "hostname"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,

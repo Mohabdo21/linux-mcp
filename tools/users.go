@@ -116,13 +116,13 @@ func GatherUserInfo(
 	search string,
 ) (*GetUserInfoOutput, error) {
 	var out GetUserInfoOutput
-	var errs ErrList
+	var errs []string
 
 	users, err := parsePasswd()
 	if err != nil {
-		errs.Add("passwd", err)
+		appendErr(&errs, "passwd", err)
 		out.Errors = errs
-		return &out, out.Err()
+		return &out, joinErrs(errs)
 	}
 
 	groupNameByGID, membersByName := parseGroup()

@@ -90,24 +90,19 @@ func (o OutputErrors) Err() error {
 	return joinErrs(o.Errors)
 }
 
-// ErrList collects errors during graceful degradation.
-// Kept for internal use in Gather functions that need local error accumulation.
-type ErrList []string
-
-func (e *ErrList) Add(context string, err error) {
-	appendErr((*[]string)(e), context, err)
-}
-
-func (e ErrList) Err() error {
-	return joinErrs(e)
-}
-
-func (e *ErrList) AppendError(s string) {
-	*e = append(*e, s)
-}
-
-func (e ErrList) ErrorCount() int {
-	return len(e)
+func collectOrFallback[T any](
+	ctx context.Context,
+	name string,
+	gather func(context.Context) (*T, error),
+	fallback T,
+	errs *[]string,
+) T {
+	out, err := gather(ctx)
+	if err != nil {
+		appendErr(errs, name, err)
+		return fallback
+	}
+	return *out
 }
 
 func WithToolTimeout(

@@ -125,80 +125,45 @@ func HandleGetSystemSnapshot(
 		0,
 		func(ctx context.Context) (*SystemSnapshotOutput, error) {
 			var snapshot SystemSnapshotOutput
-			var errs ErrList
+			var errs []string
 
-			if out, err := GatherSystemInfo(ctx); err == nil {
-				snapshot.System = *out
-			} else {
-				errs.Add("system", err)
-			}
-
-			if out, err := GatherCPUInfo(ctx); err == nil {
-				snapshot.CPU = *out
-			} else {
-				errs.Add("cpu", err)
-				snapshot.CPU = CPUInfoOutput{
-					Cores: []CPUDetails{},
-				}
-			}
-
-			if out, err := GatherCPUTemperature(ctx); err == nil {
-				snapshot.Temperature = *out
-			} else {
-				errs.Add("temperature", err)
-				snapshot.Temperature = CPUTemperatureOutput{
-					Temperatures: []TemperatureStat{},
-				}
-			}
-
-			if out, err := GatherMemoryInfo(ctx); err == nil {
-				snapshot.Memory = *out
-			} else {
-				errs.Add("memory", err)
-			}
-
-			if out, err := GatherDiskInfo(ctx, ""); err == nil {
-				snapshot.Disk = *out
-			} else {
-				errs.Add("disk", err)
-				snapshot.Disk = DiskInfoOutput{
-					Partitions: []DiskUsageStat{},
-				}
-			}
-
-			if out, err := GatherNetworkInfo(ctx); err == nil {
-				snapshot.Network = *out
-			} else {
-				errs.Add("network", err)
-				snapshot.Network = NetworkInfoOutput{
-					Interfaces: []InterfaceStats{},
-				}
-			}
-
-			if out, err := GatherLoadAverage(ctx); err == nil {
-				snapshot.LoadAverage = *out
-			} else {
-				errs.Add("load_average", err)
-			}
-
-			if out, err := GatherProcessInfo(ctx, "cpu", 10); err == nil {
-				snapshot.Processes = *out
-			} else {
-				errs.Add("processes", err)
-				snapshot.Processes = ProcessInfoOutput{
-					Processes: []ProcessStat{},
-				}
-			}
-
-			if out, err := GatherDockerInfo(ctx); err == nil {
-				snapshot.Docker = *out
-			} else {
-				errs.Add("docker", err)
-				snapshot.Docker = DockerInfoOutput{
+			snapshot.System = collectOrFallback(ctx,
+				"system", GatherSystemInfo,
+				SystemInfoOutput{}, &errs)
+			snapshot.CPU = collectOrFallback(ctx,
+				"cpu", GatherCPUInfo,
+				CPUInfoOutput{Cores: []CPUDetails{}}, &errs)
+			snapshot.Temperature = collectOrFallback(ctx,
+				"temperature", GatherCPUTemperature,
+				CPUTemperatureOutput{Temperatures: []TemperatureStat{}}, &errs)
+			snapshot.Memory = collectOrFallback(ctx,
+				"memory", GatherMemoryInfo,
+				MemoryInfoOutput{}, &errs)
+			snapshot.Disk = collectOrFallback(ctx,
+				"disk", func(ctx context.Context) (*DiskInfoOutput, error) {
+					return GatherDiskInfo(ctx, "")
+				}, DiskInfoOutput{Partitions: []DiskUsageStat{}}, &errs)
+			snapshot.Network = collectOrFallback(ctx,
+				"network", GatherNetworkInfo,
+				NetworkInfoOutput{Interfaces: []InterfaceStats{}}, &errs)
+			snapshot.LoadAverage = collectOrFallback(ctx,
+				"load_average", GatherLoadAverage,
+				LoadAverageOutput{}, &errs)
+			snapshot.Processes = collectOrFallback(
+				ctx,
+				"processes",
+				func(ctx context.Context) (*ProcessInfoOutput, error) {
+					return GatherProcessInfo(ctx, "cpu", 10)
+				},
+				ProcessInfoOutput{Processes: []ProcessStat{}},
+				&errs,
+			)
+			snapshot.Docker = collectOrFallback(ctx,
+				"docker", GatherDockerInfo,
+				DockerInfoOutput{
 					Containers: []DockerContainer{},
 					Images:     []DockerImage{},
-				}
-			}
+				}, &errs)
 
 			snapshot.Errors = errs
 			return &snapshot, nil
@@ -516,13 +481,13 @@ func GatherHardwareBusInfo(
 	search string,
 ) (*HardwareBusInfoOutput, error) {
 	var out HardwareBusInfoOutput
-	var errs ErrList
+	var errs []string
 
 	pci, err := parseLspciOutput(ctx)
 	if err != nil {
 		pci, err = parsePCIDevicesSysfs(ctx)
 		if err != nil {
-			errs.Add("pci", err)
+			appendErr(&errs, "pci", err)
 		}
 	}
 	if pci != nil {
@@ -533,7 +498,7 @@ func GatherHardwareBusInfo(
 	if err != nil {
 		usb, err = parseUSBDevicesSysfs(ctx)
 		if err != nil {
-			errs.Add("usb", err)
+			appendErr(&errs, "usb", err)
 		}
 	}
 	if usb != nil {
@@ -594,7 +559,7 @@ func GatherUserAutomation(
 	ctx context.Context,
 ) (*UserAutomationOutput, error) {
 	var out UserAutomationOutput
-	var errs ErrList
+	var errs []string
 
 	out.CronJobs = []CronJob{}
 	out.SystemdTimers = []SystemdTimer{}
@@ -616,7 +581,7 @@ func GatherUserAutomation(
 			})
 		}
 	} else {
-		errs.Add("crontab",
+		appendErr(&errs, "crontab",
 			fmt.Errorf("crontab -l: %w", err))
 	}
 
@@ -644,11 +609,11 @@ func GatherUserAutomation(
 				)
 			}
 		} else {
-			errs.Add("systemd-timers",
+			appendErr(&errs, "systemd-timers",
 				fmt.Errorf("parse json: %w", err))
 		}
 	} else {
-		errs.Add("systemd-timers",
+		appendErr(&errs, "systemd-timers",
 			fmt.Errorf("systemctl --user list-timers: %w", err))
 	}
 

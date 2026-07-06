@@ -76,7 +76,7 @@ func parseBatteryDir(dir string) (*batteryInfo, error) {
 
 func GatherPowerAnalytics(ctx context.Context) (*PowerAnalyticsOutput, error) {
 	var out PowerAnalyticsOutput
-	var errs ErrList
+	var errs []string
 
 	batts, err := os.ReadDir("/sys/class/power_supply")
 	if err != nil {
@@ -106,7 +106,7 @@ func GatherPowerAnalytics(ctx context.Context) (*PowerAnalyticsOutput, error) {
 		if isBattery {
 			batInfo, err := parseBatteryDir(dir)
 			if err != nil {
-				errs.Add(entry.Name(), err)
+				appendErr(&errs, entry.Name(), err)
 				continue
 			}
 

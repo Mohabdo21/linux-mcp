@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -126,8 +125,8 @@ func HandleGetManPage(
 	_ *mcp.CallToolRequest,
 	input GetManPageInput,
 ) (*mcp.CallToolResult, *ManPageOutput, error) {
-	if input.Command == "" {
-		return nil, nil, fmt.Errorf("command is required")
+	if err := requireField(input.Command, "command"); err != nil {
+		return nil, nil, err
 	}
 	maxLines := input.MaxLines
 	if maxLines <= 0 {

@@ -1315,33 +1315,24 @@ func HandleGetDockerSystemSnapshot(
 		0,
 		func(ctx context.Context) (*DockerSystemSnapshotOutput, error) {
 			var snapshot DockerSystemSnapshotOutput
-			var errs ErrList
+			var errs []string
 
-			if out, err := GatherDockerInfo(ctx); err == nil {
-				snapshot.Info = *out
-			} else {
-				errs.Add("info", err)
-				snapshot.Info = DockerInfoOutput{
-					Containers: []DockerContainer{},
-					Images:     []DockerImage{},
-				}
-			}
-
-			if out, err := GatherDockerStatsAll(ctx, nil); err == nil {
-				snapshot.Stats = *out
-			} else {
-				errs.Add("stats", err)
-				snapshot.Stats = DockerStatsAllOutput{
-					Containers: []DockerContainerStatEntry{},
-				}
-			}
-
-			if out, err := GatherDockerDiskUsage(ctx); err == nil {
-				snapshot.DiskUsage = *out
-			} else {
-				errs.Add("disk_usage", err)
-				snapshot.DiskUsage = DockerDiskUsageOutput{}
-			}
+			snapshot.Info = collectOrFallback(ctx,
+				"info", GatherDockerInfo,
+				DockerInfoOutput{Containers: []DockerContainer{},
+					Images: []DockerImage{}}, &errs)
+			snapshot.Stats = collectOrFallback(
+				ctx,
+				"stats",
+				func(ctx context.Context) (*DockerStatsAllOutput, error) {
+					return GatherDockerStatsAll(ctx, nil)
+				},
+				DockerStatsAllOutput{Containers: []DockerContainerStatEntry{}},
+				&errs,
+			)
+			snapshot.DiskUsage = collectOrFallback(ctx,
+				"disk_usage", GatherDockerDiskUsage,
+				DockerDiskUsageOutput{}, &errs)
 
 			snapshot.Errors = errs
 			return &snapshot, nil
