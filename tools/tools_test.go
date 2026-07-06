@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/Mohabdo21/linux-mcp/config"
 )
 
 func TestGatherBasicSystemInfo(t *testing.T) {
@@ -587,7 +589,7 @@ func TestGatherDockerSystemSnapshot(t *testing.T) {
 		NoArgs{},
 	)
 	if err != nil {
-		t.Fatalf("get_docker_system_snapshot error: %v", err)
+		t.Fatalf("%s error: %v", config.ToolNameGetDockerSystemSnapshot, err)
 	}
 	if result != nil {
 		t.Error("CallToolResult should be nil (structured output path)")
@@ -613,7 +615,7 @@ func TestGatherSystemSnapshot(t *testing.T) {
 		NoArgs{},
 	)
 	if err != nil {
-		t.Fatalf("get_system_snapshot error: %v", err)
+		t.Fatalf("%s error: %v", config.ToolNameGetSystemSnapshot, err)
 	}
 	if result != nil {
 		t.Error("CallToolResult should be nil (structured output path)")
@@ -650,7 +652,7 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 		NoArgs{},
 	)
 	if err != nil {
-		t.Fatalf("get_system_snapshot error: %v", err)
+		t.Fatalf("%s error: %v", config.ToolNameGetSystemSnapshot, err)
 	}
 	if result != nil {
 		t.Error("CallToolResult should be nil")

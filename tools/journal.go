@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -81,7 +82,7 @@ func HandleGetJournalLogs(
 ) (*mcp.CallToolResult, *JournalLogsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_journal_logs",
+		config.ToolNameGetJournalLogs,
 		0,
 		func(ctx context.Context) (*JournalLogsOutput, error) {
 			return GatherJournalLogs(ctx, input.Unit, input.Priority,

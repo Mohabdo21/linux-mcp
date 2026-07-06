@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -139,7 +140,7 @@ func HandleGetManPage(
 	}
 	return handleToolCall(
 		ctx,
-		"get_man_page",
+		config.ToolNameGetManPage,
 		0,
 		func(ctx context.Context) (*ManPageOutput, error) {
 			return GatherManPage(ctx, input.Command, maxLines, true,

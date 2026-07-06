@@ -105,6 +105,13 @@ func collectOrFallback[T any](
 	return *out
 }
 
+func nilToEmpty[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
 func WithToolTimeout(
 	ctx context.Context,
 	name string,

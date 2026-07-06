@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -119,7 +120,7 @@ func HandlePingHost(
 	}
 	return handleToolCall(
 		ctx,
-		"ping_host",
+		config.ToolNamePingHost,
 		0,
 		func(ctx context.Context) (*PingOutput, error) {
 			return GatherPing(ctx, input.Host, input.Count, input.Timeout)

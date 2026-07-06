@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/disk"
 )
@@ -70,7 +71,7 @@ func HandleGetDiskInfo(
 ) (*mcp.CallToolResult, *DiskInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_disk_info",
+		config.ToolNameGetDiskInfo,
 		0,
 		func(ctx context.Context) (*DiskInfoOutput, error) {
 			return GatherDiskInfo(ctx, input.MountPoint)
@@ -137,7 +138,7 @@ func HandleGetInodeUsage(
 ) (*mcp.CallToolResult, *InodeUsageOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_inode_usage",
+		config.ToolNameGetInodeUsage,
 		0,
 		func(ctx context.Context) (*InodeUsageOutput, error) {
 			return GatherInodeUsage(ctx, input.MountPoint)
@@ -227,7 +228,7 @@ func HandleGetLargestFiles(
 ) (*mcp.CallToolResult, *LargestFilesOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_largest_files",
+		config.ToolNameGetLargestFiles,
 		0,
 		func(ctx context.Context) (*LargestFilesOutput, error) {
 			return GatherLargestFiles(ctx, input.Path, input.Limit)
@@ -286,7 +287,7 @@ func HandleGetMountOptions(
 ) (*mcp.CallToolResult, *MountOptionsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_mount_options",
+		config.ToolNameGetMountOptions,
 		0,
 		func(ctx context.Context) (*MountOptionsOutput, error) {
 			return GatherMountOptions(ctx, input.MountPoint)

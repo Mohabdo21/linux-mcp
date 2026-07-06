@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -157,7 +158,7 @@ func HandleGetLoggedInUsers(
 ) (*mcp.CallToolResult, *LoggedInUsersOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_logged_in_users",
+		config.ToolNameGetLoggedInUsers,
 		0,
 		GatherLoggedInUsers,
 	)
@@ -170,7 +171,7 @@ func HandleGetFailedLogins(
 ) (*mcp.CallToolResult, *FailedLoginsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_failed_logins",
+		config.ToolNameGetFailedLogins,
 		0,
 		func(ctx context.Context) (*FailedLoginsOutput, error) {
 			return GatherFailedLogins(ctx, input.Lines)

@@ -14,6 +14,58 @@ import (
 	"time"
 )
 
+// Tool name constants for consistent reference across packages.
+const (
+	ToolNameGetSystemInfo             = "get_system_info"
+	ToolNameGetCPUInfo                = "get_cpu_info"
+	ToolNameGetCPUTemperature         = "get_cpu_temperature"
+	ToolNameGetMemoryInfo             = "get_memory_info"
+	ToolNameGetDiskInfo               = "get_disk_info"
+	ToolNameGetNetworkInfo            = "get_network_info"
+	ToolNameGetProcessInfo            = "get_process_info"
+	ToolNameGetDockerInfo             = "get_docker_info"
+	ToolNameGetDockerContainerDetails = "get_docker_container_details"
+	ToolNameGetDockerContainerLogs    = "get_docker_container_logs"
+	ToolNameGetDockerContainerStats   = "get_docker_container_stats"
+	ToolNameGetDockerContainerTop     = "get_docker_container_top"
+	ToolNameGetDockerContainerDiff    = "get_docker_container_diff"
+	ToolNameGetDockerImageHistory     = "get_docker_image_history"
+	ToolNameGetDockerImageDetails     = "get_docker_image_details"
+	ToolNameGetDockerNetworks         = "get_docker_networks"
+	ToolNameGetDockerVolumes          = "get_docker_volumes"
+	ToolNameGetDockerSystemInfo       = "get_docker_system_info"
+	ToolNameGetDockerDiskUsage        = "get_docker_disk_usage"
+	ToolNameGetDockerStatsAll         = "get_docker_stats_all"
+	ToolNameGetDockerSystemSnapshot   = "get_docker_system_snapshot"
+	ToolNameGetSystemSnapshot         = "get_system_snapshot"
+	ToolNameGetJournalLogs            = "get_journal_logs"
+	ToolNameGetInodeUsage             = "get_inode_usage"
+	ToolNameGetNetworkConnections     = "get_network_connections"
+	ToolNameGetListeningPorts         = "get_listening_ports"
+	ToolNameGetServiceStatus          = "get_service_status"
+	ToolNameGetProcessFDs             = "get_process_fds"
+	ToolNameGetTopIOProcesses         = "get_top_io_processes"
+	ToolNameGetFailedLogins           = "get_failed_logins"
+	ToolNameGetGPUInfo                = "get_gpu_info"
+	ToolNameGetLargestFiles           = "get_largest_files"
+	ToolNamePingHost                  = "ping_host"
+	ToolNameGetInstalledPackages      = "get_installed_packages"
+	ToolNameCheckUpdates              = "check_updates"
+	ToolNameGetLoadAverage            = "get_load_average"
+	ToolNameGetLoggedInUsers          = "get_logged_in_users"
+	ToolNameResolveDNS                = "resolve_dns"
+	ToolNameGetMountOptions           = "get_mount_options"
+	ToolNameGetSystemdUnits           = "get_systemd_units"
+	ToolNameGetManPage                = "get_man_page"
+	ToolNameGetEnvironmentVariables   = "get_environment_variables"
+	ToolNameGetHardwareBusInfo        = "get_hardware_bus_info"
+	ToolNameGetUserAutomation         = "get_user_automation"
+	ToolNameGetDesktopSessionInfo     = "get_desktop_session_info"
+	ToolNameGetPowerAnalytics         = "get_power_analytics"
+	ToolNameGetUserInfo               = "get_user_info"
+	ToolNameGetIPInfo                 = "get_ip_info"
+)
+
 type Config struct {
 	LogLevel string            `json:"log_level"`
 	Timeouts map[string]string `json:"timeouts"`
@@ -40,50 +92,54 @@ func defaultConfig() *Config {
 	return &Config{
 		LogLevel: "info",
 		Timeouts: map[string]string{
-			"get_cpu_info":                 "5s",
-			"get_cpu_temperature":          "5s",
-			"get_memory_info":              "5s",
-			"get_disk_info":                "10s",
-			"get_inode_usage":              "10s",
-			"get_network_info":             "5s",
-			"get_system_info":              "5s",
-			"get_process_info":             "10s",
-			"get_process_fds":              "10s",
-			"get_environment_variables":    "5s",
-			"get_hardware_bus_info":        "10s",
-			"get_user_automation":          "10s",
-			"get_desktop_session_info":     "5s",
-			"get_man_page":                 "15s",
-			"get_docker_container_details": "10s",
-			"get_docker_container_logs":    "30s",
-			"get_docker_container_stats":   "30s",
-			"get_docker_container_top":     "10s",
-			"get_docker_container_diff":    "10s",
-			"get_docker_image_history":     "10s",
-			"get_docker_image_details":     "10s",
-			"get_docker_networks":          "10s",
-			"get_docker_volumes":           "10s",
-			"get_docker_system_info":       "10s",
-			"get_docker_disk_usage":        "10s",
-			"get_docker_stats_all":         "30s",
-			"get_docker_system_snapshot":   "60s",
-			"get_docker_info":              "10s",
-			"get_system_snapshot":          "120s",
-			"get_journal_logs":             "20s",
-			"get_listening_ports":          "10s",
-			"get_service_status":           "10s",
-			"get_top_io_processes":         "15s",
-			"get_failed_logins":            "10s",
-			"get_gpu_info":                 "5s",
-			"get_largest_files":            "30s",
-			"ping_host":                    "10s",
-			"get_installed_packages":       "15s",
-			"check_updates":                "15s",
-			"get_load_average":             "5s",
-			"get_logged_in_users":          "5s",
-			"resolve_dns":                  "10s",
-			"get_mount_options":            "10s",
-			"get_systemd_units":            "10s",
+			ToolNameGetCPUInfo:                "5s",
+			ToolNameGetCPUTemperature:         "5s",
+			ToolNameGetMemoryInfo:             "5s",
+			ToolNameGetDiskInfo:               "10s",
+			ToolNameGetInodeUsage:             "10s",
+			ToolNameGetNetworkInfo:            "5s",
+			ToolNameGetSystemInfo:             "5s",
+			ToolNameGetProcessInfo:            "10s",
+			ToolNameGetProcessFDs:             "10s",
+			ToolNameGetEnvironmentVariables:   "5s",
+			ToolNameGetHardwareBusInfo:        "10s",
+			ToolNameGetUserAutomation:         "10s",
+			ToolNameGetDesktopSessionInfo:     "5s",
+			ToolNameGetManPage:                "15s",
+			ToolNameGetDockerContainerDetails: "10s",
+			ToolNameGetDockerContainerLogs:    "30s",
+			ToolNameGetDockerContainerStats:   "30s",
+			ToolNameGetDockerContainerTop:     "10s",
+			ToolNameGetDockerContainerDiff:    "10s",
+			ToolNameGetDockerImageHistory:     "10s",
+			ToolNameGetDockerImageDetails:     "10s",
+			ToolNameGetDockerNetworks:         "10s",
+			ToolNameGetDockerVolumes:          "10s",
+			ToolNameGetDockerSystemInfo:       "10s",
+			ToolNameGetDockerDiskUsage:        "10s",
+			ToolNameGetDockerStatsAll:         "30s",
+			ToolNameGetDockerSystemSnapshot:   "60s",
+			ToolNameGetDockerInfo:             "10s",
+			ToolNameGetSystemSnapshot:         "120s",
+			ToolNameGetJournalLogs:            "20s",
+			ToolNameGetListeningPorts:         "10s",
+			ToolNameGetServiceStatus:          "10s",
+			ToolNameGetTopIOProcesses:         "15s",
+			ToolNameGetFailedLogins:           "10s",
+			ToolNameGetGPUInfo:                "5s",
+			ToolNameGetLargestFiles:           "30s",
+			ToolNamePingHost:                  "10s",
+			ToolNameGetInstalledPackages:      "15s",
+			ToolNameCheckUpdates:              "15s",
+			ToolNameGetLoadAverage:            "5s",
+			ToolNameGetLoggedInUsers:          "5s",
+			ToolNameResolveDNS:                "10s",
+			ToolNameGetMountOptions:           "10s",
+			ToolNameGetSystemdUnits:           "10s",
+			ToolNameGetNetworkConnections:     "10s",
+			ToolNameGetPowerAnalytics:         "10s",
+			ToolNameGetUserInfo:               "10s",
+			ToolNameGetIPInfo:                 "10s",
 		},
 		Disabled: []string{},
 	}

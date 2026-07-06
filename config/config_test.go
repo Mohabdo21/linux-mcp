@@ -15,8 +15,8 @@ func TestDefaults(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Errorf("expected info, got %s", cfg.LogLevel)
 	}
-	if cfg.Timeouts["get_cpu_info"] != "5s" {
-		t.Errorf("expected 5s, got %s", cfg.Timeouts["get_cpu_info"])
+	if cfg.Timeouts[ToolNameGetCPUInfo] != "5s" {
+		t.Errorf("expected 5s, got %s", cfg.Timeouts[ToolNameGetCPUInfo])
 	}
 	if len(cfg.Disabled) != 0 {
 		t.Errorf("expected empty disabled, got %v", cfg.Disabled)
@@ -27,7 +27,7 @@ func TestToolTimeout(t *testing.T) {
 	if err := Load(); err != nil {
 		t.Fatal(err)
 	}
-	d := ToolTimeout("get_cpu_info", 10*time.Second)
+	d := ToolTimeout(ToolNameGetCPUInfo, 10*time.Second)
 	if d != 5*time.Second {
 		t.Errorf("expected 5s, got %v", d)
 	}
@@ -41,17 +41,17 @@ func TestIsDisabled(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.json")
 	if err := os.WriteFile(
-		p, []byte(`{"disabled":["ping_host"]}`), 0644,
+		p, []byte(`{"disabled":["`+ToolNamePingHost+`"]}`), 0644,
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := loadAtPath(p); err != nil {
 		t.Fatal(err)
 	}
-	if !IsDisabled("ping_host") {
+	if !IsDisabled(ToolNamePingHost) {
 		t.Error("expected ping_host disabled")
 	}
-	if IsDisabled("get_cpu_info") {
+	if IsDisabled(ToolNameGetCPUInfo) {
 		t.Error("expected get_cpu_info enabled")
 	}
 }
@@ -74,7 +74,7 @@ func TestInvalidTimeout(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.json")
 	if err := os.WriteFile(
-		p, []byte(`{"timeouts":{"get_cpu_info":"not-a-duration"}}`),
+		p, []byte(`{"timeouts":{"`+ToolNameGetCPUInfo+`":"not-a-duration"}}`),
 		0644,
 	); err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestToolTimeoutFallback(t *testing.T) {
 	if err := Load(); err != nil {
 		t.Fatal(err)
 	}
-	d := ToolTimeout("get_cpu_info", 10*time.Second)
+	d := ToolTimeout(ToolNameGetCPUInfo, 10*time.Second)
 	if d != 5*time.Second {
 		t.Errorf("expected 5s, got %v", d)
 	}

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/mem"
 )
@@ -47,7 +48,7 @@ func HandleGetMemoryInfo(
 ) (*mcp.CallToolResult, *MemoryInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_memory_info",
+		config.ToolNameGetMemoryInfo,
 		0,
 		GatherMemoryInfo,
 	)

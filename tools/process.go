@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/process"
 )
@@ -87,7 +88,7 @@ func HandleGetProcessInfo(
 ) (*mcp.CallToolResult, *ProcessInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_process_info",
+		config.ToolNameGetProcessInfo,
 		0,
 		func(ctx context.Context) (*ProcessInfoOutput, error) {
 			return GatherProcessInfo(ctx, input.SortBy, input.Limit)
@@ -251,7 +252,7 @@ func HandleGetProcessFDs(
 ) (*mcp.CallToolResult, *ProcessFDsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_process_fds",
+		config.ToolNameGetProcessFDs,
 		0,
 		func(ctx context.Context) (*ProcessFDsOutput, error) {
 			return GatherProcessFDs(ctx, input.PID)
@@ -266,7 +267,7 @@ func HandleGetTopIOProcesses(
 ) (*mcp.CallToolResult, *TopIOProcessesOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_top_io_processes",
+		config.ToolNameGetTopIOProcesses,
 		0,
 		func(ctx context.Context) (*TopIOProcessesOutput, error) {
 			return GatherTopIOProcesses(ctx, input.Limit)
