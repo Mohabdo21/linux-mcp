@@ -29,21 +29,13 @@ type batteryInfo struct {
 	energyFullDesign float64
 }
 
-func readPowerSysfs(dir, key string) (string, error) {
-	data, err := os.ReadFile(filepath.Join(dir, key))
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
-}
-
 func parseBatteryDir(dir string) (*batteryInfo, error) {
-	status, err := readPowerSysfs(dir, "status")
+	status, err := readSysfsFile(filepath.Join(dir, "status"))
 	if err != nil {
 		return nil, fmt.Errorf("reading status: %w", err)
 	}
 
-	capacity, err := readPowerSysfs(dir, "capacity")
+	capacity, err := readSysfsFile(filepath.Join(dir, "capacity"))
 	if err != nil {
 		return nil, fmt.Errorf("reading capacity: %w", err)
 	}
@@ -57,7 +49,7 @@ func parseBatteryDir(dir string) (*batteryInfo, error) {
 		capacity: capVal,
 	}
 
-	pn, err := readPowerSysfs(dir, "power_now")
+	pn, err := readSysfsFile(filepath.Join(dir, "power_now"))
 	if err == nil {
 		pnVal, parseErr := strconv.ParseFloat(pn, 64)
 		if parseErr == nil {
@@ -65,7 +57,7 @@ func parseBatteryDir(dir string) (*batteryInfo, error) {
 		}
 	}
 
-	ef, err := readPowerSysfs(dir, "energy_full")
+	ef, err := readSysfsFile(filepath.Join(dir, "energy_full"))
 	if err == nil {
 		efVal, parseErr := strconv.ParseFloat(ef, 64)
 		if parseErr == nil {
@@ -73,7 +65,7 @@ func parseBatteryDir(dir string) (*batteryInfo, error) {
 		}
 	}
 
-	efd, err := readPowerSysfs(dir, "energy_full_design")
+	efd, err := readSysfsFile(filepath.Join(dir, "energy_full_design"))
 	if err == nil {
 		efdVal, parseErr := strconv.ParseFloat(efd, 64)
 		if parseErr == nil {
@@ -97,7 +89,7 @@ func GatherPowerAnalytics(ctx context.Context) (*PowerAnalyticsOutput, error) {
 	for _, entry := range batts {
 		dir := filepath.Join("/sys/class/power_supply", entry.Name())
 
-		uevent, err := readPowerSysfs(dir, "uevent")
+		uevent, err := readSysfsFile(filepath.Join(dir, "uevent"))
 		if err != nil {
 			continue
 		}
@@ -106,7 +98,7 @@ func GatherPowerAnalytics(ctx context.Context) (*PowerAnalyticsOutput, error) {
 		isMains := strings.Contains(uevent, "POWER_SUPPLY_TYPE=Mains")
 
 		if isMains {
-			online, err := readPowerSysfs(dir, "online")
+			online, err := readSysfsFile(filepath.Join(dir, "online"))
 			if err == nil {
 				out.ACOnline = strings.TrimSpace(online) == "1"
 			}

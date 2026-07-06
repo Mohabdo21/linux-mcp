@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -112,6 +113,14 @@ func WithToolTimeout(
 		ctx,
 		config.ToolTimeout(name, fallback),
 	)
+}
+
+func readSysfsFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 func LogToolCall(

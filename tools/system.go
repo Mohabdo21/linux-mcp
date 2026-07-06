@@ -41,11 +41,8 @@ type SystemInfoOutput struct {
 }
 
 func readDMIField(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	s, _ := readSysfsFile(path)
+	return s
 }
 
 func readTPMVersion(ctx context.Context) string {
@@ -348,14 +345,6 @@ var pciBaseClasses = map[uint8]string{
 	0x12: "Processing accelerators",
 	0x13: "Non-Essential Instrumentation",
 	0x14: "Coprocessor",
-}
-
-func readSysfsFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
 }
 
 func parsePCIDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
