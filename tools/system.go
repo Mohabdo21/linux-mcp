@@ -15,8 +15,6 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-type GetSystemInfoInput struct{}
-
 type SystemInfoOutput struct {
 	Hostname             string `json:"hostname"`
 	OSName               string `json:"os_name"`
@@ -41,11 +39,8 @@ type SystemInfoOutput struct {
 }
 
 func readDMIField(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	s, _ := readSysfsFile(path)
+	return s
 }
 
 func readTPMVersion(ctx context.Context) string {
@@ -97,7 +92,7 @@ func GatherSystemInfo(ctx context.Context) (*SystemInfoOutput, error) {
 func HandleGetSystemInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetSystemInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *SystemInfoOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -106,8 +101,6 @@ func HandleGetSystemInfo(
 		GatherSystemInfo,
 	)
 }
-
-type GetSystemSnapshotInput struct{}
 
 type SystemSnapshotOutput struct {
 	System      SystemInfoOutput     `json:"system"`
@@ -125,7 +118,7 @@ type SystemSnapshotOutput struct {
 func HandleGetSystemSnapshot(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetSystemSnapshotInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *SystemSnapshotOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -213,8 +206,6 @@ func HandleGetSystemSnapshot(
 		},
 	)
 }
-
-type GetLoadAverageInput struct{}
 
 type LoadAverageOutput struct {
 	Load1  float64 `json:"load_1"`
@@ -348,14 +339,6 @@ var pciBaseClasses = map[uint8]string{
 	0x12: "Processing accelerators",
 	0x13: "Non-Essential Instrumentation",
 	0x14: "Coprocessor",
-}
-
-func readSysfsFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
 }
 
 func parsePCIDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
@@ -588,7 +571,7 @@ func HandleGetHardwareBusInfo(
 func HandleGetLoadAverage(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetLoadAverageInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *LoadAverageOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -597,8 +580,6 @@ func HandleGetLoadAverage(
 		GatherLoadAverage,
 	)
 }
-
-type GetUserAutomationInput struct{}
 
 type CronJob struct {
 	Schedule string `json:"schedule"`
@@ -692,7 +673,7 @@ func GatherUserAutomation(
 func HandleGetUserAutomation(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetUserAutomationInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *UserAutomationOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -701,8 +682,6 @@ func HandleGetUserAutomation(
 		GatherUserAutomation,
 	)
 }
-
-type GetDesktopSessionInfoInput struct{}
 
 type DesktopSessionOutput struct {
 	SessionType    string `json:"session_type"`
@@ -728,7 +707,7 @@ func GatherDesktopSessionInfo(
 func HandleGetDesktopSessionInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDesktopSessionInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DesktopSessionOutput, error) {
 	return handleToolCall(
 		ctx,

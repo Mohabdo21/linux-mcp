@@ -7,8 +7,6 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
-type GetMemoryInfoInput struct{}
-
 type MemoryInfoOutput struct {
 	Total           uint64  `json:"total"`
 	Used            uint64  `json:"used"`
@@ -45,7 +43,7 @@ func GatherMemoryInfo(ctx context.Context) (*MemoryInfoOutput, error) {
 func HandleGetMemoryInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetMemoryInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *MemoryInfoOutput, error) {
 	return handleToolCall(
 		ctx,

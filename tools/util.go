@@ -1,3 +1,5 @@
+// Package tools provides MCP tool implementations for system inspection,
+// including CPU, memory, disk, network, Docker, GPU, and other utilities.
 package tools
 
 import (
@@ -5,11 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/Mohabdo21/linux-mcp/config"
 )
+
+// NoArgs is used for tools that accept no parameters.
+type NoArgs struct{}
 
 func HumanSize(bytes int64) string {
 	const unit = 1024
@@ -49,6 +55,19 @@ func ParseProcessField(s string) string {
 	return s
 }
 
+func appendErr(errors *[]string, context string, err error) {
+	if err != nil {
+		*errors = append(*errors, context+": "+err.Error())
+	}
+}
+
+func joinErrs(errs []string) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(errs, "; "))
+}
+
 // OutputErrors is embedded in output structs for error accumulation.
 type OutputErrors struct {
 	Errors []string `json:"errors,omitempty"`
@@ -63,16 +82,11 @@ func (o OutputErrors) ErrorCount() int {
 }
 
 func (o *OutputErrors) Add(context string, err error) {
-	if err != nil {
-		o.Errors = append(o.Errors, context+": "+err.Error())
-	}
+	appendErr(&o.Errors, context, err)
 }
 
 func (o OutputErrors) Err() error {
-	if len(o.Errors) == 0 {
-		return nil
-	}
-	return errors.New(strings.Join(o.Errors, "; "))
+	return joinErrs(o.Errors)
 }
 
 // ErrList collects errors during graceful degradation.
@@ -80,16 +94,11 @@ func (o OutputErrors) Err() error {
 type ErrList []string
 
 func (e *ErrList) Add(context string, err error) {
-	if err != nil {
-		*e = append(*e, context+": "+err.Error())
-	}
+	appendErr((*[]string)(e), context, err)
 }
 
 func (e ErrList) Err() error {
-	if len(e) == 0 {
-		return nil
-	}
-	return errors.New(strings.Join(e, "; "))
+	return joinErrs(e)
 }
 
 func (e *ErrList) AppendError(s string) {
@@ -109,6 +118,30 @@ func WithToolTimeout(
 		ctx,
 		config.ToolTimeout(name, fallback),
 	)
+}
+
+func readSysfsFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+const shortIDLen = 12
+
+func shortID(id string) string {
+	if len(id) > shortIDLen {
+		return id[:shortIDLen]
+	}
+	return id
+}
+
+func requireField(val, name string) error {
+	if val == "" {
+		return fmt.Errorf("%s is required", name)
+	}
+	return nil
 }
 
 func LogToolCall(

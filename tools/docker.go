@@ -13,8 +13,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type GetDockerInfoInput struct{}
-
 type DockerContainer struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -64,10 +62,7 @@ func ListDockerContainers(ctx context.Context) ([]DockerContainer, error) {
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		id := c.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
+		id := shortID(c.ID)
 		containers = append(containers, DockerContainer{
 			ID: id, Name: name, Image: c.Image, Status: c.Status,
 		})
@@ -97,10 +92,7 @@ func ListDockerImages(ctx context.Context) ([]DockerImage, error) {
 				repo = img.RepoTags[0]
 			}
 		}
-		id := img.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
+		id := shortID(img.ID)
 		images = append(images, DockerImage{
 			Repository: repo, Tag: tag, ID: id, Size: HumanSize(img.Size),
 		})
@@ -109,68 +101,26 @@ func ListDockerImages(ctx context.Context) ([]DockerImage, error) {
 }
 
 func GatherDockerInfo(ctx context.Context) (*DockerInfoOutput, error) {
-	cli, err := newDockerClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cli.Close() }()
-
-	containers, err := cli.ContainerList(
-		ctx,
-		mobyclient.ContainerListOptions{All: true},
-	)
+	containers, err := ListDockerContainers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	images, err := cli.ImageList(ctx, mobyclient.ImageListOptions{})
+	images, err := ListDockerImages(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	containerList := make([]DockerContainer, 0, len(containers.Items))
-	for _, c := range containers.Items {
-		name := ""
-		if len(c.Names) > 0 {
-			name = strings.TrimPrefix(c.Names[0], "/")
-		}
-		id := c.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
-		containerList = append(containerList, DockerContainer{
-			ID: id, Name: name, Image: c.Image, Status: c.Status,
-		})
-	}
-
-	imageList := make([]DockerImage, 0, len(images.Items))
-	for _, img := range images.Items {
-		repo, tag := "<none>", "<none>"
-		if len(img.RepoTags) > 0 {
-			if idx := strings.LastIndex(img.RepoTags[0], ":"); idx >= 0 {
-				repo, tag = img.RepoTags[0][:idx], img.RepoTags[0][idx+1:]
-			} else {
-				repo = img.RepoTags[0]
-			}
-		}
-		id := img.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
-		imageList = append(imageList, DockerImage{
-			Repository: repo, Tag: tag, ID: id, Size: HumanSize(img.Size),
-		})
 	}
 
 	return &DockerInfoOutput{
-		Containers: containerList, Images: imageList,
+		Containers: containers,
+		Images:     images,
 	}, nil
 }
 
 func HandleGetDockerInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerInfoOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -235,10 +185,7 @@ func GatherContainerDetail(
 	c := result.Container
 
 	name := strings.TrimPrefix(c.Name, "/")
-	id := c.ID
-	if len(id) > 12 {
-		id = id[:12]
-	}
+	id := shortID(c.ID)
 
 	state := map[string]any{}
 	if c.State != nil {
@@ -320,8 +267,8 @@ func HandleGetContainerDetail(
 	_ *mcp.CallToolRequest,
 	input GetDockerContainerDetailInput,
 ) (*mcp.CallToolResult, *DockerContainerDetailOutput, error) {
-	if input.ContainerID == "" {
-		return nil, nil, fmt.Errorf("container_id is required")
+	if err := requireField(input.ContainerID, "container_id"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,
@@ -396,8 +343,8 @@ func HandleGetContainerLogs(
 	_ *mcp.CallToolRequest,
 	input GetDockerContainerLogsInput,
 ) (*mcp.CallToolResult, *DockerContainerLogsOutput, error) {
-	if input.ContainerID == "" {
-		return nil, nil, fmt.Errorf("container_id is required")
+	if err := requireField(input.ContainerID, "container_id"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,
@@ -532,14 +479,11 @@ func GatherContainerStats(
 		}
 	}
 
-	shortID := containerID
-	if len(shortID) > 12 {
-		shortID = shortID[:12]
-	}
+	id := shortID(containerID)
 
 	return &DockerContainerStatsOutput{
 		Containers: []DockerContainerStatEntry{{
-			ID:            shortID,
+			ID:            id,
 			CPUPercent:    cpuPercent,
 			MemoryUsage:   stats.MemoryStats.Usage,
 			MemoryLimit:   stats.MemoryStats.Limit,
@@ -557,8 +501,8 @@ func HandleGetContainerStats(
 	_ *mcp.CallToolRequest,
 	input GetDockerContainerStatsInput,
 ) (*mcp.CallToolResult, *DockerContainerStatsOutput, error) {
-	if input.ContainerIDs == "" {
-		return nil, nil, fmt.Errorf("container_ids is required")
+	if err := requireField(input.ContainerIDs, "container_ids"); err != nil {
+		return nil, nil, err
 	}
 
 	if input.ContainerIDs == "all" {
@@ -661,11 +605,8 @@ func GatherDockerStatsAll(
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		shortID := c.ID
-		if len(shortID) > 12 {
-			shortID = shortID[:12]
-		}
-		if len(filterSet) > 0 && !filterSet[c.ID] && !filterSet[shortID] &&
+		sid := shortID(c.ID)
+		if len(filterSet) > 0 && !filterSet[c.ID] && !filterSet[sid] &&
 			!filterSet[name] {
 			continue
 		}
@@ -696,19 +637,16 @@ func GatherDockerStatsAll(
 	var errs []string
 	for range targets {
 		r := <-ch
-		shortID := r.id
-		if len(shortID) > 12 {
-			shortID = shortID[:12]
-		}
+		sid := shortID(r.id)
 		entry := DockerContainerStatEntry{
-			ID:   shortID,
+			ID:   sid,
 			Name: r.name,
 		}
 		if r.err != nil {
 			entry.Error = r.err.Error()
 			errs = append(
 				errs,
-				fmt.Sprintf("%s (%s): %v", r.name, shortID, r.err),
+				fmt.Sprintf("%s (%s): %v", r.name, sid, r.err),
 			)
 		} else {
 			entry.CPUPercent = r.entry.CPUPercent
@@ -797,8 +735,8 @@ func HandleGetContainerTop(
 	_ *mcp.CallToolRequest,
 	input GetDockerContainerTopInput,
 ) (*mcp.CallToolResult, *DockerContainerTopOutput, error) {
-	if input.ContainerID == "" {
-		return nil, nil, fmt.Errorf("container_id is required")
+	if err := requireField(input.ContainerID, "container_id"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,
@@ -873,8 +811,8 @@ func HandleGetContainerDiff(
 	_ *mcp.CallToolRequest,
 	input GetDockerContainerDiffInput,
 ) (*mcp.CallToolResult, *DockerContainerDiffOutput, error) {
-	if input.ContainerID == "" {
-		return nil, nil, fmt.Errorf("container_id is required")
+	if err := requireField(input.ContainerID, "container_id"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,
@@ -923,10 +861,7 @@ func GatherImageHistory(
 
 	layers := make([]DockerImageLayer, 0, len(result.Items))
 	for _, item := range result.Items {
-		id := item.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
+		id := shortID(item.ID)
 		layers = append(layers, DockerImageLayer{
 			ID:        id,
 			Created:   item.Created,
@@ -944,8 +879,8 @@ func HandleGetImageHistory(
 	_ *mcp.CallToolRequest,
 	input GetDockerImageHistoryInput,
 ) (*mcp.CallToolResult, *DockerImageHistoryOutput, error) {
-	if input.ImageID == "" {
-		return nil, nil, fmt.Errorf("image_id is required")
+	if err := requireField(input.ImageID, "image_id"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,
@@ -1000,10 +935,7 @@ func GatherImageDetail(
 		return nil, err
 	}
 
-	id := result.ID
-	if len(id) > 12 {
-		id = id[:12]
-	}
+	id := shortID(result.ID)
 
 	var entrypoint, cmd, env []string
 	var workingDir string
@@ -1050,8 +982,8 @@ func HandleGetImageDetail(
 	_ *mcp.CallToolRequest,
 	input GetDockerImageDetailInput,
 ) (*mcp.CallToolResult, *DockerImageDetailOutput, error) {
-	if input.ImageID == "" {
-		return nil, nil, fmt.Errorf("image_id is required")
+	if err := requireField(input.ImageID, "image_id"); err != nil {
+		return nil, nil, err
 	}
 	return handleToolCall(
 		ctx,
@@ -1064,8 +996,6 @@ func HandleGetImageDetail(
 }
 
 // --- Networks ---
-
-type GetDockerNetworksInput struct{}
 
 type DockerNetworkSummary struct {
 	ID         string            `json:"id"`
@@ -1098,10 +1028,7 @@ func GatherDockerNetworks(ctx context.Context) (*DockerNetworksOutput, error) {
 
 	networks := make([]DockerNetworkSummary, 0, len(result.Items))
 	for _, n := range result.Items {
-		id := n.ID
-		if len(id) > 12 {
-			id = id[:12]
-		}
+		id := shortID(n.ID)
 		networks = append(networks, DockerNetworkSummary{
 			ID:         id,
 			Name:       n.Name,
@@ -1120,7 +1047,7 @@ func GatherDockerNetworks(ctx context.Context) (*DockerNetworksOutput, error) {
 func HandleGetDockerNetworks(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerNetworksInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerNetworksOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1131,8 +1058,6 @@ func HandleGetDockerNetworks(
 }
 
 // --- Volumes ---
-
-type GetDockerVolumesInput struct{}
 
 type DockerVolumeSummary struct {
 	Name       string            `json:"name"`
@@ -1183,7 +1108,7 @@ func GatherDockerVolumes(ctx context.Context) (*DockerVolumesOutput, error) {
 func HandleGetDockerVolumes(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerVolumesInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerVolumesOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1194,8 +1119,6 @@ func HandleGetDockerVolumes(
 }
 
 // --- System Info ---
-
-type GetDockerSystemInfoInput struct{}
 
 type DockerSystemInfoSummary struct {
 	ID                string         `json:"id"`
@@ -1242,10 +1165,7 @@ func GatherDockerSystemInfo(
 	}
 
 	sysInfo := result.Info
-	id := sysInfo.ID
-	if len(id) > 12 {
-		id = id[:12]
-	}
+	id := shortID(sysInfo.ID)
 
 	runtimes := make([]string, 0, len(sysInfo.Runtimes))
 	for name := range sysInfo.Runtimes {
@@ -1288,7 +1208,7 @@ func GatherDockerSystemInfo(
 func HandleGetDockerSystemInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerSystemInfoInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerSystemInfoOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1299,8 +1219,6 @@ func HandleGetDockerSystemInfo(
 }
 
 // --- Disk Usage ---
-
-type GetDockerDiskUsageInput struct{}
 
 type DockerDiskUsageCategory struct {
 	ActiveCount int64  `json:"active_count"`
@@ -1367,7 +1285,7 @@ func GatherDockerDiskUsage(
 func HandleGetDockerDiskUsage(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerDiskUsageInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerDiskUsageOutput, error) {
 	return handleToolCall(
 		ctx,
@@ -1379,8 +1297,6 @@ func HandleGetDockerDiskUsage(
 
 // --- Docker System Snapshot ---
 
-type GetDockerSystemSnapshotInput struct{}
-
 type DockerSystemSnapshotOutput struct {
 	Info      DockerInfoOutput      `json:"info"`
 	Stats     DockerStatsAllOutput  `json:"stats"`
@@ -1391,7 +1307,7 @@ type DockerSystemSnapshotOutput struct {
 func HandleGetDockerSystemSnapshot(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ GetDockerSystemSnapshotInput,
+	_ NoArgs,
 ) (*mcp.CallToolResult, *DockerSystemSnapshotOutput, error) {
 	return handleToolCall(
 		ctx,

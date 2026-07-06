@@ -1,3 +1,5 @@
+// Package config provides configuration loading, validation, and defaults
+// for the linux-mcp MCP server.
 package config
 
 import (
