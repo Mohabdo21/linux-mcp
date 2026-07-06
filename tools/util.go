@@ -126,6 +126,22 @@ func readSysfsFile(path string) (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
+const shortIDLen = 12
+
+func shortID(id string) string {
+	if len(id) > shortIDLen {
+		return id[:shortIDLen]
+	}
+	return id
+}
+
+func requireField(val, name string) error {
+	if val == "" {
+		return fmt.Errorf("%s is required", name)
+	}
+	return nil
+}
+
 func LogToolCall(
 	ctx context.Context,
 	tool string,
