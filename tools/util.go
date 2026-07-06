@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -118,6 +119,47 @@ func WithToolTimeout(
 		ctx,
 		config.ToolTimeout(name, fallback),
 	)
+}
+
+func execOutput(
+	ctx context.Context,
+	binary string,
+	args ...string,
+) (string, error) {
+	cmd := exec.CommandContext(ctx, binary, args...)
+	out, err := cmd.Output()
+	return strings.TrimSpace(string(out)), err
+}
+
+func execCombinedOutput(
+	ctx context.Context,
+	binary string,
+	args ...string,
+) (string, error) {
+	cmd := exec.CommandContext(ctx, binary, args...)
+	out, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
+}
+
+func execLines(
+	ctx context.Context,
+	binary string,
+	args ...string,
+) ([]string, error) {
+	out, err := execOutput(ctx, binary, args...)
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return nil, nil
+	}
+	var lines []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines, nil
 }
 
 func readSysfsFile(path string) (string, error) {

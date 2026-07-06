@@ -1160,3 +1160,57 @@ func TestGatherPowerAnalytics(t *testing.T) {
 		t.Log("Battery detected and reporting")
 	}
 }
+
+func TestExecOutput(t *testing.T) {
+	t.Run("Basic", func(t *testing.T) {
+		out, err := execOutput(t.Context(), "echo", "-n", "hello world")
+		if err != nil {
+			t.Fatalf("execOutput() error: %v", err)
+		}
+		if out != "hello world" {
+			t.Errorf("execOutput() = %q, want %q", out, "hello world")
+		}
+	})
+	t.Run("NotFound", func(t *testing.T) {
+		_, err := execOutput(t.Context(), "nonexistent-binary-xyz")
+		if err == nil {
+			t.Fatal("expected error for nonexistent binary")
+		}
+	})
+}
+
+func TestExecCombinedOutput(t *testing.T) {
+	out, err := execCombinedOutput(
+		t.Context(),
+		"sh",
+		"-c",
+		"echo stdout; echo stderr >&2",
+	)
+	if err != nil {
+		t.Fatalf("execCombinedOutput() error: %v", err)
+	}
+	if !strings.Contains(out, "stdout") || !strings.Contains(out, "stderr") {
+		t.Errorf("execCombinedOutput() = %q, want both stdout and stderr", out)
+	}
+}
+
+func TestExecLines(t *testing.T) {
+	t.Run("MultiLine", func(t *testing.T) {
+		lines, err := execLines(t.Context(), "printf", "a\nb\nc\n")
+		if err != nil {
+			t.Fatalf("execLines() error: %v", err)
+		}
+		if want := []string{"a", "b", "c"}; !equalSlices(lines, want) {
+			t.Errorf("execLines() = %v, want %v", lines, want)
+		}
+	})
+	t.Run("Empty", func(t *testing.T) {
+		lines, err := execLines(t.Context(), "true")
+		if err != nil {
+			t.Fatalf("execLines() error: %v", err)
+		}
+		if lines != nil {
+			t.Errorf("execLines() = %v, want nil", lines)
+		}
+	})
+}
