@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -426,17 +425,13 @@ func parseUSBDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
 }
 
 func parseLspciOutput(ctx context.Context) ([]BusDevice, error) {
-	cmd := exec.CommandContext(ctx, "lspci")
-	out, err := cmd.Output()
+	lines, err := execLines(ctx, "lspci")
 	if err != nil {
 		return nil, err
 	}
 	var devices []BusDevice
-	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
 		slot, rest, ok := strings.Cut(line, " ")
 		if !ok {
 			continue
@@ -456,17 +451,13 @@ func parseLspciOutput(ctx context.Context) ([]BusDevice, error) {
 }
 
 func parseLsusbOutput(ctx context.Context) ([]BusDevice, error) {
-	cmd := exec.CommandContext(ctx, "lsusb")
-	out, err := cmd.Output()
+	lines, err := execLines(ctx, "lsusb")
 	if err != nil {
 		return nil, err
 	}
 	var devices []BusDevice
-	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
 		parts := strings.Fields(line)
 		if len(parts) < 6 {
 			continue
@@ -608,13 +599,9 @@ func GatherUserAutomation(
 	out.CronJobs = []CronJob{}
 	out.SystemdTimers = []SystemdTimer{}
 
-	crontab, err := exec.CommandContext(
-		ctx, "crontab", "-l",
-	).Output()
+	crontab, err := execOutput(ctx, "crontab", "-l")
 	if err == nil {
-		for line := range strings.SplitSeq(
-			strings.TrimSpace(string(crontab)), "\n",
-		) {
+		for line := range strings.SplitSeq(crontab, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
@@ -633,10 +620,9 @@ func GatherUserAutomation(
 			fmt.Errorf("crontab -l: %w", err))
 	}
 
-	timers, err := exec.CommandContext(
-		ctx, "systemctl", "--user",
+	timers, err := execOutput(ctx, "systemctl", "--user",
 		"list-timers", "--output=json",
-	).Output()
+	)
 	if err == nil {
 		var rawTimers []struct {
 			Unit      string `json:"unit"`
@@ -646,7 +632,7 @@ func GatherUserAutomation(
 			Passed    string `json:"passed"`
 			Activates string `json:"activates"`
 		}
-		if err := json.Unmarshal(timers, &rawTimers); err == nil {
+		if err := json.Unmarshal([]byte(timers), &rawTimers); err == nil {
 			for _, t := range rawTimers {
 				out.SystemdTimers = append(
 					out.SystemdTimers, SystemdTimer{

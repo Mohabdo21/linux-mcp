@@ -53,23 +53,22 @@ func GatherManPage(
 	if _, err := exec.LookPath("man"); err != nil {
 		return nil, errors.New("man command not found")
 	}
-	cmd := exec.CommandContext(ctx, "man", "-P", "cat", command)
-	out, err := cmd.Output()
+	out, err := execOutput(ctx, "man", "-P", "cat", command)
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			msg := strings.TrimSpace(string(exitErr.Stderr))
 			if msg == "" {
-				msg = string(out)
+				msg = out
 			}
 			if strings.Contains(msg, "No manual entry") ||
-				strings.Contains(string(out), "No manual entry") {
+				strings.Contains(out, "No manual entry") {
 				return nil,
 					errors.New("No manual page found for '" + command + "'")
 			}
 		}
 		return nil, err
 	}
-	content := string(out)
+	content := out
 	if cleanSpecialChars {
 		content = cleanManOutput(content)
 	}

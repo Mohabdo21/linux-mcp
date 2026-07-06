@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -57,18 +56,12 @@ func GatherJournalLogs(
 	if until != "" {
 		args = append(args, "--until", until)
 	}
-	cmd := exec.CommandContext(ctx, "journalctl", args...)
-	out, err := cmd.Output()
+	logLines, err := execLines(ctx, "journalctl", args...)
 	if err != nil {
 		return nil, err
 	}
 	entries := make([]JournalLogEntry, 0)
-	for line := range strings.SplitSeq(
-		strings.TrimSpace(string(out)), "\n",
-	) {
-		if line == "" {
-			continue
-		}
+	for _, line := range logLines {
 		parts := strings.SplitN(line, " ", 3)
 		if len(parts) < 3 {
 			continue

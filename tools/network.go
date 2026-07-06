@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
 	"syscall"
@@ -92,18 +91,12 @@ func GatherListeningPorts(
 	ctx context.Context,
 	protocol string,
 ) (*ListeningPortsOutput, error) {
-	cmd := exec.CommandContext(ctx, "ss", "-tulnp")
-	out, err := cmd.Output()
+	lines, err := execLines(ctx, "ss", "-tulnp")
 	if err != nil {
 		return nil, err
 	}
 	ports := make([]ListeningPort, 0)
-	for line := range strings.SplitSeq(
-		strings.TrimSpace(string(out)), "\n",
-	) {
-		if line == "" {
-			continue
-		}
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 5 || fields[0] == "Netid" {
 			continue

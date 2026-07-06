@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -122,15 +121,12 @@ func GatherTopIOProcesses(
 	} else if limit > 50 {
 		limit = 50
 	}
-	cmd := exec.CommandContext(ctx, "pidstat", "-d", "1", "1")
-	out, err := cmd.Output()
+	lines, err := execLines(ctx, "pidstat", "-d", "1", "1")
 	if err != nil {
 		return nil, err
 	}
 	procs := make([]IOProcessStat, 0)
-	for line := range strings.SplitSeq(
-		strings.TrimSpace(string(out)), "\n",
-	) {
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 6 || fields[0] == "Linux" || fields[0] == "#" {
 			continue

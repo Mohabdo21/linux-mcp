@@ -73,13 +73,13 @@ func ParseJournalctlFailedLogins(output string) []FailedLoginEntry {
 func GatherFailedLoginsJournalctl(
 	ctx context.Context, lines int,
 ) (*FailedLoginsOutput, error) {
-	out, err := exec.CommandContext(ctx,
-		"journalctl", "-u", "sshd", "-u", "systemd-logind",
+	out, err := execOutput(ctx, "journalctl",
+		"-u", "sshd", "-u", "systemd-logind",
 		"--grep", "Failed password|authentication failure|Failed login",
 		"--no-pager", "-o", "short-iso",
 		"-n", fmt.Sprintf("%d", lines),
-	).Output()
-	entries := ParseJournalctlFailedLogins(string(out))
+	)
+	entries := ParseJournalctlFailedLogins(out)
 	if err != nil && errors.Is(err, exec.ErrNotFound) {
 		return nil, err
 	}
@@ -92,16 +92,14 @@ func GatherFailedLogins(
 	if lines <= 0 {
 		lines = 20
 	}
-	out, lastbErr := exec.CommandContext(
-		ctx, "lastb", "-n", fmt.Sprintf("%d", lines),
-	).Output()
+	out, lastbErr := execOutput(ctx, "lastb", "-n", fmt.Sprintf("%d", lines))
 	if lastbErr == nil {
 		return &FailedLoginsOutput{
-			Entries: ParseLastbOutput(string(out)),
+			Entries: ParseLastbOutput(out),
 		}, nil
 	}
 	if !errors.Is(lastbErr, exec.ErrNotFound) {
-		if entries := ParseLastbOutput(string(out)); len(entries) > 0 {
+		if entries := ParseLastbOutput(out); len(entries) > 0 {
 			return &FailedLoginsOutput{Entries: entries}, nil
 		}
 	}
@@ -128,15 +126,12 @@ type LoggedInUsersOutput struct {
 }
 
 func GatherLoggedInUsers(ctx context.Context) (*LoggedInUsersOutput, error) {
-	out, err := exec.CommandContext(ctx, "who", "-u").Output()
+	lines, err := execLines(ctx, "who", "-u")
 	if err != nil {
 		return nil, err
 	}
 	users := make([]LoggedInUser, 0)
-	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue

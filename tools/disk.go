@@ -100,15 +100,12 @@ func GatherInodeUsage(
 	ctx context.Context,
 	mountPoint string,
 ) (*InodeUsageOutput, error) {
-	cmd := exec.CommandContext(ctx, "df", "-i")
-	out, err := cmd.Output()
+	lines, err := execLines(ctx, "df", "-i")
 	if err != nil {
 		return nil, err
 	}
 	mounts := make([]InodeUsageStat, 0)
-	for line := range strings.SplitSeq(
-		strings.TrimSpace(string(out)), "\n",
-	) {
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 6 || fields[0] == "Filesystem" {
 			continue
@@ -258,17 +255,13 @@ func GatherMountOptions(
 	ctx context.Context,
 	mountPoint string,
 ) (*MountOptionsOutput, error) {
-	args := []string{"--noheadings", "-o", "SOURCE,TARGET,FSTYPE,OPTIONS"}
-	cmd := exec.CommandContext(ctx, "findmnt", args...)
-	out, err := cmd.Output()
+	lines, err := execLines(ctx, "findmnt",
+		"--noheadings", "-o", "SOURCE,TARGET,FSTYPE,OPTIONS")
 	if err != nil {
 		return nil, err
 	}
 	mounts := make([]MountEntry, 0)
-	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os/exec"
 	"strings"
 	"unicode"
 
@@ -67,16 +66,11 @@ func GatherPing(
 	if timeout <= 0 {
 		timeout = 10
 	}
-	cmd := exec.CommandContext(ctx,
-		"ping",
-		"-c",
-		fmt.Sprintf("%d", count),
-		"-w",
-		fmt.Sprintf("%d", timeout),
+	output, err := execOutput(ctx, "ping",
+		"-c", fmt.Sprintf("%d", count),
+		"-w", fmt.Sprintf("%d", timeout),
 		host,
 	)
-	out, err := cmd.Output()
-	output := string(out)
 	result := &PingOutput{Host: host}
 	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, "packets transmitted") {

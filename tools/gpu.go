@@ -28,23 +28,17 @@ type GPUInfoOutput struct {
 }
 
 func GatherNvidiaGPU(ctx context.Context) (*GPUInfoOutput, error) {
-	cmd := exec.CommandContext(
+	lines, err := execLines(
 		ctx,
 		"nvidia-smi",
 		"--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
 		"--format=csv,noheader,nounits",
 	)
-	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 	var gpus []GPUDevice
-	for line := range strings.SplitSeq(
-		strings.TrimSpace(string(out)), "\n",
-	) {
-		if line == "" {
-			continue
-		}
+	for _, line := range lines {
 		fields := strings.Split(line, ", ")
 		if len(fields) < 7 {
 			continue
@@ -76,13 +70,12 @@ func GatherNvidiaGPU(ctx context.Context) (*GPUInfoOutput, error) {
 }
 
 func GatherAMDGPU(ctx context.Context) (*GPUInfoOutput, error) {
-	cmd := exec.CommandContext(ctx, "rocm-smi", "--json")
-	out, err := cmd.Output()
+	out, err := execOutput(ctx, "rocm-smi", "--json")
 	if err != nil {
 		return nil, err
 	}
 	var raw map[string]any
-	if err := json.Unmarshal(out, &raw); err != nil {
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return nil, err
 	}
 	var gpus []GPUDevice

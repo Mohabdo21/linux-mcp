@@ -70,11 +70,11 @@ func gatherPacmanPackages(
 	} else {
 		args = []string{"-Qs", name}
 	}
-	out, err := exec.CommandContext(ctx, "pacman", args...).Output()
+	out, err := execOutput(ctx, "pacman", args...)
 	if err != nil {
 		return nil, err
 	}
-	return parsePacmanQOutput(string(out)), nil
+	return parsePacmanQOutput(out), nil
 }
 
 func parsePacmanQOutput(output string) *InstalledPackagesOutput {
@@ -109,11 +109,11 @@ func gatherDpkgPackages(
 	if name != "" {
 		args = []string{"-l", name}
 	}
-	out, err := exec.CommandContext(ctx, "dpkg", args...).Output()
+	out, err := execOutput(ctx, "dpkg", args...)
 	if err != nil {
 		return nil, err
 	}
-	return parseDpkgLOutput(string(out)), nil
+	return parseDpkgLOutput(out), nil
 }
 
 func parseDpkgLOutput(output string) *InstalledPackagesOutput {
@@ -149,13 +149,13 @@ func GatherCheckUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 }
 
 func gatherPacmanUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
-	out, err := exec.CommandContext(ctx, "pacman", "-Qu").Output()
+	out, err := execOutput(ctx, "pacman", "-Qu")
 	if err != nil {
-		if len(out) == 0 {
+		if out == "" {
 			return &CheckUpdatesOutput{Updates: []AvailableUpdate{}}, nil
 		}
 	}
-	return parsePacmanQuOutput(string(out)), nil
+	return parsePacmanQuOutput(out), nil
 }
 
 func parsePacmanQuOutput(output string) *CheckUpdatesOutput {
@@ -191,13 +191,13 @@ func parsePacmanQuOutput(output string) *CheckUpdatesOutput {
 }
 
 func gatherAptUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
-	out, err := exec.CommandContext(ctx, "apt", "list", "--upgradable").Output()
+	out, err := execOutput(ctx, "apt", "list", "--upgradable")
 	if err != nil {
-		if len(out) == 0 {
+		if out == "" {
 			return nil, err
 		}
 	}
-	return parseAptListOutput(string(out)), nil
+	return parseAptListOutput(out), nil
 }
 
 func parseAptListOutput(output string) *CheckUpdatesOutput {

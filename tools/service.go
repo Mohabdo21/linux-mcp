@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"os/exec"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -39,9 +38,7 @@ func GatherServiceStatus(
 	if user {
 		args = append([]string{"--user"}, args...)
 	}
-	cmd := exec.CommandContext(ctx, "systemctl", args...)
-	out, err := cmd.CombinedOutput()
-	output := string(out)
+	output, err := execCombinedOutput(ctx, "systemctl", args...)
 	loaded := ExtractField(output, "Loaded:")
 	active := ExtractField(output, "Active:")
 	pid := ExtractField(output, "Main PID:")
@@ -68,22 +65,17 @@ type SystemdUnitsOutput struct {
 }
 
 func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
-	cmd := exec.CommandContext(ctx,
-		"systemctl",
+	lines, err := execLines(ctx, "systemctl",
 		"list-units",
 		"--all",
 		"--no-pager",
 		"--no-legend",
 	)
-	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 	units := make([]SystemdUnit, 0)
-	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
+	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue
