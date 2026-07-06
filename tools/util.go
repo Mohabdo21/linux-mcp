@@ -1,3 +1,5 @@
+// Package tools provides MCP tool implementations for system inspection,
+// including CPU, memory, disk, network, Docker, GPU, and other utilities.
 package tools
 
 import (

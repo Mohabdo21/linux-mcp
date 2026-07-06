@@ -13,6 +13,9 @@ linters:
     - unused
     - misspell
   settings:
+    staticcheck:
+      checks:
+        - all
     errcheck:
       check-type-assertions: true
       check-blank: false
