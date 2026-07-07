@@ -51,7 +51,7 @@ func RegisterResources(server *mcp.Server) {
 		{URITemplate: scheme("disk/{mount_point}"),
 			Name: "Disk Information (filtered)",
 			Description: "Disk usage for a specific mount point, " +
-				"e.g. system:///disk// or system:///disk//home"},
+				"e.g. system:///disk/ (root) or system:///disk/boot"},
 		{URITemplate: scheme("service/{name}"),
 			Name: "Service Status",
 			Description: "Detailed status of a systemd service, " +
@@ -112,7 +112,11 @@ func handleReadResource(
 	case path == "/failed_logins":
 		data, nerr = GatherFailedLogins(ctx, 20)
 	case strings.HasPrefix(path, "/disk/"):
-		data, nerr = GatherDiskInfo(ctx, strings.TrimPrefix(path, "/disk/"))
+		mountPoint := strings.TrimPrefix(path, "/disk/")
+		if mountPoint != "" && !strings.HasPrefix(mountPoint, "/") {
+			mountPoint = "/" + mountPoint
+		}
+		data, nerr = GatherDiskInfo(ctx, mountPoint)
 	case strings.HasPrefix(path, "/service/"):
 		data, nerr = GatherServiceStatus(
 			ctx,
@@ -123,10 +127,11 @@ func handleReadResource(
 		return nil, mcp.ResourceNotFoundError(uri)
 	}
 
-	if nerr != nil {
-		// If the gather function returned an empty/invalid struct,
-		// return a proper error instead of marshaling zeros.
-		return nil, fmt.Errorf("resource unavailable: %w", nerr)
+	if data == nil {
+		if nerr != nil {
+			return nil, fmt.Errorf("resource unavailable: %w", nerr)
+		}
+		return nil, fmt.Errorf("resource unavailable: no data")
 	}
 
 	jsonData, err := json.Marshal(data)

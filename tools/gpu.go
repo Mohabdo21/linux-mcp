@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -150,5 +151,5 @@ func HandleGetGPUInfo(
 	_ *mcp.CallToolRequest,
 	_ NoArgs,
 ) (*mcp.CallToolResult, *GPUInfoOutput, error) {
-	return handleToolCall(ctx, "get_gpu_info", 0, GatherGPUInfo)
+	return handleToolCall(ctx, config.ToolNameGetGPUInfo, 0, GatherGPUInfo)
 }

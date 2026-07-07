@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/disk"
 )
@@ -70,7 +71,7 @@ func HandleGetDiskInfo(
 ) (*mcp.CallToolResult, *DiskInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_disk_info",
+		config.ToolNameGetDiskInfo,
 		0,
 		func(ctx context.Context) (*DiskInfoOutput, error) {
 			return GatherDiskInfo(ctx, input.MountPoint)
@@ -137,7 +138,7 @@ func HandleGetInodeUsage(
 ) (*mcp.CallToolResult, *InodeUsageOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_inode_usage",
+		config.ToolNameGetInodeUsage,
 		0,
 		func(ctx context.Context) (*InodeUsageOutput, error) {
 			return GatherInodeUsage(ctx, input.MountPoint)
@@ -170,11 +171,6 @@ func GatherLargestFiles(
 ) (*LargestFilesOutput, error) {
 	if path == "" {
 		path = "."
-	}
-	if limit <= 0 {
-		limit = 10
-	} else if limit > 100 {
-		limit = 100
 	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(
 		"du -sb %s/* %s/.[!.]* 2>/dev/null | sort -rn",
@@ -225,12 +221,13 @@ func HandleGetLargestFiles(
 	_ *mcp.CallToolRequest,
 	input GetLargestFilesInput,
 ) (*mcp.CallToolResult, *LargestFilesOutput, error) {
+	limit := clampZero(input.Limit, 10, 100)
 	return handleToolCall(
 		ctx,
-		"get_largest_files",
+		config.ToolNameGetLargestFiles,
 		0,
 		func(ctx context.Context) (*LargestFilesOutput, error) {
-			return GatherLargestFiles(ctx, input.Path, input.Limit)
+			return GatherLargestFiles(ctx, input.Path, limit)
 		},
 	)
 }
@@ -286,7 +283,7 @@ func HandleGetMountOptions(
 ) (*mcp.CallToolResult, *MountOptionsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_mount_options",
+		config.ToolNameGetMountOptions,
 		0,
 		func(ctx context.Context) (*MountOptionsOutput, error) {
 			return GatherMountOptions(ctx, input.MountPoint)

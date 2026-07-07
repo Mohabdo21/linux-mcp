@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	gnet "github.com/shirou/gopsutil/v4/net"
 )
@@ -65,7 +66,7 @@ func HandleGetNetworkInfo(
 ) (*mcp.CallToolResult, *NetworkInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_network_info",
+		config.ToolNameGetNetworkInfo,
 		0,
 		GatherNetworkInfo,
 	)
@@ -127,7 +128,7 @@ func HandleGetListeningPorts(
 ) (*mcp.CallToolResult, *ListeningPortsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_listening_ports",
+		config.ToolNameGetListeningPorts,
 		0,
 		func(ctx context.Context) (*ListeningPortsOutput, error) {
 			return GatherListeningPorts(ctx, input.Protocol)
@@ -341,15 +342,10 @@ func HandleGetNetworkConnections(
 	_ *mcp.CallToolRequest,
 	input GetNetworkConnectionsInput,
 ) (*mcp.CallToolResult, *NetworkConnectionsOutput, error) {
-	maxConn := input.MaxConnections
-	if maxConn < 0 {
-		maxConn = 0
-	} else if maxConn > maxNetworkConnections {
-		maxConn = maxNetworkConnections
-	}
+	maxConn := clampVal(input.MaxConnections, 0, maxNetworkConnections)
 	return handleToolCall(
 		ctx,
-		"get_network_connections",
+		config.ToolNameGetNetworkConnections,
 		0,
 		func(ctx context.Context) (*NetworkConnectionsOutput, error) {
 			return GatherNetworkConnections(
@@ -374,7 +370,7 @@ func HandleResolveDNS(
 	}
 	return handleToolCall(
 		ctx,
-		"resolve_dns",
+		config.ToolNameResolveDNS,
 		0,
 		func(ctx context.Context) (*ResolveDNSOutput, error) {
 			return GatherDNSResolve(ctx, input.Hostname)
@@ -518,7 +514,7 @@ func HandleGetIPInfo(
 ) (*mcp.CallToolResult, *IPInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_ip_info",
+		config.ToolNameGetIPInfo,
 		0,
 		func(ctx context.Context) (*IPInfoOutput, error) {
 			return GatherIPInfo(ctx, input.IP)

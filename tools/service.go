@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -102,7 +103,7 @@ func HandleGetSystemdUnits(
 ) (*mcp.CallToolResult, *SystemdUnitsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_systemd_units",
+		config.ToolNameGetSystemdUnits,
 		0,
 		GatherSystemdUnits,
 	)
@@ -115,7 +116,7 @@ func HandleGetServiceStatus(
 ) (*mcp.CallToolResult, *ServiceStatusOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_service_status",
+		config.ToolNameGetServiceStatus,
 		0,
 		func(ctx context.Context) (*ServiceStatusOutput, error) {
 			return GatherServiceStatus(ctx, input.Name, input.User)

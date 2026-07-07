@@ -105,6 +105,33 @@ func collectOrFallback[T any](
 	return *out
 }
 
+func clampVal[T ~int](val, min, max T) T {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
+}
+
+func clampZero[T ~int](val, def, max T) T {
+	if val <= 0 {
+		return def
+	}
+	if val > max {
+		return max
+	}
+	return val
+}
+
+func nilToEmpty[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
 func WithToolTimeout(
 	ctx context.Context,
 	name string,

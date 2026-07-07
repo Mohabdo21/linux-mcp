@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -138,7 +139,7 @@ func HandleGetPowerAnalytics(
 ) (*mcp.CallToolResult, *PowerAnalyticsOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_power_analytics",
+		config.ToolNameGetPowerAnalytics,
 		0,
 		GatherPowerAnalytics,
 	)

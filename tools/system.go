@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/host"
 )
@@ -95,7 +96,7 @@ func HandleGetSystemInfo(
 ) (*mcp.CallToolResult, *SystemInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_system_info",
+		config.ToolNameGetSystemInfo,
 		0,
 		GatherSystemInfo,
 	)
@@ -121,7 +122,7 @@ func HandleGetSystemSnapshot(
 ) (*mcp.CallToolResult, *SystemSnapshotOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_system_snapshot",
+		config.ToolNameGetSystemSnapshot,
 		0,
 		func(ctx context.Context) (*SystemSnapshotOutput, error) {
 			var snapshot SystemSnapshotOutput
@@ -250,7 +251,7 @@ func HandleGetEnvironmentVariables(
 ) (*mcp.CallToolResult, *EnvironmentVariablesOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_environment_variables",
+		config.ToolNameGetEnvironmentVariables,
 		0,
 		func(ctx context.Context) (*EnvironmentVariablesOutput, error) {
 			return GatherEnvironmentVariables(ctx, input.Search)
@@ -342,9 +343,7 @@ func parsePCIDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
 		})
 	}
 
-	if devices == nil {
-		devices = []BusDevice{}
-	}
+	devices = nilToEmpty(devices)
 	return devices, nil
 }
 
@@ -383,9 +382,7 @@ func parseUSBDevicesSysfs(ctx context.Context) ([]BusDevice, error) {
 		})
 	}
 
-	if devices == nil {
-		devices = []BusDevice{}
-	}
+	devices = nilToEmpty(devices)
 	return devices, nil
 }
 
@@ -409,9 +406,7 @@ func parseLspciOutput(ctx context.Context) ([]BusDevice, error) {
 			Device: strings.TrimSpace(desc),
 		})
 	}
-	if devices == nil {
-		devices = []BusDevice{}
-	}
+	devices = nilToEmpty(devices)
 	return devices, nil
 }
 
@@ -442,9 +437,7 @@ func parseLsusbOutput(ctx context.Context) ([]BusDevice, error) {
 			Device: desc,
 		})
 	}
-	if devices == nil {
-		devices = []BusDevice{}
-	}
+	devices = nilToEmpty(devices)
 	return devices, nil
 }
 
@@ -470,9 +463,7 @@ func filterDevices(devices []BusDevice, search string) []BusDevice {
 			filtered = append(filtered, d)
 		}
 	}
-	if filtered == nil {
-		filtered = []BusDevice{}
-	}
+	filtered = nilToEmpty(filtered)
 	return filtered
 }
 
@@ -516,7 +507,7 @@ func HandleGetHardwareBusInfo(
 ) (*mcp.CallToolResult, *HardwareBusInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_hardware_bus_info",
+		config.ToolNameGetHardwareBusInfo,
 		0,
 		func(ctx context.Context) (*HardwareBusInfoOutput, error) {
 			return GatherHardwareBusInfo(ctx, input.Search)
@@ -531,7 +522,7 @@ func HandleGetLoadAverage(
 ) (*mcp.CallToolResult, *LoadAverageOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_load_average",
+		config.ToolNameGetLoadAverage,
 		0,
 		GatherLoadAverage,
 	)
@@ -561,8 +552,8 @@ func GatherUserAutomation(
 	var out UserAutomationOutput
 	var errs []string
 
-	out.CronJobs = []CronJob{}
-	out.SystemdTimers = []SystemdTimer{}
+	out.CronJobs = nilToEmpty(out.CronJobs)
+	out.SystemdTimers = nilToEmpty(out.SystemdTimers)
 
 	crontab, err := execOutput(ctx, "crontab", "-l")
 	if err == nil {
@@ -628,7 +619,7 @@ func HandleGetUserAutomation(
 ) (*mcp.CallToolResult, *UserAutomationOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_user_automation",
+		config.ToolNameGetUserAutomation,
 		0,
 		GatherUserAutomation,
 	)
@@ -662,7 +653,7 @@ func HandleGetDesktopSessionInfo(
 ) (*mcp.CallToolResult, *DesktopSessionOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_desktop_session_info",
+		config.ToolNameGetDesktopSessionInfo,
 		0,
 		GatherDesktopSessionInfo,
 	)

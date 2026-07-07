@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -245,7 +246,7 @@ func HandleGetInstalledPackages(
 ) (*mcp.CallToolResult, *InstalledPackagesOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_installed_packages",
+		config.ToolNameGetInstalledPackages,
 		0,
 		func(ctx context.Context) (*InstalledPackagesOutput, error) {
 			return GatherInstalledPackages(ctx, input.Name)
@@ -260,7 +261,7 @@ func HandleCheckUpdates(
 ) (*mcp.CallToolResult, *CheckUpdatesOutput, error) {
 	return handleToolCall(
 		ctx,
-		"check_updates",
+		config.ToolNameCheckUpdates,
 		0,
 		GatherCheckUpdates,
 	)

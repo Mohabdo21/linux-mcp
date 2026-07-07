@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/sensors"
@@ -58,7 +59,7 @@ func HandleGetCPUInfo(
 	_ *mcp.CallToolRequest,
 	_ NoArgs,
 ) (*mcp.CallToolResult, *CPUInfoOutput, error) {
-	return handleToolCall(ctx, "get_cpu_info", 0, GatherCPUInfo)
+	return handleToolCall(ctx, config.ToolNameGetCPUInfo, 0, GatherCPUInfo)
 }
 
 type TemperatureStat struct {
@@ -101,7 +102,7 @@ func HandleGetCPUTemperature(
 ) (*mcp.CallToolResult, *CPUTemperatureOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_cpu_temperature",
+		config.ToolNameGetCPUTemperature,
 		0,
 		GatherCPUTemperature,
 	)

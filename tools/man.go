@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -128,18 +129,14 @@ func HandleGetManPage(
 	if err := requireField(input.Command, "command"); err != nil {
 		return nil, nil, err
 	}
-	maxLines := input.MaxLines
-	if maxLines <= 0 {
-		maxLines = 500
-	}
-	maxLines = min(maxLines, 10000)
+	maxLines := clampZero(input.MaxLines, 500, 10000)
 	contextLines := input.ContextLines
 	if input.Search != "" && contextLines <= 0 {
 		contextLines = 2
 	}
 	return handleToolCall(
 		ctx,
-		"get_man_page",
+		config.ToolNameGetManPage,
 		0,
 		func(ctx context.Context) (*ManPageOutput, error) {
 			return GatherManPage(ctx, input.Command, maxLines, true,

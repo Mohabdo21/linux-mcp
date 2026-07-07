@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -142,15 +143,11 @@ func GatherUserInfo(
 				u.Username, u.GID,
 			)
 		}
-		if u.Groups == nil {
-			u.Groups = []string{}
-		}
+		u.Groups = nilToEmpty(u.Groups)
 		out.Users = append(out.Users, u)
 	}
 
-	if out.Users == nil {
-		out.Users = []UserInfo{}
-	}
+	out.Users = nilToEmpty(out.Users)
 
 	out.Errors = errs
 	return &out, out.Err()
@@ -163,7 +160,7 @@ func HandleGetUserInfo(
 ) (*mcp.CallToolResult, *GetUserInfoOutput, error) {
 	return handleToolCall(
 		ctx,
-		"get_user_info",
+		config.ToolNameGetUserInfo,
 		0,
 		func(ctx context.Context) (*GetUserInfoOutput, error) {
 			return GatherUserInfo(ctx, input.Search)
