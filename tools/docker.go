@@ -34,7 +34,10 @@ type DockerInfoOutput struct {
 	OutputErrors
 }
 
-func withDockerClient[T any](ctx context.Context, fn func(cli dockersdk.SDKClient) (T, error)) (T, error) {
+func withDockerClient[T any](
+	ctx context.Context,
+	fn func(cli dockersdk.SDKClient) (T, error),
+) (T, error) {
 	cli, err := dockersdk.New(ctx)
 	if err != nil {
 		var zero T
@@ -45,54 +48,66 @@ func withDockerClient[T any](ctx context.Context, fn func(cli dockersdk.SDKClien
 }
 
 func ListDockerContainers(ctx context.Context) ([]DockerContainer, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) ([]DockerContainer, error) {
-		result, err := cli.ContainerList(
-			ctx,
-			mobyclient.ContainerListOptions{All: true},
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		containers := make([]DockerContainer, 0, len(result.Items))
-		for _, c := range result.Items {
-			name := ""
-			if len(c.Names) > 0 {
-				name = strings.TrimPrefix(c.Names[0], "/")
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) ([]DockerContainer, error) {
+			result, err := cli.ContainerList(
+				ctx,
+				mobyclient.ContainerListOptions{All: true},
+			)
+			if err != nil {
+				return nil, err
 			}
-			id := shortID(c.ID)
-			containers = append(containers, DockerContainer{
-				ID: id, Name: name, Image: c.Image, Status: c.Status,
-			})
-		}
-		return containers, nil
-	})
+
+			containers := make([]DockerContainer, 0, len(result.Items))
+			for _, c := range result.Items {
+				name := ""
+				if len(c.Names) > 0 {
+					name = strings.TrimPrefix(c.Names[0], "/")
+				}
+				id := shortID(c.ID)
+				containers = append(containers, DockerContainer{
+					ID: id, Name: name, Image: c.Image, Status: c.Status,
+				})
+			}
+			return containers, nil
+		},
+	)
 }
 
 func ListDockerImages(ctx context.Context) ([]DockerImage, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) ([]DockerImage, error) {
-		result, err := cli.ImageList(ctx, mobyclient.ImageListOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		images := make([]DockerImage, 0, len(result.Items))
-		for _, img := range result.Items {
-			repo, tag := "<none>", "<none>"
-			if len(img.RepoTags) > 0 {
-				if idx := strings.LastIndex(img.RepoTags[0], ":"); idx >= 0 {
-					repo, tag = img.RepoTags[0][:idx], img.RepoTags[0][idx+1:]
-				} else {
-					repo = img.RepoTags[0]
-				}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) ([]DockerImage, error) {
+			result, err := cli.ImageList(ctx, mobyclient.ImageListOptions{})
+			if err != nil {
+				return nil, err
 			}
-			id := shortID(img.ID)
-			images = append(images, DockerImage{
-				Repository: repo, Tag: tag, ID: id, Size: HumanSize(img.Size),
-			})
-		}
-		return images, nil
-	})
+
+			images := make([]DockerImage, 0, len(result.Items))
+			for _, img := range result.Items {
+				repo, tag := "<none>", "<none>"
+				if len(img.RepoTags) > 0 {
+					if idx := strings.LastIndex(
+						img.RepoTags[0],
+						":",
+					); idx >= 0 {
+						repo, tag = img.RepoTags[0][:idx], img.RepoTags[0][idx+1:]
+					} else {
+						repo = img.RepoTags[0]
+					}
+				}
+				id := shortID(img.ID)
+				images = append(images, DockerImage{
+					Repository: repo,
+					Tag:        tag,
+					ID:         id,
+					Size:       HumanSize(img.Size),
+				})
+			}
+			return images, nil
+		},
+	)
 }
 
 func GatherDockerInfo(ctx context.Context) (*DockerInfoOutput, error) {
@@ -163,90 +178,93 @@ func GatherContainerDetail(
 	ctx context.Context,
 	containerID string,
 ) (*DockerContainerDetailOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerContainerDetailOutput, error) {
-		result, err := cli.ContainerInspect(
-			ctx,
-			containerID,
-			mobyclient.ContainerInspectOptions{},
-		)
-		if err != nil {
-			return nil, err
-		}
-		c := result.Container
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerContainerDetailOutput, error) {
+			result, err := cli.ContainerInspect(
+				ctx,
+				containerID,
+				mobyclient.ContainerInspectOptions{},
+			)
+			if err != nil {
+				return nil, err
+			}
+			c := result.Container
 
-		name := strings.TrimPrefix(c.Name, "/")
-		id := shortID(c.ID)
+			name := strings.TrimPrefix(c.Name, "/")
+			id := shortID(c.ID)
 
-		state := map[string]any{}
-		if c.State != nil {
-			state["status"] = c.State.Status
-			state["running"] = c.State.Running
-			state["paused"] = c.State.Paused
-			state["restarting"] = c.State.Restarting
-			state["exit_code"] = c.State.ExitCode
-			state["started_at"] = c.State.StartedAt
-			state["finished_at"] = c.State.FinishedAt
-		}
+			state := map[string]any{}
+			if c.State != nil {
+				state["status"] = c.State.Status
+				state["running"] = c.State.Running
+				state["paused"] = c.State.Paused
+				state["restarting"] = c.State.Restarting
+				state["exit_code"] = c.State.ExitCode
+				state["started_at"] = c.State.StartedAt
+				state["finished_at"] = c.State.FinishedAt
+			}
 
-		network := map[string]any{}
-		ports := map[string]any{}
-		if c.NetworkSettings != nil {
-			for name, ep := range c.NetworkSettings.Networks {
-				network[name] = map[string]string{
-					"ip_address":    ep.IPAddress.String(),
-					"ip_prefix_len": fmt.Sprintf("%d", ep.IPPrefixLen),
-					"gateway":       ep.Gateway.String(),
-					"mac_address":   ep.MacAddress.String(),
+			network := map[string]any{}
+			ports := map[string]any{}
+			if c.NetworkSettings != nil {
+				for name, ep := range c.NetworkSettings.Networks {
+					network[name] = map[string]string{
+						"ip_address":    ep.IPAddress.String(),
+						"ip_prefix_len": fmt.Sprintf("%d", ep.IPPrefixLen),
+						"gateway":       ep.Gateway.String(),
+						"mac_address":   ep.MacAddress.String(),
+					}
+				}
+				for p, bindings := range c.NetworkSettings.Ports {
+					var bList []string
+					for _, b := range bindings {
+						bList = append(bList, b.HostIP.String()+":"+b.HostPort)
+					}
+					ports[p.String()] = bList
 				}
 			}
-			for p, bindings := range c.NetworkSettings.Ports {
-				var bList []string
-				for _, b := range bindings {
-					bList = append(bList, b.HostIP.String()+":"+b.HostPort)
-				}
-				ports[p.String()] = bList
+
+			mounts := make([]DockerContainerMount, 0, len(c.Mounts))
+			for _, m := range c.Mounts {
+				mounts = append(mounts, DockerContainerMount{
+					Type:        string(m.Type),
+					Source:      m.Source,
+					Destination: m.Destination,
+					Mode:        m.Mode,
+					RW:          m.RW,
+				})
 			}
-		}
 
-		mounts := make([]DockerContainerMount, 0, len(c.Mounts))
-		for _, m := range c.Mounts {
-			mounts = append(mounts, DockerContainerMount{
-				Type:        string(m.Type),
-				Source:      m.Source,
-				Destination: m.Destination,
-				Mode:        m.Mode,
-				RW:          m.RW,
-			})
-		}
+			var env []string
+			if c.Config != nil {
+				env = c.Config.Env
+			}
+			env = nilToEmpty(env)
 
-		var env []string
-		if c.Config != nil {
-			env = c.Config.Env
-		}
-		env = nilToEmpty(env)
+			status, _ := state["status"].(string)
 
-		status, _ := state["status"].(string)
+			args := c.Args
+			args = nilToEmpty(args)
 
-		args := c.Args
-		args = nilToEmpty(args)
-
-		return &DockerContainerDetailOutput{
-			Container: DockerContainerDetail{
-				ID:      id,
-				Name:    name,
-				Image:   c.Image,
-				Created: c.Created,
-				State:   state,
-				Status:  status,
-				Path:    c.Path,
-				Args:    args,
-				Env:     env,
-				Mounts:  mounts,
-				Network: network,
-				Ports:   ports,
-			},
-		}, nil
-	})
+			return &DockerContainerDetailOutput{
+				Container: DockerContainerDetail{
+					ID:      id,
+					Name:    name,
+					Image:   c.Image,
+					Created: c.Created,
+					State:   state,
+					Status:  status,
+					Path:    c.Path,
+					Args:    args,
+					Env:     env,
+					Mounts:  mounts,
+					Network: network,
+					Ports:   ports,
+				},
+			}, nil
+		},
+	)
 }
 
 func HandleGetContainerDetail(
@@ -286,39 +304,36 @@ func GatherContainerLogs(
 	tail int,
 	timestamps bool,
 ) (*DockerContainerLogsOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerContainerLogsOutput, error) {
-		if tail <= 0 {
-			tail = 100
-		} else if tail > 10000 {
-			tail = 10000
-		}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerContainerLogsOutput, error) {
+			result, err := cli.ContainerLogs(
+				ctx,
+				containerID,
+				mobyclient.ContainerLogsOptions{
+					ShowStdout: true,
+					ShowStderr: true,
+					Timestamps: timestamps,
+					Tail:       fmt.Sprintf("%d", tail),
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+			defer func() { _ = result.Close() }()
 
-		result, err := cli.ContainerLogs(
-			ctx,
-			containerID,
-			mobyclient.ContainerLogsOptions{
-				ShowStdout: true,
-				ShowStderr: true,
-				Timestamps: timestamps,
-				Tail:       fmt.Sprintf("%d", tail),
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = result.Close() }()
+			lines := make([]string, 0)
+			scanner := bufio.NewScanner(result)
+			for scanner.Scan() {
+				lines = append(lines, scanner.Text())
+			}
+			if err := scanner.Err(); err != nil {
+				return nil, err
+			}
 
-		lines := make([]string, 0)
-		scanner := bufio.NewScanner(result)
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			return nil, err
-		}
-
-		return &DockerContainerLogsOutput{Logs: lines}, nil
-	})
+			return &DockerContainerLogsOutput{Logs: lines}, nil
+		},
+	)
 }
 
 func HandleGetContainerLogs(
@@ -329,6 +344,7 @@ func HandleGetContainerLogs(
 	if err := requireField(input.ContainerID, "container_id"); err != nil {
 		return nil, nil, err
 	}
+	tail := clampZero(input.Tail, 100, 10000)
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetDockerContainerLogs,
@@ -337,7 +353,7 @@ func HandleGetContainerLogs(
 			return GatherContainerLogs(
 				ctx,
 				input.ContainerID,
-				input.Tail,
+				tail,
 				input.Timestamps,
 			)
 		},
@@ -370,109 +386,112 @@ func GatherContainerStats(
 	ctx context.Context,
 	containerID string,
 ) (*DockerContainerStatsOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerContainerStatsOutput, error) {
-		result, err := cli.ContainerStats(
-			ctx,
-			containerID,
-			mobyclient.ContainerStatsOptions{
-				Stream: false,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = result.Body.Close() }()
-
-		var stats struct {
-			CPUStats struct {
-				CPUUsage struct {
-					TotalUsage uint64 `json:"total_usage"`
-				} `json:"cpu_usage"`
-				SystemUsage uint64 `json:"system_cpu_usage"`
-				OnlineCPUs  uint32 `json:"online_cpus"`
-			} `json:"cpu_stats"`
-			PreCPUStats struct {
-				CPUUsage struct {
-					TotalUsage uint64 `json:"total_usage"`
-				} `json:"cpu_usage"`
-				SystemUsage uint64 `json:"system_cpu_usage"`
-			} `json:"precpu_stats"`
-			MemoryStats struct {
-				Usage uint64            `json:"usage"`
-				Limit uint64            `json:"limit"`
-				Stats map[string]uint64 `json:"stats"`
-			} `json:"memory_stats"`
-			PidsStats struct {
-				Current uint64 `json:"current"`
-			} `json:"pids_stats"`
-			BlkioStats struct {
-				IoServiceBytesRecursive []struct {
-					Op    string `json:"op"`
-					Value uint64 `json:"value"`
-				} `json:"io_service_bytes_recursive"`
-			} `json:"blkio_stats"`
-			Networks map[string]struct {
-				RxBytes   uint64 `json:"rx_bytes"`
-				TxBytes   uint64 `json:"tx_bytes"`
-				RxPackets uint64 `json:"rx_packets"`
-				TxPackets uint64 `json:"tx_packets"`
-			} `json:"networks"`
-		}
-
-		if err := json.NewDecoder(result.Body).Decode(&stats); err != nil {
-			return nil, err
-		}
-
-		cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
-		sysDelta := stats.CPUStats.SystemUsage - stats.PreCPUStats.SystemUsage
-		cpuPercent := 0.0
-		if sysDelta > 0 && stats.CPUStats.OnlineCPUs > 0 {
-			cpuPercent = (float64(cpuDelta) / float64(sysDelta)) * float64(
-				stats.CPUStats.OnlineCPUs,
-			) * 100.0
-		}
-
-		memPercent := 0.0
-		if stats.MemoryStats.Limit > 0 {
-			memPercent = (float64(stats.MemoryStats.Usage) / float64(stats.MemoryStats.Limit)) * 100.0
-		}
-
-		networkMap := map[string]map[string]uint64{}
-		for name, net := range stats.Networks {
-			networkMap[name] = map[string]uint64{
-				"rx_bytes":   net.RxBytes,
-				"tx_bytes":   net.TxBytes,
-				"rx_packets": net.RxPackets,
-				"tx_packets": net.TxPackets,
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerContainerStatsOutput, error) {
+			result, err := cli.ContainerStats(
+				ctx,
+				containerID,
+				mobyclient.ContainerStatsOptions{
+					Stream: false,
+				},
+			)
+			if err != nil {
+				return nil, err
 			}
-		}
+			defer func() { _ = result.Body.Close() }()
 
-		var blkRead, blkWrite uint64
-		for _, op := range stats.BlkioStats.IoServiceBytesRecursive {
-			switch op.Op {
-			case "read":
-				blkRead += op.Value
-			case "write":
-				blkWrite += op.Value
+			var stats struct {
+				CPUStats struct {
+					CPUUsage struct {
+						TotalUsage uint64 `json:"total_usage"`
+					} `json:"cpu_usage"`
+					SystemUsage uint64 `json:"system_cpu_usage"`
+					OnlineCPUs  uint32 `json:"online_cpus"`
+				} `json:"cpu_stats"`
+				PreCPUStats struct {
+					CPUUsage struct {
+						TotalUsage uint64 `json:"total_usage"`
+					} `json:"cpu_usage"`
+					SystemUsage uint64 `json:"system_cpu_usage"`
+				} `json:"precpu_stats"`
+				MemoryStats struct {
+					Usage uint64            `json:"usage"`
+					Limit uint64            `json:"limit"`
+					Stats map[string]uint64 `json:"stats"`
+				} `json:"memory_stats"`
+				PidsStats struct {
+					Current uint64 `json:"current"`
+				} `json:"pids_stats"`
+				BlkioStats struct {
+					IoServiceBytesRecursive []struct {
+						Op    string `json:"op"`
+						Value uint64 `json:"value"`
+					} `json:"io_service_bytes_recursive"`
+				} `json:"blkio_stats"`
+				Networks map[string]struct {
+					RxBytes   uint64 `json:"rx_bytes"`
+					TxBytes   uint64 `json:"tx_bytes"`
+					RxPackets uint64 `json:"rx_packets"`
+					TxPackets uint64 `json:"tx_packets"`
+				} `json:"networks"`
 			}
-		}
 
-		id := shortID(containerID)
+			if err := json.NewDecoder(result.Body).Decode(&stats); err != nil {
+				return nil, err
+			}
 
-		return &DockerContainerStatsOutput{
-			Containers: []DockerContainerStatEntry{{
-				ID:            id,
-				CPUPercent:    cpuPercent,
-				MemoryUsage:   stats.MemoryStats.Usage,
-				MemoryLimit:   stats.MemoryStats.Limit,
-				MemoryPercent: memPercent,
-				PIDs:          stats.PidsStats.Current,
-				Network:       networkMap,
-				BlockRead:     blkRead,
-				BlockWrite:    blkWrite,
-			}},
-		}, nil
-	})
+			cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
+			sysDelta := stats.CPUStats.SystemUsage - stats.PreCPUStats.SystemUsage
+			cpuPercent := 0.0
+			if sysDelta > 0 && stats.CPUStats.OnlineCPUs > 0 {
+				cpuPercent = (float64(cpuDelta) / float64(sysDelta)) * float64(
+					stats.CPUStats.OnlineCPUs,
+				) * 100.0
+			}
+
+			memPercent := 0.0
+			if stats.MemoryStats.Limit > 0 {
+				memPercent = (float64(stats.MemoryStats.Usage) / float64(stats.MemoryStats.Limit)) * 100.0
+			}
+
+			networkMap := map[string]map[string]uint64{}
+			for name, net := range stats.Networks {
+				networkMap[name] = map[string]uint64{
+					"rx_bytes":   net.RxBytes,
+					"tx_bytes":   net.TxBytes,
+					"rx_packets": net.RxPackets,
+					"tx_packets": net.TxPackets,
+				}
+			}
+
+			var blkRead, blkWrite uint64
+			for _, op := range stats.BlkioStats.IoServiceBytesRecursive {
+				switch op.Op {
+				case "read":
+					blkRead += op.Value
+				case "write":
+					blkWrite += op.Value
+				}
+			}
+
+			id := shortID(containerID)
+
+			return &DockerContainerStatsOutput{
+				Containers: []DockerContainerStatEntry{{
+					ID:            id,
+					CPUPercent:    cpuPercent,
+					MemoryUsage:   stats.MemoryStats.Usage,
+					MemoryLimit:   stats.MemoryStats.Limit,
+					MemoryPercent: memPercent,
+					PIDs:          stats.PidsStats.Current,
+					Network:       networkMap,
+					BlockRead:     blkRead,
+					BlockWrite:    blkWrite,
+				}},
+			}, nil
+		},
+	)
 }
 
 func HandleGetContainerStats(
@@ -558,87 +577,90 @@ func GatherDockerStatsAll(
 	ctx context.Context,
 	containers []string,
 ) (*DockerStatsAllOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerStatsAllOutput, error) {
-		running, err := cli.ContainerList(
-			ctx,
-			mobyclient.ContainerListOptions{All: false},
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		filterSet := map[string]bool{}
-		for _, f := range containers {
-			filterSet[f] = true
-		}
-
-		type target struct{ id, name string }
-		var targets []target
-		for _, c := range running.Items {
-			name := ""
-			if len(c.Names) > 0 {
-				name = strings.TrimPrefix(c.Names[0], "/")
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerStatsAllOutput, error) {
+			running, err := cli.ContainerList(
+				ctx,
+				mobyclient.ContainerListOptions{All: false},
+			)
+			if err != nil {
+				return nil, err
 			}
-			sid := shortID(c.ID)
-			if len(filterSet) > 0 && !filterSet[c.ID] && !filterSet[sid] &&
-				!filterSet[name] {
-				continue
-			}
-			targets = append(targets, target{id: c.ID, name: name})
-		}
 
-		type statResult struct {
-			id    string
-			name  string
-			entry DockerContainerStatEntry
-			err   error
-		}
-		ch := make(chan statResult, len(targets))
-		for _, t := range targets {
-			go func(containerID, containerName string) {
-				out, err := GatherContainerStats(ctx, containerID)
-				if err != nil {
-					ch <- statResult{id: containerID, name: containerName, err: err}
-				} else if len(out.Containers) > 0 {
-					ch <- statResult{
-						id: containerID, name: containerName, entry: out.Containers[0],
-					}
+			filterSet := map[string]bool{}
+			for _, f := range containers {
+				filterSet[f] = true
+			}
+
+			type target struct{ id, name string }
+			var targets []target
+			for _, c := range running.Items {
+				name := ""
+				if len(c.Names) > 0 {
+					name = strings.TrimPrefix(c.Names[0], "/")
 				}
-			}(t.id, t.name)
-		}
-
-		entries := make([]DockerContainerStatEntry, 0, len(targets))
-		var errs []string
-		for range targets {
-			r := <-ch
-			sid := shortID(r.id)
-			entry := DockerContainerStatEntry{
-				ID:   sid,
-				Name: r.name,
+				sid := shortID(c.ID)
+				if len(filterSet) > 0 && !filterSet[c.ID] && !filterSet[sid] &&
+					!filterSet[name] {
+					continue
+				}
+				targets = append(targets, target{id: c.ID, name: name})
 			}
-			if r.err != nil {
-				entry.Error = r.err.Error()
-				errs = append(
-					errs,
-					fmt.Sprintf("%s (%s): %v", r.name, sid, r.err),
-				)
-			} else {
-				entry.CPUPercent = r.entry.CPUPercent
-				entry.MemoryUsage = r.entry.MemoryUsage
-				entry.MemoryLimit = r.entry.MemoryLimit
-				entry.MemoryPercent = r.entry.MemoryPercent
-				entry.PIDs = r.entry.PIDs
-				entry.Network = r.entry.Network
-				entry.BlockRead = r.entry.BlockRead
-				entry.BlockWrite = r.entry.BlockWrite
-			}
-			entries = append(entries, entry)
-		}
 
-		out := &DockerStatsAllOutput{Containers: entries}
-		out.Errors = errs
-		return out, nil
-	})
+			type statResult struct {
+				id    string
+				name  string
+				entry DockerContainerStatEntry
+				err   error
+			}
+			ch := make(chan statResult, len(targets))
+			for _, t := range targets {
+				go func(containerID, containerName string) {
+					out, err := GatherContainerStats(ctx, containerID)
+					if err != nil {
+						ch <- statResult{id: containerID, name: containerName, err: err}
+					} else if len(out.Containers) > 0 {
+						ch <- statResult{
+							id: containerID, name: containerName, entry: out.Containers[0],
+						}
+					}
+				}(t.id, t.name)
+			}
+
+			entries := make([]DockerContainerStatEntry, 0, len(targets))
+			var errs []string
+			for range targets {
+				r := <-ch
+				sid := shortID(r.id)
+				entry := DockerContainerStatEntry{
+					ID:   sid,
+					Name: r.name,
+				}
+				if r.err != nil {
+					entry.Error = r.err.Error()
+					errs = append(
+						errs,
+						fmt.Sprintf("%s (%s): %v", r.name, sid, r.err),
+					)
+				} else {
+					entry.CPUPercent = r.entry.CPUPercent
+					entry.MemoryUsage = r.entry.MemoryUsage
+					entry.MemoryLimit = r.entry.MemoryLimit
+					entry.MemoryPercent = r.entry.MemoryPercent
+					entry.PIDs = r.entry.PIDs
+					entry.Network = r.entry.Network
+					entry.BlockRead = r.entry.BlockRead
+					entry.BlockWrite = r.entry.BlockWrite
+				}
+				entries = append(entries, entry)
+			}
+
+			out := &DockerStatsAllOutput{Containers: entries}
+			out.Errors = errs
+			return out, nil
+		},
+	)
 }
 
 func HandleGetDockerStatsAll(
@@ -674,27 +696,30 @@ func GatherContainerTop(
 	containerID string,
 	args []string,
 ) (*DockerContainerTopOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerContainerTopOutput, error) {
-		result, err := cli.ContainerTop(
-			ctx,
-			containerID,
-			mobyclient.ContainerTopOptions{
-				Arguments: args,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerContainerTopOutput, error) {
+			result, err := cli.ContainerTop(
+				ctx,
+				containerID,
+				mobyclient.ContainerTopOptions{
+					Arguments: args,
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
 
-		titles := result.Titles
-		titles = nilToEmpty(titles)
-		procs := result.Processes
-		procs = nilToEmpty(procs)
-		return &DockerContainerTopOutput{
-			Titles:    titles,
-			Processes: procs,
-		}, nil
-	})
+			titles := result.Titles
+			titles = nilToEmpty(titles)
+			procs := result.Processes
+			procs = nilToEmpty(procs)
+			return &DockerContainerTopOutput{
+				Titles:    titles,
+				Processes: procs,
+			}, nil
+		},
+	)
 }
 
 func HandleGetContainerTop(
@@ -748,25 +773,28 @@ func GatherContainerDiff(
 	ctx context.Context,
 	containerID string,
 ) (*DockerContainerDiffOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerContainerDiffOutput, error) {
-		result, err := cli.ContainerDiff(
-			ctx,
-			containerID,
-			mobyclient.ContainerDiffOptions{},
-		)
-		if err != nil {
-			return nil, err
-		}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerContainerDiffOutput, error) {
+			result, err := cli.ContainerDiff(
+				ctx,
+				containerID,
+				mobyclient.ContainerDiffOptions{},
+			)
+			if err != nil {
+				return nil, err
+			}
 
-		changes := make([]DockerFileChange, 0, len(result.Changes))
-		for _, ch := range result.Changes {
-			changes = append(changes, DockerFileChange{
-				Kind: tristateKind(uint8(ch.Kind)),
-				Path: ch.Path,
-			})
-		}
-		return &DockerContainerDiffOutput{Changes: changes}, nil
-	})
+			changes := make([]DockerFileChange, 0, len(result.Changes))
+			for _, ch := range result.Changes {
+				changes = append(changes, DockerFileChange{
+					Kind: tristateKind(uint8(ch.Kind)),
+					Path: ch.Path,
+				})
+			}
+			return &DockerContainerDiffOutput{Changes: changes}, nil
+		},
+	)
 }
 
 func HandleGetContainerDiff(
@@ -811,26 +839,29 @@ func GatherImageHistory(
 	ctx context.Context,
 	imageID string,
 ) (*DockerImageHistoryOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerImageHistoryOutput, error) {
-		result, err := cli.ImageHistory(ctx, imageID)
-		if err != nil {
-			return nil, err
-		}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerImageHistoryOutput, error) {
+			result, err := cli.ImageHistory(ctx, imageID)
+			if err != nil {
+				return nil, err
+			}
 
-		layers := make([]DockerImageLayer, 0, len(result.Items))
-		for _, item := range result.Items {
-			id := shortID(item.ID)
-			layers = append(layers, DockerImageLayer{
-				ID:        id,
-				Created:   item.Created,
-				CreatedBy: item.CreatedBy,
-				Size:      HumanSize(item.Size),
-				Tags:      item.Tags,
-				Comment:   item.Comment,
-			})
-		}
-		return &DockerImageHistoryOutput{Layers: layers}, nil
-	})
+			layers := make([]DockerImageLayer, 0, len(result.Items))
+			for _, item := range result.Items {
+				id := shortID(item.ID)
+				layers = append(layers, DockerImageLayer{
+					ID:        id,
+					Created:   item.Created,
+					CreatedBy: item.CreatedBy,
+					Size:      HumanSize(item.Size),
+					Tags:      item.Tags,
+					Comment:   item.Comment,
+				})
+			}
+			return &DockerImageHistoryOutput{Layers: layers}, nil
+		},
+	)
 }
 
 func HandleGetImageHistory(
@@ -883,49 +914,52 @@ func GatherImageDetail(
 	ctx context.Context,
 	imageID string,
 ) (*DockerImageDetailOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerImageDetailOutput, error) {
-		result, err := cli.ImageInspect(ctx, imageID)
-		if err != nil {
-			return nil, err
-		}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerImageDetailOutput, error) {
+			result, err := cli.ImageInspect(ctx, imageID)
+			if err != nil {
+				return nil, err
+			}
 
-		id := shortID(result.ID)
+			id := shortID(result.ID)
 
-		var entrypoint, cmd, env []string
-		var workingDir string
-		var labels map[string]string
-		if result.Config != nil {
-			entrypoint = result.Config.Entrypoint
-			cmd = result.Config.Cmd
-			env = result.Config.Env
-			workingDir = result.Config.WorkingDir
-			labels = result.Config.Labels
-		}
+			var entrypoint, cmd, env []string
+			var workingDir string
+			var labels map[string]string
+			if result.Config != nil {
+				entrypoint = result.Config.Entrypoint
+				cmd = result.Config.Cmd
+				env = result.Config.Env
+				workingDir = result.Config.WorkingDir
+				labels = result.Config.Labels
+			}
 
-		repoTags := result.RepoTags
-		repoTags = nilToEmpty(repoTags)
-		repoDigests := result.RepoDigests
-		repoDigests = nilToEmpty(repoDigests)
+			repoTags := result.RepoTags
+			repoTags = nilToEmpty(repoTags)
+			repoDigests := result.RepoDigests
+			repoDigests = nilToEmpty(repoDigests)
 
-		return &DockerImageDetailOutput{
-			Image: DockerImageDetail{
-				ID:           id,
-				RepoTags:     repoTags,
-				RepoDigests:  repoDigests,
-				Created:      result.Created,
-				Author:       result.Author,
-				Architecture: result.Architecture,
-				OS:           result.Os,
-				Size:         HumanSize(result.Size),
-				Entrypoint:   entrypoint,
-				Cmd:          cmd,
-				Env:          env,
-				WorkingDir:   workingDir,
-				Labels:       labels,
-				Layers:       result.RootFS.Layers,
-			},
-		}, nil
-	})
+			return &DockerImageDetailOutput{
+				Image: DockerImageDetail{
+					ID:           id,
+					RepoTags:     repoTags,
+					RepoDigests:  repoDigests,
+					Created:      result.Created,
+					Author:       result.Author,
+					Architecture: result.Architecture,
+					OS:           result.Os,
+					Size:         HumanSize(result.Size),
+					Entrypoint:   entrypoint,
+					Cmd:          cmd,
+					Env:          env,
+					WorkingDir:   workingDir,
+					Labels:       labels,
+					Layers:       result.RootFS.Layers,
+				},
+			}, nil
+		},
+	)
 }
 
 func HandleGetImageDetail(
@@ -966,29 +1000,32 @@ type DockerNetworksOutput struct {
 }
 
 func GatherDockerNetworks(ctx context.Context) (*DockerNetworksOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerNetworksOutput, error) {
-		result, err := cli.NetworkList(ctx, mobyclient.NetworkListOptions{})
-		if err != nil {
-			return nil, err
-		}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerNetworksOutput, error) {
+			result, err := cli.NetworkList(ctx, mobyclient.NetworkListOptions{})
+			if err != nil {
+				return nil, err
+			}
 
-		networks := make([]DockerNetworkSummary, 0, len(result.Items))
-		for _, n := range result.Items {
-			id := shortID(n.ID)
-			networks = append(networks, DockerNetworkSummary{
-				ID:         id,
-				Name:       n.Name,
-				Driver:     n.Driver,
-				Scope:      n.Scope,
-				Attachable: n.Attachable,
-				Internal:   n.Internal,
-				Ingress:    n.Ingress,
-				IPv6:       n.EnableIPv6,
-				Labels:     n.Labels,
-			})
-		}
-		return &DockerNetworksOutput{Networks: networks}, nil
-	})
+			networks := make([]DockerNetworkSummary, 0, len(result.Items))
+			for _, n := range result.Items {
+				id := shortID(n.ID)
+				networks = append(networks, DockerNetworkSummary{
+					ID:         id,
+					Name:       n.Name,
+					Driver:     n.Driver,
+					Scope:      n.Scope,
+					Attachable: n.Attachable,
+					Internal:   n.Internal,
+					Ingress:    n.Ingress,
+					IPv6:       n.EnableIPv6,
+					Labels:     n.Labels,
+				})
+			}
+			return &DockerNetworksOutput{Networks: networks}, nil
+		},
+	)
 }
 
 func HandleGetDockerNetworks(
@@ -1022,30 +1059,33 @@ type DockerVolumesOutput struct {
 }
 
 func GatherDockerVolumes(ctx context.Context) (*DockerVolumesOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerVolumesOutput, error) {
-		result, err := cli.VolumeList(ctx, mobyclient.VolumeListOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		volumes := make([]DockerVolumeSummary, 0, len(result.Items))
-		for _, v := range result.Items {
-			size := ""
-			if v.UsageData != nil {
-				size = HumanSize(v.UsageData.Size)
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerVolumesOutput, error) {
+			result, err := cli.VolumeList(ctx, mobyclient.VolumeListOptions{})
+			if err != nil {
+				return nil, err
 			}
-			volumes = append(volumes, DockerVolumeSummary{
-				Name:       v.Name,
-				Driver:     v.Driver,
-				Mountpoint: v.Mountpoint,
-				Scope:      v.Scope,
-				CreatedAt:  v.CreatedAt,
-				Size:       size,
-				Labels:     v.Labels,
-			})
-		}
-		return &DockerVolumesOutput{Volumes: volumes}, nil
-	})
+
+			volumes := make([]DockerVolumeSummary, 0, len(result.Items))
+			for _, v := range result.Items {
+				size := ""
+				if v.UsageData != nil {
+					size = HumanSize(v.UsageData.Size)
+				}
+				volumes = append(volumes, DockerVolumeSummary{
+					Name:       v.Name,
+					Driver:     v.Driver,
+					Mountpoint: v.Mountpoint,
+					Scope:      v.Scope,
+					CreatedAt:  v.CreatedAt,
+					Size:       size,
+					Labels:     v.Labels,
+				})
+			}
+			return &DockerVolumesOutput{Volumes: volumes}, nil
+		},
+	)
 }
 
 func HandleGetDockerVolumes(
@@ -1096,53 +1136,56 @@ type DockerSystemInfoOutput struct {
 func GatherDockerSystemInfo(
 	ctx context.Context,
 ) (*DockerSystemInfoOutput, error) {
-	return withDockerClient(ctx, func(cli dockersdk.SDKClient) (*DockerSystemInfoOutput, error) {
-		result, err := cli.Info(ctx, mobyclient.InfoOptions{})
-	if err != nil {
-		return nil, err
-	}
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerSystemInfoOutput, error) {
+			result, err := cli.Info(ctx, mobyclient.InfoOptions{})
+			if err != nil {
+				return nil, err
+			}
 
-	sysInfo := result.Info
-	id := shortID(sysInfo.ID)
+			sysInfo := result.Info
+			id := shortID(sysInfo.ID)
 
-	runtimes := make([]string, 0, len(sysInfo.Runtimes))
-	for name := range sysInfo.Runtimes {
-		runtimes = append(runtimes, name)
-	}
+			runtimes := make([]string, 0, len(sysInfo.Runtimes))
+			for name := range sysInfo.Runtimes {
+				runtimes = append(runtimes, name)
+			}
 
-	swarm := map[string]any{}
-	swarm["node_id"] = sysInfo.Swarm.NodeID
-	swarm["control_available"] = sysInfo.Swarm.ControlAvailable
-	swarm["local_node_state"] = sysInfo.Swarm.LocalNodeState
+			swarm := map[string]any{}
+			swarm["node_id"] = sysInfo.Swarm.NodeID
+			swarm["control_available"] = sysInfo.Swarm.ControlAvailable
+			swarm["local_node_state"] = sysInfo.Swarm.LocalNodeState
 
-	return &DockerSystemInfoOutput{
-		Info: DockerSystemInfoSummary{
-			ID:                id,
-			ServerVersion:     sysInfo.ServerVersion,
-			Architecture:      sysInfo.Architecture,
-			OSType:            sysInfo.OSType,
-			OperatingSystem:   sysInfo.OperatingSystem,
-			KernelVersion:     sysInfo.KernelVersion,
-			NCPU:              sysInfo.NCPU,
-			MemTotal:          HumanSize(int64(sysInfo.MemTotal)),
-			Driver:            sysInfo.Driver,
-			LoggingDriver:     sysInfo.LoggingDriver,
-			CgroupDriver:      sysInfo.CgroupDriver,
-			CgroupVersion:     sysInfo.CgroupVersion,
-			DefaultRuntime:    sysInfo.DefaultRuntime,
-			Runtimes:          runtimes,
-			ContainersTotal:   sysInfo.Containers,
-			ContainersRunning: sysInfo.ContainersRunning,
-			ContainersPaused:  sysInfo.ContainersPaused,
-			ContainersStopped: sysInfo.ContainersStopped,
-			ImagesTotal:       sysInfo.Images,
-			DockerRootDir:     sysInfo.DockerRootDir,
-			SecurityOptions:   sysInfo.SecurityOptions,
-			Swarm:             swarm,
+			return &DockerSystemInfoOutput{
+				Info: DockerSystemInfoSummary{
+					ID:                id,
+					ServerVersion:     sysInfo.ServerVersion,
+					Architecture:      sysInfo.Architecture,
+					OSType:            sysInfo.OSType,
+					OperatingSystem:   sysInfo.OperatingSystem,
+					KernelVersion:     sysInfo.KernelVersion,
+					NCPU:              sysInfo.NCPU,
+					MemTotal:          HumanSize(int64(sysInfo.MemTotal)),
+					Driver:            sysInfo.Driver,
+					LoggingDriver:     sysInfo.LoggingDriver,
+					CgroupDriver:      sysInfo.CgroupDriver,
+					CgroupVersion:     sysInfo.CgroupVersion,
+					DefaultRuntime:    sysInfo.DefaultRuntime,
+					Runtimes:          runtimes,
+					ContainersTotal:   sysInfo.Containers,
+					ContainersRunning: sysInfo.ContainersRunning,
+					ContainersPaused:  sysInfo.ContainersPaused,
+					ContainersStopped: sysInfo.ContainersStopped,
+					ImagesTotal:       sysInfo.Images,
+					DockerRootDir:     sysInfo.DockerRootDir,
+					SecurityOptions:   sysInfo.SecurityOptions,
+					Swarm:             swarm,
+				},
+			}, nil
 		},
-	}, nil
+	)
 }
-
 func HandleGetDockerSystemInfo(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
@@ -1176,48 +1219,47 @@ type DockerDiskUsageOutput struct {
 func GatherDockerDiskUsage(
 	ctx context.Context,
 ) (*DockerDiskUsageOutput, error) {
-	cli, err := newDockerClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cli.Close() }()
+	return withDockerClient(
+		ctx,
+		func(cli dockersdk.SDKClient) (*DockerDiskUsageOutput, error) {
+			result, err := cli.DiskUsage(ctx, mobyclient.DiskUsageOptions{
+				Containers: true,
+				Images:     true,
+				BuildCache: true,
+				Volumes:    true,
+			})
+			if err != nil {
+				return nil, err
+			}
 
-	result, err := cli.DiskUsage(ctx, mobyclient.DiskUsageOptions{
-		Containers: true,
-		Images:     true,
-		BuildCache: true,
-		Volumes:    true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &DockerDiskUsageOutput{
-		Containers: DockerDiskUsageCategory{
-			ActiveCount: result.Containers.ActiveCount,
-			TotalCount:  result.Containers.TotalCount,
-			Reclaimable: HumanSize(result.Containers.Reclaimable),
-			TotalSize:   HumanSize(result.Containers.TotalSize),
+			return &DockerDiskUsageOutput{
+				Containers: DockerDiskUsageCategory{
+					ActiveCount: result.Containers.ActiveCount,
+					TotalCount:  result.Containers.TotalCount,
+					Reclaimable: HumanSize(result.Containers.Reclaimable),
+					TotalSize:   HumanSize(result.Containers.TotalSize),
+				},
+				Images: DockerDiskUsageCategory{
+					ActiveCount: result.Images.ActiveCount,
+					TotalCount:  result.Images.TotalCount,
+					Reclaimable: HumanSize(result.Images.Reclaimable),
+					TotalSize:   HumanSize(result.Images.TotalSize),
+				},
+				Volumes: DockerDiskUsageCategory{
+					ActiveCount: result.Volumes.ActiveCount,
+					TotalCount:  result.Volumes.TotalCount,
+					Reclaimable: HumanSize(result.Volumes.Reclaimable),
+					TotalSize:   HumanSize(result.Volumes.TotalSize),
+				},
+				BuildCache: DockerDiskUsageCategory{
+					ActiveCount: result.BuildCache.ActiveCount,
+					TotalCount:  result.BuildCache.TotalCount,
+					Reclaimable: HumanSize(result.BuildCache.Reclaimable),
+					TotalSize:   HumanSize(result.BuildCache.TotalSize),
+				},
+			}, nil
 		},
-		Images: DockerDiskUsageCategory{
-			ActiveCount: result.Images.ActiveCount,
-			TotalCount:  result.Images.TotalCount,
-			Reclaimable: HumanSize(result.Images.Reclaimable),
-			TotalSize:   HumanSize(result.Images.TotalSize),
-		},
-		Volumes: DockerDiskUsageCategory{
-			ActiveCount: result.Volumes.ActiveCount,
-			TotalCount:  result.Volumes.TotalCount,
-			Reclaimable: HumanSize(result.Volumes.Reclaimable),
-			TotalSize:   HumanSize(result.Volumes.TotalSize),
-		},
-		BuildCache: DockerDiskUsageCategory{
-			ActiveCount: result.BuildCache.ActiveCount,
-			TotalCount:  result.BuildCache.TotalCount,
-			Reclaimable: HumanSize(result.BuildCache.Reclaimable),
-			TotalSize:   HumanSize(result.BuildCache.TotalSize),
-		},
-	}, nil
+	)
 }
 
 func HandleGetDockerDiskUsage(

@@ -358,9 +358,9 @@ func TestGatherMountOptions(t *testing.T) {
 
 func TestGatherProcessInfo(t *testing.T) {
 	t.Run("Defaults", func(t *testing.T) {
-		out, err := GatherProcessInfo(t.Context(), "", 0)
+		out, err := GatherProcessInfo(t.Context(), "", 10)
 		skipOnErr(t, err,
-			"GatherProcessInfo(\"\", 0) error: %v", err)
+			"GatherProcessInfo(\"\", 10) error: %v", err)
 		if len(out.Processes) == 0 {
 			t.Fatal("Processes should not be empty")
 		}
@@ -399,12 +399,14 @@ func TestGatherProcessInfo(t *testing.T) {
 	})
 
 	t.Run("LimitClamping", func(t *testing.T) {
-		out, err := GatherProcessInfo(t.Context(), "cpu", 200)
+		// Clamping is now handled in HandleGetProcessInfo;
+		// GatherProcessInfo uses the limit as-is.
+		out, err := GatherProcessInfo(t.Context(), "cpu", 100)
 		skipOnErr(t, err,
-			"GatherProcessInfo(\"cpu\", 200) error: %v", err)
+			"GatherProcessInfo(\"cpu\", 100) error: %v", err)
 		if len(out.Processes) > 100 {
 			t.Errorf(
-				"Expected limit clamped to 100, got %d",
+				"Expected at most 100 processes, got %d",
 				len(out.Processes),
 			)
 		}
@@ -779,9 +781,12 @@ func TestGatherProcessFDs(t *testing.T) {
 	})
 
 	t.Run("InvalidPID", func(t *testing.T) {
-		_, err := GatherProcessFDs(t.Context(), -1)
-		if err == nil {
-			t.Error("Expected error for negative PID")
+		out, err := GatherProcessFDs(t.Context(), -1)
+		if err != nil {
+			t.Fatalf("GatherProcessFDs() error: %v", err)
+		}
+		if len(out.Errors) == 0 {
+			t.Error("Expected error in output.Errors for negative PID")
 		}
 	})
 }
@@ -789,10 +794,10 @@ func TestGatherProcessFDs(t *testing.T) {
 func TestGatherTopIOProcesses(t *testing.T) {
 	out, err := GatherTopIOProcesses(t.Context(), 5)
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			t.Skip("pidstat not installed")
-		}
 		t.Fatalf("GatherTopIOProcesses() error: %v", err)
+	}
+	if len(out.Errors) > 0 {
+		t.Skipf("pidstat not available: %s", out.Errors[0])
 	}
 	t.Logf("Found %d IO processes", len(out.Processes))
 }

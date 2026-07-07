@@ -61,12 +61,6 @@ func GatherPing(
 	host string,
 	count, timeout int,
 ) (*PingOutput, error) {
-	if count <= 0 {
-		count = 4
-	}
-	if timeout <= 0 {
-		timeout = 10
-	}
 	output, err := execOutput(ctx, "ping",
 		"-c", fmt.Sprintf("%d", count),
 		"-w", fmt.Sprintf("%d", timeout),
@@ -105,7 +99,8 @@ func GatherPing(
 		}
 	}
 	if err != nil && output == "" {
-		return nil, err
+		result.Add("ping", err)
+		return result, nil
 	}
 	return result, nil
 }
@@ -118,12 +113,20 @@ func HandlePingHost(
 	if !validHost(input.Host) {
 		return nil, nil, errInvalidHost
 	}
+	count := input.Count
+	if count <= 0 {
+		count = 4
+	}
+	timeout := input.Timeout
+	if timeout <= 0 {
+		timeout = 10
+	}
 	return handleToolCall(
 		ctx,
 		config.ToolNamePingHost,
 		0,
 		func(ctx context.Context) (*PingOutput, error) {
-			return GatherPing(ctx, input.Host, input.Count, input.Timeout)
+			return GatherPing(ctx, input.Host, count, timeout)
 		},
 	)
 }

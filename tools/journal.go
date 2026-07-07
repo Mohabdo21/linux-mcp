@@ -32,9 +32,6 @@ func GatherJournalLogs(
 	ctx context.Context, unit, priority, since, until string,
 	lines int, user bool,
 ) (*JournalLogsOutput, error) {
-	if lines <= 0 {
-		lines = 50
-	}
 	args := []string{
 		"--no-pager",
 		"-n",
@@ -80,6 +77,10 @@ func HandleGetJournalLogs(
 	_ *mcp.CallToolRequest,
 	input GetJournalLogsInput,
 ) (*mcp.CallToolResult, *JournalLogsOutput, error) {
+	lines := input.Lines
+	if lines <= 0 {
+		lines = 50
+	}
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetJournalLogs,
@@ -87,7 +88,7 @@ func HandleGetJournalLogs(
 		func(ctx context.Context) (*JournalLogsOutput, error) {
 			return GatherJournalLogs(ctx, input.Unit, input.Priority,
 				input.Since, input.Until,
-				input.Lines, input.User)
+				lines, input.User)
 		},
 	)
 }

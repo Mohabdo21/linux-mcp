@@ -90,9 +90,6 @@ func GatherFailedLoginsJournalctl(
 func GatherFailedLogins(
 	ctx context.Context, lines int,
 ) (*FailedLoginsOutput, error) {
-	if lines <= 0 {
-		lines = 20
-	}
 	out, lastbErr := execOutput(ctx, "lastb", "-n", fmt.Sprintf("%d", lines))
 	if lastbErr == nil {
 		return &FailedLoginsOutput{
@@ -169,12 +166,16 @@ func HandleGetFailedLogins(
 	_ *mcp.CallToolRequest,
 	input GetFailedLoginsInput,
 ) (*mcp.CallToolResult, *FailedLoginsOutput, error) {
+	lines := input.Lines
+	if lines <= 0 {
+		lines = 20
+	}
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetFailedLogins,
 		0,
 		func(ctx context.Context) (*FailedLoginsOutput, error) {
-			return GatherFailedLogins(ctx, input.Lines)
+			return GatherFailedLogins(ctx, lines)
 		},
 	)
 }

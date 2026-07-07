@@ -342,12 +342,7 @@ func HandleGetNetworkConnections(
 	_ *mcp.CallToolRequest,
 	input GetNetworkConnectionsInput,
 ) (*mcp.CallToolResult, *NetworkConnectionsOutput, error) {
-	maxConn := input.MaxConnections
-	if maxConn < 0 {
-		maxConn = 0
-	} else if maxConn > maxNetworkConnections {
-		maxConn = maxNetworkConnections
-	}
+	maxConn := clampVal(input.MaxConnections, 0, maxNetworkConnections)
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetNetworkConnections,

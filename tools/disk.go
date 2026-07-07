@@ -172,11 +172,6 @@ func GatherLargestFiles(
 	if path == "" {
 		path = "."
 	}
-	if limit <= 0 {
-		limit = 10
-	} else if limit > 100 {
-		limit = 100
-	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(
 		"du -sb %s/* %s/.[!.]* 2>/dev/null | sort -rn",
 		ShellQuote(path), ShellQuote(path),
@@ -226,12 +221,13 @@ func HandleGetLargestFiles(
 	_ *mcp.CallToolRequest,
 	input GetLargestFilesInput,
 ) (*mcp.CallToolResult, *LargestFilesOutput, error) {
+	limit := clampZero(input.Limit, 10, 100)
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetLargestFiles,
 		0,
 		func(ctx context.Context) (*LargestFilesOutput, error) {
-			return GatherLargestFiles(ctx, input.Path, input.Limit)
+			return GatherLargestFiles(ctx, input.Path, limit)
 		},
 	)
 }

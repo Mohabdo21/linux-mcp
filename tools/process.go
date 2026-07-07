@@ -37,11 +37,6 @@ func GatherProcessInfo(
 	sortBy string,
 	limit int,
 ) (*ProcessInfoOutput, error) {
-	if limit <= 0 {
-		limit = 10
-	} else if limit > 100 {
-		limit = 100
-	}
 	if sortBy == "" {
 		sortBy = "cpu"
 	}
@@ -86,12 +81,13 @@ func HandleGetProcessInfo(
 	_ *mcp.CallToolRequest,
 	input GetProcessInfoInput,
 ) (*mcp.CallToolResult, *ProcessInfoOutput, error) {
+	limit := clampZero(input.Limit, 10, 100)
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetProcessInfo,
 		0,
 		func(ctx context.Context) (*ProcessInfoOutput, error) {
-			return GatherProcessInfo(ctx, input.SortBy, input.Limit)
+			return GatherProcessInfo(ctx, input.SortBy, limit)
 		},
 	)
 }
@@ -117,14 +113,11 @@ func GatherTopIOProcesses(
 	ctx context.Context,
 	limit int,
 ) (*TopIOProcessesOutput, error) {
-	if limit <= 0 {
-		limit = 10
-	} else if limit > 50 {
-		limit = 50
-	}
 	lines, err := execLines(ctx, "pidstat", "-d", "1", "1")
 	if err != nil {
-		return nil, err
+		out := &TopIOProcessesOutput{Processes: []IOProcessStat{}}
+		out.Add("pidstat", err)
+		return out, nil
 	}
 	procs := make([]IOProcessStat, 0)
 	for _, line := range lines {
@@ -189,7 +182,9 @@ func GatherProcessFDs(
 ) (*ProcessFDsOutput, error) {
 	p, err := process.NewProcess(pid)
 	if err != nil {
-		return nil, fmt.Errorf("process %d: %w", pid, err)
+		out := &ProcessFDsOutput{PID: int(pid)}
+		out.Add("process", err)
+		return out, nil
 	}
 
 	name, _ := p.Name()
