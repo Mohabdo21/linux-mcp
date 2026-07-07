@@ -41,7 +41,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetDiskInfo,
-		"Returns disk usage for mounted partitions, optionally filtered by mount point",
+		"Returns disk usage for mounted partitions, optionally filtered by mount point and usage threshold",
 		HandleGetDiskInfo,
 	)
 	registerTool(
@@ -53,7 +53,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetProcessInfo,
-		"Returns list of running processes, optionally sorted by CPU or memory usage with configurable limit",
+		"Returns list of running processes, optionally sorted by CPU, memory, or both with configurable limit",
 		HandleGetProcessInfo,
 	)
 	registerTool(
@@ -149,7 +149,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetJournalLogs,
-		"Reads systemd journal logs with optional filtering by unit, priority, and time range. Set user=true to query user-level journal.",
+		"Reads systemd journal logs with optional filtering by unit, priority, and time range. Set user=true to query user-level journal. Returns structured entries with timestamp, message, priority, unit, and PID.",
 		HandleGetJournalLogs,
 	)
 	registerTool(
@@ -191,7 +191,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetFailedLogins,
-		"Returns recent failed login attempts to detect brute-force attacks",
+		"Returns recent failed login attempts (excluding Boot records) with summary statistics",
 		HandleGetFailedLogins,
 	)
 	registerTool(
@@ -251,7 +251,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetSystemdUnits,
-		"Returns all systemd units and their states for full service inventory",
+		"Returns all systemd units and their states for full service inventory. Supports optional state filter: 'failed', 'active', 'inactive'.",
 		HandleGetSystemdUnits,
 	)
 	registerTool(

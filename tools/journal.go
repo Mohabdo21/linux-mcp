@@ -2,8 +2,11 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,6 +24,20 @@ type GetJournalLogsInput struct {
 type JournalLogEntry struct {
 	Timestamp string `json:"timestamp"`
 	Message   string `json:"message"`
+	Priority  string `json:"priority,omitempty"`
+	Unit      string `json:"unit,omitempty"`
+	PID       int    `json:"pid,omitempty"`
+}
+
+var journalPriorityNames = map[int64]string{
+	0: "emerg",
+	1: "alert",
+	2: "crit",
+	3: "err",
+	4: "warning",
+	5: "notice",
+	6: "info",
+	7: "debug",
 }
 
 type JournalLogsOutput struct {
@@ -37,7 +54,7 @@ func GatherJournalLogs(
 		"-n",
 		fmt.Sprintf("%d", lines),
 		"-o",
-		"short-iso",
+		"json",
 	}
 	if user {
 		args = append(args, "--user")
@@ -54,20 +71,58 @@ func GatherJournalLogs(
 	if until != "" {
 		args = append(args, "--until", until)
 	}
-	logLines, err := execLines(ctx, "journalctl", args...)
+	out, err := execOutput(ctx, "journalctl", args...)
 	if err != nil {
 		return nil, err
 	}
 	entries := make([]JournalLogEntry, 0)
-	for _, line := range logLines {
-		parts := strings.SplitN(line, " ", 3)
-		if len(parts) < 3 {
+	for line := range strings.SplitSeq(out, "\n") {
+		if line == "" {
 			continue
 		}
-		entries = append(entries, JournalLogEntry{
-			Timestamp: parts[0],
-			Message:   parts[2],
-		})
+		var raw map[string]any
+		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+			continue
+		}
+		entry := JournalLogEntry{}
+
+		if msg, ok := raw["MESSAGE"]; ok {
+			entry.Message, _ = msg.(string)
+		}
+
+		if ts, ok := raw["__REALTIME_TIMESTAMP"]; ok {
+			if tsStr, ok := ts.(string); ok {
+				if micro, err := strconv.ParseInt(tsStr, 10, 64); err == nil {
+					entry.Timestamp = time.UnixMicro(micro).Format(time.RFC3339)
+				}
+			}
+		}
+
+		if prio, ok := raw["PRIORITY"]; ok {
+			if prioStr, ok := prio.(string); ok {
+				if p, err := strconv.ParseInt(prioStr, 10, 64); err == nil {
+					if name, ok := journalPriorityNames[p]; ok {
+						entry.Priority = name
+					}
+				}
+			}
+		}
+
+		if unit, ok := raw["_SYSTEMD_UNIT"]; ok {
+			entry.Unit, _ = unit.(string)
+		} else if unit, ok := raw["UNIT"]; ok {
+			entry.Unit, _ = unit.(string)
+		}
+
+		if pid, ok := raw["_PID"]; ok {
+			if pidStr, ok := pid.(string); ok {
+				if p, err := strconv.Atoi(pidStr); err == nil {
+					entry.PID = p
+				}
+			}
+		}
+
+		entries = append(entries, entry)
 	}
 	return &JournalLogsOutput{Entries: entries}, nil
 }

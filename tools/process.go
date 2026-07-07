@@ -15,7 +15,7 @@ import (
 )
 
 type GetProcessInfoInput struct {
-	SortBy string `json:"sort_by" jsonschema:"sort by 'cpu' or 'memory' (default: cpu)"`
+	SortBy string `json:"sort_by" jsonschema:"sort by 'cpu', 'memory', or 'both' (default: cpu)"`
 	Limit  int    `json:"limit"   jsonschema:"max results (default: 10, max: 100)"`
 }
 
@@ -28,7 +28,9 @@ type ProcessStat struct {
 }
 
 type ProcessInfoOutput struct {
-	Processes []ProcessStat `json:"processes"`
+	Processes []ProcessStat `json:"processes,omitempty"`
+	ByCPU     []ProcessStat `json:"by_cpu,omitempty"`
+	ByMemory  []ProcessStat `json:"by_memory,omitempty"`
 	OutputErrors
 }
 
@@ -62,18 +64,42 @@ func GatherProcessInfo(
 		})
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		if sortBy == "memory" {
-			return result[i].MemoryPercent > result[j].MemoryPercent
-		}
-		return result[i].CPUPercent > result[j].CPUPercent
-	})
+	out := &ProcessInfoOutput{}
 
-	if len(result) > limit {
-		result = result[:limit]
+	if sortBy == "both" {
+		byCPU := make([]ProcessStat, len(result))
+		copy(byCPU, result)
+		sort.Slice(byCPU, func(i, j int) bool {
+			return byCPU[i].CPUPercent > byCPU[j].CPUPercent
+		})
+		if len(byCPU) > limit {
+			byCPU = byCPU[:limit]
+		}
+		out.ByCPU = byCPU
+
+		byMemory := make([]ProcessStat, len(result))
+		copy(byMemory, result)
+		sort.Slice(byMemory, func(i, j int) bool {
+			return byMemory[i].MemoryPercent > byMemory[j].MemoryPercent
+		})
+		if len(byMemory) > limit {
+			byMemory = byMemory[:limit]
+		}
+		out.ByMemory = byMemory
+	} else {
+		sort.Slice(result, func(i, j int) bool {
+			if sortBy == "memory" {
+				return result[i].MemoryPercent > result[j].MemoryPercent
+			}
+			return result[i].CPUPercent > result[j].CPUPercent
+		})
+		if len(result) > limit {
+			result = result[:limit]
+		}
+		out.Processes = result
 	}
 
-	return &ProcessInfoOutput{Processes: result}, nil
+	return out, nil
 }
 
 func HandleGetProcessInfo(

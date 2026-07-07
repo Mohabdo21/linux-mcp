@@ -142,7 +142,7 @@ func HandleGetSystemSnapshot(
 				MemoryInfoOutput{}, &errs)
 			snapshot.Disk = collectOrFallback(ctx,
 				"disk", func(ctx context.Context) (*DiskInfoOutput, error) {
-					return GatherDiskInfo(ctx, "")
+					return GatherDiskInfo(ctx, "", 0)
 				}, DiskInfoOutput{Partitions: []DiskUsageStat{}}, &errs)
 			snapshot.Network = collectOrFallback(ctx,
 				"network", GatherNetworkInfo,

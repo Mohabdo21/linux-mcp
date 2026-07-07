@@ -15,7 +15,8 @@ import (
 )
 
 type GetDiskInfoInput struct {
-	MountPoint string `json:"mount_point" jsonschema:"optional mount point filter"`
+	MountPoint string  `json:"mount_point,omitempty" jsonschema:"optional mount point filter"`
+	Threshold  float64 `json:"threshold,omitempty"   jsonschema:"optional threshold filter (e.g. 80 means only partitions >=80% used)"`
 }
 
 type DiskUsageStat struct {
@@ -36,6 +37,7 @@ type DiskInfoOutput struct {
 func GatherDiskInfo(
 	ctx context.Context,
 	mountPoint string,
+	threshold float64,
 ) (*DiskInfoOutput, error) {
 	partitions, err := disk.Partitions(false)
 	if err != nil {
@@ -49,6 +51,9 @@ func GatherDiskInfo(
 		}
 		usage, err := disk.Usage(p.Mountpoint)
 		if err != nil {
+			continue
+		}
+		if threshold > 0 && usage.UsedPercent < threshold {
 			continue
 		}
 		result = append(result, DiskUsageStat{
@@ -74,7 +79,7 @@ func HandleGetDiskInfo(
 		config.ToolNameGetDiskInfo,
 		0,
 		func(ctx context.Context) (*DiskInfoOutput, error) {
-			return GatherDiskInfo(ctx, input.MountPoint)
+			return GatherDiskInfo(ctx, input.MountPoint, input.Threshold)
 		},
 	)
 }

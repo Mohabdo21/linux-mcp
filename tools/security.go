@@ -22,9 +22,23 @@ type FailedLoginEntry struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type FailedLoginsSummary struct {
+	TotalAttempts   int `json:"total_attempts"`
+	UniqueUsernames int `json:"unique_usernames"`
+	UniqueSources   int `json:"unique_sources"`
+}
+
 type FailedLoginsOutput struct {
-	Entries []FailedLoginEntry `json:"entries"`
+	Entries []FailedLoginEntry  `json:"entries"`
+	Summary FailedLoginsSummary `json:"summary"`
 	OutputErrors
+}
+
+func isBootEntry(fields []string) bool {
+	if len(fields) < 2 {
+		return false
+	}
+	return fields[0] == "reboot" || fields[1] == "Boot"
 }
 
 func ParseLastbOutput(output string) []FailedLoginEntry {
@@ -37,6 +51,9 @@ func ParseLastbOutput(output string) []FailedLoginEntry {
 		}
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
+			continue
+		}
+		if isBootEntry(fields) {
 			continue
 		}
 		entries = append(entries, FailedLoginEntry{
@@ -54,7 +71,7 @@ func ParseJournalctlFailedLogins(output string) []FailedLoginEntry {
 	for line := range strings.SplitSeq(
 		strings.TrimSpace(output), "\n",
 	) {
-		if line == "" {
+		if line == "" || strings.HasPrefix(line, "-- ") {
 			continue
 		}
 		parts := strings.SplitN(line, " ", 3)
@@ -87,24 +104,48 @@ func GatherFailedLoginsJournalctl(
 	return &FailedLoginsOutput{Entries: entries}, nil
 }
 
+func computeFailedLoginsSummary(
+	entries []FailedLoginEntry,
+) FailedLoginsSummary {
+	userSet := make(map[string]struct{})
+	sourceSet := make(map[string]struct{})
+	for _, e := range entries {
+		userSet[e.Username] = struct{}{}
+		if e.Source != "" {
+			sourceSet[e.Source] = struct{}{}
+		}
+	}
+	return FailedLoginsSummary{
+		TotalAttempts:   len(entries),
+		UniqueUsernames: len(userSet),
+		UniqueSources:   len(sourceSet),
+	}
+}
+
 func GatherFailedLogins(
 	ctx context.Context, lines int,
 ) (*FailedLoginsOutput, error) {
 	out, lastbErr := execOutput(ctx, "lastb", "-n", fmt.Sprintf("%d", lines))
 	if lastbErr == nil {
+		entries := ParseLastbOutput(out)
 		return &FailedLoginsOutput{
-			Entries: ParseLastbOutput(out),
+			Entries: entries,
+			Summary: computeFailedLoginsSummary(entries),
 		}, nil
 	}
 	if !errors.Is(lastbErr, exec.ErrNotFound) {
 		if entries := ParseLastbOutput(out); len(entries) > 0 {
-			return &FailedLoginsOutput{Entries: entries}, nil
+			return &FailedLoginsOutput{
+				Entries: entries,
+				Summary: computeFailedLoginsSummary(entries),
+			}, nil
 		}
 	}
 	jOut, jErr := GatherFailedLoginsJournalctl(ctx, lines)
 	if jErr != nil {
 		return jOut, errors.Join(lastbErr, jErr)
 	}
+	jOut.Summary = computeFailedLoginsSummary(jOut.Entries)
 	if !errors.Is(lastbErr, exec.ErrNotFound) {
 		return jOut, lastbErr
 	}

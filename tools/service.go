@@ -60,12 +60,19 @@ type SystemdUnit struct {
 	Description string `json:"description"`
 }
 
+type GetSystemdUnitsInput struct {
+	State string `json:"state,omitempty" jsonschema:"optional state filter: 'failed', 'active', 'inactive'"`
+}
+
 type SystemdUnitsOutput struct {
 	Units []SystemdUnit `json:"units"`
 	OutputErrors
 }
 
-func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
+func GatherSystemdUnits(
+	ctx context.Context,
+	state string,
+) (*SystemdUnitsOutput, error) {
 	lines, err := execLines(ctx, "systemctl",
 		"list-units",
 		"--all",
@@ -79,6 +86,9 @@ func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
 	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
+			continue
+		}
+		if state != "" && fields[2] != state {
 			continue
 		}
 		desc := ""
@@ -99,13 +109,15 @@ func GatherSystemdUnits(ctx context.Context) (*SystemdUnitsOutput, error) {
 func HandleGetSystemdUnits(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
-	_ NoArgs,
+	input GetSystemdUnitsInput,
 ) (*mcp.CallToolResult, *SystemdUnitsOutput, error) {
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetSystemdUnits,
 		0,
-		GatherSystemdUnits,
+		func(ctx context.Context) (*SystemdUnitsOutput, error) {
+			return GatherSystemdUnits(ctx, input.State)
+		},
 	)
 }
 

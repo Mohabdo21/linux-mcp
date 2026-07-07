@@ -40,7 +40,7 @@ func TestGatherBasicSystemInfo(t *testing.T) {
 	})
 
 	t.Run("SystemdUnits", func(t *testing.T) {
-		out, err := GatherSystemdUnits(t.Context())
+		out, err := GatherSystemdUnits(t.Context(), "")
 		skipOnErr(t, err, "GatherSystemdUnits() error: %v", err)
 		if len(out.Units) == 0 {
 			t.Error("Units should not be empty")
@@ -244,7 +244,7 @@ func TestGatherMemoryInfo(t *testing.T) {
 }
 
 func TestGatherDiskInfo(t *testing.T) {
-	out, err := GatherDiskInfo(t.Context(), "")
+	out, err := GatherDiskInfo(t.Context(), "", 0)
 	if err != nil {
 		t.Skipf("GatherDiskInfo() error: %v", err)
 	}
@@ -268,9 +268,83 @@ func TestGatherDiskInfo(t *testing.T) {
 	}
 }
 
+func TestGatherDiskInfoThreshold(t *testing.T) {
+	out, err := GatherDiskInfo(t.Context(), "", 0)
+	if err != nil {
+		t.Skipf("GatherDiskInfo() error: %v", err)
+	}
+	if len(out.Partitions) == 0 {
+		t.Fatal("Partitions should not be empty")
+	}
+	// With threshold=0, all partitions returned (same as no filter)
+	allCount := len(out.Partitions)
+
+	// With threshold=100 (impossible to reach), expect no partitions
+	outHigh, err := GatherDiskInfo(t.Context(), "", 100)
+	if err != nil {
+		t.Fatalf("GatherDiskInfo with threshold=100 error: %v", err)
+	}
+	if len(outHigh.Partitions) != 0 {
+		t.Logf("Threshold=100 filtered %d -> %d partitions (unusual but ok)",
+			allCount, len(outHigh.Partitions))
+	}
+
+	// With threshold=0, should match all-count
+	if len(out.Partitions) != allCount {
+		t.Errorf("Threshold=0 returned %d, expected %d",
+			len(out.Partitions), allCount)
+	}
+}
+
+func TestGatherSystemdUnitsStateFilter(t *testing.T) {
+	all, err := GatherSystemdUnits(t.Context(), "")
+	if err != nil {
+		t.Skipf("GatherSystemdUnits() error: %v", err)
+	}
+	if len(all.Units) == 0 {
+		t.Fatal("Units should not be empty")
+	}
+
+	active, err := GatherSystemdUnits(t.Context(), "active")
+	if err != nil {
+		t.Fatalf("GatherSystemdUnits('active') error: %v", err)
+	}
+	if len(active.Units) == 0 {
+		t.Error("Expected at least some active units")
+	}
+	for _, u := range active.Units {
+		if u.Active != "active" {
+			t.Errorf(
+				"Expected active unit, got active=%q for %s",
+				u.Active,
+				u.Unit,
+			)
+		}
+	}
+	if len(active.Units) > len(all.Units) {
+		t.Error("Filtered set should not exceed total")
+	}
+
+	failed, err := GatherSystemdUnits(t.Context(), "failed")
+	if err != nil {
+		t.Fatalf("GatherSystemdUnits('failed') error: %v", err)
+	}
+	for _, u := range failed.Units {
+		if u.Active != "failed" {
+			t.Errorf(
+				"Expected failed unit, got active=%q for %s",
+				u.Active,
+				u.Unit,
+			)
+		}
+	}
+	t.Logf("All=%d Active=%d Failed=%d",
+		len(all.Units), len(active.Units), len(failed.Units))
+}
+
 func TestGatherFunctionsWithFilter(t *testing.T) {
 	t.Run("DiskInfo/root", func(t *testing.T) {
-		out, err := GatherDiskInfo(t.Context(), "/")
+		out, err := GatherDiskInfo(t.Context(), "/", 0)
 		skipOnErr(t, err, "GatherDiskInfo(\"/\") error: %v", err)
 		if len(out.Partitions) == 0 {
 			t.Fatal("Expected at least / partition")
@@ -283,7 +357,7 @@ func TestGatherFunctionsWithFilter(t *testing.T) {
 	})
 
 	t.Run("DiskInfo/nonexistent", func(t *testing.T) {
-		out, err := GatherDiskInfo(t.Context(), "/nonexistent")
+		out, err := GatherDiskInfo(t.Context(), "/nonexistent", 0)
 		if err != nil {
 			t.Fatalf(
 				"GatherDiskInfo(\"/nonexistent\") error: %v", err)
@@ -418,6 +492,33 @@ func TestGatherProcessInfo(t *testing.T) {
 			"GatherProcessInfo(\"cpu\", 5) error: %v", err)
 		if len(out.Processes) > 0 && out.Processes[0].Status == "" {
 			t.Error("Process status should not be empty")
+		}
+	})
+
+	t.Run("SortByBoth", func(t *testing.T) {
+		out, err := GatherProcessInfo(t.Context(), "both", 10)
+		skipOnErr(t, err,
+			"GatherProcessInfo(\"both\", 10) error: %v", err)
+		if len(out.ByCPU) == 0 {
+			t.Fatal("ByCPU should not be empty")
+		}
+		if len(out.ByMemory) == 0 {
+			t.Fatal("ByMemory should not be empty")
+		}
+		if out.Processes != nil {
+			t.Error("Processes should be nil when sort_by='both'")
+		}
+		for i := 1; i < len(out.ByCPU); i++ {
+			if out.ByCPU[i-1].CPUPercent < out.ByCPU[i].CPUPercent {
+				t.Error("ByCPU should be sorted by CPU descending")
+				break
+			}
+		}
+		for i := 1; i < len(out.ByMemory); i++ {
+			if out.ByMemory[i-1].MemoryPercent < out.ByMemory[i].MemoryPercent {
+				t.Error("ByMemory should be sorted by Memory descending")
+				break
+			}
 		}
 	})
 }
@@ -663,14 +764,25 @@ func TestGatherSystemSnapshotErrors(t *testing.T) {
 }
 
 func TestGatherJournalLogs(t *testing.T) {
-	out, err := GatherJournalLogs(t.Context(), "", "", "", "", 5, false)
+	entries, err := GatherJournalLogs(t.Context(), "", "", "", "", 5, false)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("journalctl not installed")
 		}
 		t.Fatalf("GatherJournalLogs() error: %v", err)
 	}
-	t.Logf("Found %d journal entries", len(out.Entries))
+	t.Logf("Found %d journal entries", len(entries.Entries))
+	// Verify structured data
+	for i, e := range entries.Entries {
+		if e.Timestamp == "" {
+			t.Errorf("Entries[%d].Timestamp should not be empty", i)
+		}
+		if e.Message == "" {
+			t.Errorf("Entries[%d].Message should not be empty", i)
+		}
+		t.Logf("  [%s] priority=%s unit=%s pid=%d msg=%s",
+			e.Timestamp, e.Priority, e.Unit, e.PID, e.Message)
+	}
 }
 
 func TestGatherGPUInfo(t *testing.T) {
@@ -811,6 +923,59 @@ func TestGatherFailedLogins(t *testing.T) {
 		t.Skipf("GatherFailedLogins() error (likely permissions): %v", err)
 	}
 	t.Logf("Found %d failed login entries", len(out.Entries))
+	if out.Summary.TotalAttempts != len(out.Entries) {
+		t.Errorf("Summary.TotalAttempts=%d != len(entries)=%d",
+			out.Summary.TotalAttempts, len(out.Entries))
+	}
+}
+
+func TestParseLastbFiltersBoot(t *testing.T) {
+	input := "reboot   system boot  0.0         Mon Jan  1 12:00\nroot     pts/0        192.168.1.1     Mon Jan  1 12:30 - 12:31 (00:01)\nbtmp begins Mon Jan  1 12:00\n"
+	entries := ParseLastbOutput(input)
+	if len(entries) != 1 {
+		t.Errorf("expected 1 entry after filtering Boot, got %d", len(entries))
+	}
+	if len(entries) > 0 && entries[0].Username != "root" {
+		t.Errorf(
+			"expected root as remaining entry, got %s",
+			entries[0].Username,
+		)
+	}
+}
+
+func TestParseLastbFiltersBootTerminal(t *testing.T) {
+	input := "3231d21b Boot        0.0         --\nroot     pts/0        192.168.1.1     Mon Jan  1 12:30\n"
+	entries := ParseLastbOutput(input)
+	if len(entries) != 1 {
+		t.Errorf(
+			"expected 1 entry after filtering terminal=Boot, got %d",
+			len(entries),
+		)
+	}
+	if len(entries) > 0 && entries[0].Username != "root" {
+		t.Errorf(
+			"expected root as remaining entry, got %s",
+			entries[0].Username,
+		)
+	}
+}
+
+func TestComputeFailedLoginsSummary(t *testing.T) {
+	entries := []FailedLoginEntry{
+		{Username: "root", Source: "10.0.0.1"},
+		{Username: "admin", Source: "10.0.0.1"},
+		{Username: "root", Source: "10.0.0.2"},
+	}
+	summary := computeFailedLoginsSummary(entries)
+	if summary.TotalAttempts != 3 {
+		t.Errorf("TotalAttempts = %d, want 3", summary.TotalAttempts)
+	}
+	if summary.UniqueUsernames != 2 {
+		t.Errorf("UniqueUsernames = %d, want 2", summary.UniqueUsernames)
+	}
+	if summary.UniqueSources != 2 {
+		t.Errorf("UniqueSources = %d, want 2", summary.UniqueSources)
+	}
 }
 
 func TestGatherDNSResolve(t *testing.T) {

@@ -96,7 +96,7 @@ func handleReadResource(
 	case path == "/memory":
 		data, nerr = GatherMemoryInfo(ctx)
 	case path == "/disk":
-		data, nerr = GatherDiskInfo(ctx, "")
+		data, nerr = GatherDiskInfo(ctx, "", 0)
 	case path == "/network":
 		data, nerr = GatherNetworkInfo(ctx)
 	case path == "/load":
@@ -116,7 +116,7 @@ func handleReadResource(
 		if mountPoint != "" && !strings.HasPrefix(mountPoint, "/") {
 			mountPoint = "/" + mountPoint
 		}
-		data, nerr = GatherDiskInfo(ctx, mountPoint)
+		data, nerr = GatherDiskInfo(ctx, mountPoint, 0)
 	case strings.HasPrefix(path, "/service/"):
 		data, nerr = GatherServiceStatus(
 			ctx,
