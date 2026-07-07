@@ -4,6 +4,10 @@
 
 A Linux system monitoring server built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Provides real-time system information - CPU, memory, disk, network, processes, Docker, and more - via MCP tools over STDIO transport.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="linux-mcp demo" width="100%">
+</p>
+
 ## Features
 
 - **System** - hostname, OS, kernel, architecture, uptime, load averages

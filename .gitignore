@@ -1,3 +1,5 @@
 bin/
 .mcpregistry_*
 mcp-publisher
+assets/demo.mp4
+assets/frames/

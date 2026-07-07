@@ -28,5 +28,8 @@ check:
 	golangci-lint fmt
 	golangci-lint run --fix
 
+demo:
+	vhs scripts/cassette.tape
+
 release:
 	@scripts/release.sh "$(VERSION)"
