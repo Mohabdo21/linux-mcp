@@ -588,7 +588,7 @@ func GatherUserAutomation(
 			Passed    string `json:"passed"`
 			Activates string `json:"activates"`
 		}
-		if err := json.Unmarshal([]byte(timers), &rawTimers); err == nil {
+		if uErr := json.Unmarshal([]byte(timers), &rawTimers); uErr == nil {
 			for _, t := range rawTimers {
 				out.SystemdTimers = append(
 					out.SystemdTimers, SystemdTimer{
@@ -601,7 +601,7 @@ func GatherUserAutomation(
 			}
 		} else {
 			appendErr(&errs, "systemd-timers",
-				fmt.Errorf("parse json: %w", err))
+				fmt.Errorf("parse json: %w", uErr))
 		}
 	} else {
 		appendErr(&errs, "systemd-timers",

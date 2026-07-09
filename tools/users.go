@@ -86,6 +86,9 @@ func parseGroup() (map[int]string, map[string][]string) {
 			membersByName[parts[0]] = strings.Split(parts[3], ",")
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, nil
+	}
 	return nameByGID, membersByName
 }
 
