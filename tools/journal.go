@@ -127,11 +127,29 @@ func GatherJournalLogs(
 	return &JournalLogsOutput{Entries: entries}, nil
 }
 
+func isValidUnitName(unit string) bool {
+	if unit == "" {
+		return true
+	}
+	for _, c := range unit {
+		if !strings.ContainsRune(
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.@-",
+			c,
+		) {
+			return false
+		}
+	}
+	return true
+}
+
 func HandleGetJournalLogs(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
 	input GetJournalLogsInput,
 ) (*mcp.CallToolResult, *JournalLogsOutput, error) {
+	if !isValidUnitName(input.Unit) {
+		return nil, nil, fmt.Errorf("invalid unit name: %q", input.Unit)
+	}
 	lines := input.Lines
 	if lines <= 0 {
 		lines = 50

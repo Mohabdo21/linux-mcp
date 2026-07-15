@@ -241,6 +241,13 @@ func GatherContainerDetail(
 				env = c.Config.Env
 			}
 			env = nilToEmpty(env)
+			for i, e := range env {
+				if before, _, ok := strings.Cut(e, "="); ok {
+					if isSensitiveEnvVar(before) {
+						env[i] = before + "=***"
+					}
+				}
+			}
 
 			status, _ := state["status"].(string)
 
@@ -324,6 +331,7 @@ func GatherContainerLogs(
 
 			lines := make([]string, 0)
 			scanner := bufio.NewScanner(result)
+			scanner.Buffer(make([]byte, 0, 64*1024), 1<<20)
 			for scanner.Scan() {
 				lines = append(lines, scanner.Text())
 			}

@@ -227,9 +227,13 @@ func GatherEnvironmentVariables(
 						continue
 					}
 				}
+				value := pair[i+1:]
+				if isSensitiveEnvVar(name) {
+					value = "***"
+				}
 				variables = append(variables, EnvironmentVariable{
 					Name:  name,
-					Value: pair[i+1:],
+					Value: value,
 				})
 				break
 			}

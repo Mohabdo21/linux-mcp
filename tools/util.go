@@ -201,6 +201,21 @@ func shortID(id string) string {
 	return id
 }
 
+var sensitiveEnvPatterns = []string{
+	"SECRET", "TOKEN", "PASSWORD", "CREDENTIAL",
+	"API_KEY", "PRIVATE_KEY", "DATABASE_URL",
+}
+
+func isSensitiveEnvVar(name string) bool {
+	upper := strings.ToUpper(name)
+	for _, pattern := range sensitiveEnvPatterns {
+		if strings.Contains(upper, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 func requireField(val, name string) error {
 	if val == "" {
 		return fmt.Errorf("%s is required", name)
