@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -74,6 +73,9 @@ func HandleGetDiskInfo(
 	_ *mcp.CallToolRequest,
 	input GetDiskInfoInput,
 ) (*mcp.CallToolResult, *DiskInfoOutput, error) {
+	if input.MountPoint != "" && !strings.HasPrefix(input.MountPoint, "/") {
+		return nil, nil, fmt.Errorf("invalid mount point: must start with /")
+	}
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetDiskInfo,
@@ -177,45 +179,35 @@ func GatherLargestFiles(
 	if path == "" {
 		path = "."
 	}
-	cmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf(
-		"du -sb %s/* %s/.[!.]* 2>/dev/null | sort -rn",
-		ShellQuote(path), ShellQuote(path),
-	))
-	out, err := cmd.Output()
+	dirEntries, err := os.ReadDir(path)
 	if err != nil {
 		return &LargestFilesOutput{
 			Path:    path,
 			Entries: []LargestFileEntry{},
 		}, nil
 	}
-	entries := make([]LargestFileEntry, 0, limit)
-	for line := range strings.SplitSeq(
-		strings.TrimSpace(string(out)), "\n",
-	) {
-		if line == "" {
-			continue
+	entries := make([]LargestFileEntry, 0, len(dirEntries))
+	for _, de := range dirEntries {
+		select {
+		case <-ctx.Done():
+			return &LargestFilesOutput{Path: path, Entries: entries}, ctx.Err()
+		default:
 		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		info, err := de.Info()
+		if err != nil {
 			continue
-		}
-		size, _ := strconv.ParseInt(fields[0], 10, 64)
-		name := strings.Join(fields[1:], " ")
-		isDir := false
-		if info, err := os.Stat(name); err == nil {
-			isDir = info.IsDir()
 		}
 		entries = append(entries, LargestFileEntry{
-			Name:      name,
-			SizeBytes: size,
-			SizeHuman: HumanSize(size),
-			IsDir:     isDir,
+			Name:      de.Name(),
+			SizeBytes: info.Size(),
+			SizeHuman: HumanSize(info.Size()),
+			IsDir:     de.IsDir(),
 		})
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].SizeBytes > entries[j].SizeBytes
 	})
-	if len(entries) > limit {
+	if limit > 0 && len(entries) > limit {
 		entries = entries[:limit]
 	}
 	return &LargestFilesOutput{Path: path, Entries: entries}, nil

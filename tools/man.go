@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/Mohabdo21/linux-mcp/config"
@@ -121,6 +123,8 @@ func GatherManPage(
 	}, nil
 }
 
+var validManName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
 func HandleGetManPage(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
@@ -128,6 +132,9 @@ func HandleGetManPage(
 ) (*mcp.CallToolResult, *ManPageOutput, error) {
 	if err := requireField(input.Command, "command"); err != nil {
 		return nil, nil, err
+	}
+	if !validManName.MatchString(input.Command) {
+		return nil, nil, fmt.Errorf("invalid command name: %q", input.Command)
 	}
 	maxLines := clampZero(input.MaxLines, 500, 10000)
 	contextLines := input.ContextLines

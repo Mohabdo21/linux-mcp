@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/Mohabdo21/linux-mcp/config"
@@ -121,11 +123,19 @@ func HandleGetSystemdUnits(
 	)
 }
 
+var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
 func HandleGetServiceStatus(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
 	input GetServiceStatusInput,
 ) (*mcp.CallToolResult, *ServiceStatusOutput, error) {
+	if err := requireField(input.Name, "name"); err != nil {
+		return nil, nil, err
+	}
+	if !validServiceName.MatchString(input.Name) {
+		return nil, nil, fmt.Errorf("invalid service name: %q", input.Name)
+	}
 	return handleToolCall(
 		ctx,
 		config.ToolNameGetServiceStatus,

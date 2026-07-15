@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"unicode"
 
 	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -14,6 +13,11 @@ import (
 
 var errInvalidHost = errors.New(
 	"invalid host: must be a valid hostname or IP address")
+
+func isASCIIHostChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') || r == '.' || r == '-'
+}
 
 func validHost(host string) bool {
 	if host == "" || len(host) > 253 {
@@ -23,8 +27,7 @@ func validHost(host string) bool {
 		return true
 	}
 	for _, r := range host {
-		if r != '.' && r != '-' && !unicode.IsLetter(r) &&
-			!unicode.IsDigit(r) {
+		if !isASCIIHostChar(r) {
 			return false
 		}
 	}
