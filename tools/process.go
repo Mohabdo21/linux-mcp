@@ -15,8 +15,8 @@ import (
 )
 
 type GetProcessInfoInput struct {
-	SortBy string `json:"sort_by" jsonschema:"sort by 'cpu', 'memory', or 'both' (default: cpu)"`
-	Limit  int    `json:"limit"   jsonschema:"max results (default: 10, max: 100)"`
+	SortBy string `json:"sort_by,omitempty" jsonschema:"sort by 'cpu', 'memory', or 'both' (default: cpu)"`
+	Limit  int    `json:"limit,omitempty"   jsonschema:"max results (default: 10, max: 100)"`
 }
 
 type ProcessStat struct {
@@ -25,6 +25,10 @@ type ProcessStat struct {
 	CPUPercent    float64 `json:"cpu_percent"`
 	MemoryPercent float32 `json:"memory_percent"`
 	Status        string  `json:"status"`
+	RSSBytes      *int64  `json:"rss_bytes,omitempty"`
+	PSSBytes      *int64  `json:"pss_bytes,omitempty"`
+	SwapBytes     *int64  `json:"swap_bytes,omitempty"`
+	CgroupPath    *string `json:"cgroup_path,omitempty"`
 }
 
 type ProcessInfoOutput struct {
@@ -55,13 +59,23 @@ func GatherProcessInfo(
 		mem, _ := p.MemoryPercent()
 		status, _ := p.Status()
 		statusStr := strings.Join(status, ",")
-		result = append(result, ProcessStat{
+		stat := ProcessStat{
 			PID:           p.Pid,
 			Name:          name,
 			CPUPercent:    cpu,
 			MemoryPercent: mem,
 			Status:        statusStr,
-		})
+		}
+		if maps, err := p.MemoryMaps(true); err == nil && len(*maps) > 0 {
+			m := (*maps)[0]
+			stat.RSSBytes = &[]int64{int64(m.Rss) * 1024}[0]
+			stat.PSSBytes = &[]int64{int64(m.Pss) * 1024}[0]
+			stat.SwapBytes = &[]int64{int64(m.Swap) * 1024}[0]
+		}
+		if cg := readCgroupPath(p.Pid); cg != "" {
+			stat.CgroupPath = &cg
+		}
+		result = append(result, stat)
 	}
 
 	out := &ProcessInfoOutput{}
@@ -294,4 +308,19 @@ func HandleGetTopIOProcesses(
 			return GatherTopIOProcesses(ctx, input.Limit)
 		},
 	)
+}
+
+func readCgroupPath(pid int32) string {
+	path := fmt.Sprintf("/proc/%d/cgroup", pid)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for line := range strings.SplitSeq(string(data), "\n") {
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) == 3 && parts[2] != "" {
+			return parts[2]
+		}
+	}
+	return ""
 }

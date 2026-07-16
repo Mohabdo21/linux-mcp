@@ -326,3 +326,164 @@ func TestGatherDiskIOMetrics(t *testing.T) {
 	}
 	t.Logf("Found %d devices with I/O metrics", len(out.Metrics))
 }
+
+func TestParseLockLine(t *testing.T) {
+	// Realistic /proc/locks line: ID TYPE ACCESS RW PID MAJOR:MINOR INODE START [END] [PATH]
+	input := "1: FLOCK  ADVISORY  WRITE 1234 00:00 12345678 0 EOF"
+	lock, err := parseLockLine(input)
+	if err != nil {
+		t.Fatalf("parseLockLine failed: %v", err)
+	}
+	if lock.LockType != "FLOCK" {
+		t.Errorf("LockType = %s, want FLOCK", lock.LockType)
+	}
+	if lock.Access != "ADVISORY WRITE" {
+		t.Errorf("Access = %s, want 'ADVISORY WRITE'", lock.Access)
+	}
+	if lock.PID != 1234 {
+		t.Errorf("PID = %d, want 1234", lock.PID)
+	}
+	if lock.Start != 0 {
+		t.Errorf("Start = %d, want 0", lock.Start)
+	}
+	if lock.End != -1 {
+		t.Errorf("End = %d, want -1 (EOF)", lock.End)
+	}
+}
+
+func TestParseLockLineWithEnd(t *testing.T) {
+	input := "2: POSIX  MANDATORY  READ 5678 08:01 9876543 100 200"
+	lock, err := parseLockLine(input)
+	if err != nil {
+		t.Fatalf("parseLockLine failed: %v", err)
+	}
+	if lock.LockType != "POSIX" {
+		t.Errorf("LockType = %s, want POSIX", lock.LockType)
+	}
+	if lock.Access != "MANDATORY READ" {
+		t.Errorf("Access = %s, want 'MANDATORY READ'", lock.Access)
+	}
+	if lock.PID != 5678 {
+		t.Errorf("PID = %d, want 5678", lock.PID)
+	}
+	if lock.End != 200 {
+		t.Errorf("End = %d, want 200", lock.End)
+	}
+}
+
+func TestParseLockLineInsufficientFields(t *testing.T) {
+	_, err := parseLockLine("1: FLOCK")
+	if err == nil {
+		t.Error("Expected error for insufficient fields")
+	}
+}
+
+func TestGatherFileLocks(t *testing.T) {
+	out, err := GatherFileLocks()
+	if err != nil {
+		t.Skipf("GatherFileLocks failed (may need permissions): %v", err)
+	}
+	t.Logf("Found %d file locks", len(out.Locks))
+}
+
+func TestParseShmLine(t *testing.T) {
+	// Realistic /proc/sysvipc/shm line
+	// key shmid perms size cpid lpid nattch status uid gid cuid cgid atime dtime ctime
+	input := "0 0 644 65536 1234 1234 2 dest 1000 1000 1000 1000 1234567890 0 1234567890"
+	seg, err := parseShmLine(input)
+	if err != nil {
+		t.Fatalf("parseShmLine failed: %v", err)
+	}
+	if seg.Key != 0 {
+		t.Errorf("Key = %d, want 0", seg.Key)
+	}
+	if seg.ID != 0 {
+		t.Errorf("ID = %d, want 0", seg.ID)
+	}
+	if seg.Bytes != 65536 {
+		t.Errorf("Bytes = %d, want 65536", seg.Bytes)
+	}
+	if seg.Nattch != 2 {
+		t.Errorf("Nattch = %d, want 2", seg.Nattch)
+	}
+	if seg.Status != "dest" {
+		t.Errorf("Status = %s, want dest", seg.Status)
+	}
+}
+
+func TestParseShmLineInsufficientFields(t *testing.T) {
+	_, err := parseShmLine("0 0 644")
+	if err == nil {
+		t.Error("Expected error for insufficient fields")
+	}
+}
+
+func TestGatherSharedMemorySegments(t *testing.T) {
+	out, err := GatherSharedMemorySegments()
+	if err != nil {
+		t.Skipf("GatherSharedMemorySegments failed: %v", err)
+	}
+	t.Logf("Found %d shared memory segments", len(out.Segments))
+}
+
+func TestParseJournalctlLine(t *testing.T) {
+	input := "2024-01-15T10:30:00+0000 myhost kernel: [  123.456] avc: denied { read }"
+	entry := parseJournalctlLine(input)
+	if entry.Timestamp != "2024-01-15T10:30:00+0000 myhost" {
+		t.Errorf(
+			"Timestamp = %s, want '2024-01-15T10:30:00+0000 myhost'",
+			entry.Timestamp,
+		)
+	}
+	if entry.Type != "kernel" {
+		t.Errorf("Type = %s, want kernel", entry.Type)
+	}
+	if entry.Message != "avc: denied { read }" {
+		t.Errorf("Message = %s, want 'avc: denied { read }'", entry.Message)
+	}
+}
+
+func TestParseAuditdLine(t *testing.T) {
+	input := "type=AVC msg=audit(1700000000.123:456): avc: denied { read }"
+	entry := parseAuditdLine(input)
+	if entry.Type != "AVC" {
+		t.Errorf("Type = %s, want AVC", entry.Type)
+	}
+	if entry.Timestamp != "1700000000.123:456" {
+		t.Errorf("Timestamp = %s, want '1700000000.123:456'", entry.Timestamp)
+	}
+	if entry.Message != "avc: denied { read }" {
+		t.Errorf("Message = %s, want 'avc: denied { read }'", entry.Message)
+	}
+}
+
+func TestParseAuditdLineInsufficientFields(t *testing.T) {
+	entry := parseAuditdLine("invalid line")
+	if entry.Type != "unknown" {
+		t.Errorf("Type = %s, want unknown", entry.Type)
+	}
+}
+
+func TestGatherAuditLogs(t *testing.T) {
+	out, err := GatherAuditLogs(t.Context(), 10, "auto")
+	if err != nil {
+		t.Skipf("GatherAuditLogs failed (auditd may not be available): %v", err)
+	}
+	t.Logf("Found %d audit log entries", len(out.Entries))
+}
+
+func TestGatherAuditLogsJournalctl(t *testing.T) {
+	out, err := GatherAuditLogs(t.Context(), 5, "journalctl")
+	if err != nil {
+		t.Skipf("GatherAuditLogs (journalctl) failed: %v", err)
+	}
+	t.Logf("Found %d journalctl entries", len(out.Entries))
+}
+
+func TestGatherAuditLogsAuditLog(t *testing.T) {
+	out, err := GatherAuditLogs(t.Context(), 5, "audit.log")
+	if err != nil {
+		t.Skipf("GatherAuditLogs (audit.log) failed: %v", err)
+	}
+	t.Logf("Found %d audit.log entries", len(out.Entries))
+}

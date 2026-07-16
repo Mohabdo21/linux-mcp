@@ -75,6 +75,9 @@ const (
 	ToolNameGetSMARTHealth            = "get_smart_health"
 	ToolNameGetDiskIOMetrics          = "get_disk_io_metrics"
 	ToolNameGetProcDiagnostics        = "get_proc_diagnostics"
+	ToolNameGetAuditLogs              = "get_audit_logs"
+	ToolNameGetFileLocks              = "get_file_locks"
+	ToolNameGetSharedMemorySegments   = "get_shared_memory_segments"
 )
 
 type Config struct {
@@ -162,6 +165,9 @@ func defaultConfig() *Config {
 			ToolNameGetSMARTHealth:            "30s",
 			ToolNameGetDiskIOMetrics:          "10s",
 			ToolNameGetProcDiagnostics:        "10s",
+			ToolNameGetAuditLogs:              "15s",
+			ToolNameGetFileLocks:              "5s",
+			ToolNameGetSharedMemorySegments:   "5s",
 		},
 		Disabled: []string{},
 	}

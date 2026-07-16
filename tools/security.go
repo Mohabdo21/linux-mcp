@@ -1,9 +1,11 @@
 package tools
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -217,6 +219,170 @@ func HandleGetFailedLogins(
 		0,
 		func(ctx context.Context) (*FailedLoginsOutput, error) {
 			return GatherFailedLogins(ctx, lines)
+		},
+	)
+}
+
+type GetAuditLogsInput struct {
+	Lines  int    `json:"lines,omitempty"  jsonschema:"number of recent entries (default: 50)"`
+	Source string `json:"source,omitempty" jsonschema:"audit source: 'journalctl', 'audit.log', or 'auto' (default: auto)"`
+}
+
+type AuditLogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Type      string `json:"type"`
+	Message   string `json:"message"`
+}
+
+type AuditLogsOutput struct {
+	Entries []AuditLogEntry `json:"entries"`
+	OutputErrors
+}
+
+func GatherAuditLogs(
+	ctx context.Context,
+	lines int,
+	source string,
+) (*AuditLogsOutput, error) {
+	if lines <= 0 {
+		lines = 50
+	}
+
+	if source == "" {
+		source = "auto"
+	}
+
+	switch source {
+	case "journalctl":
+		return gatherFromJournalctl(ctx, lines)
+	case "audit.log":
+		return gatherFromAuditLog(lines)
+	default:
+		out, err := gatherFromJournalctl(ctx, lines)
+		if err == nil && len(out.Entries) > 0 {
+			return out, nil
+		}
+		return gatherFromAuditLog(lines)
+	}
+}
+
+func gatherFromJournalctl(
+	ctx context.Context,
+	lines int,
+) (*AuditLogsOutput, error) {
+	cmd := exec.CommandContext(
+		ctx,
+		"journalctl",
+		"-k",
+		"--no-pager",
+		"-n",
+		fmt.Sprintf("%d", lines),
+		"--output=short-iso",
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("journalctl failed: %w", err)
+	}
+
+	out := &AuditLogsOutput{Entries: make([]AuditLogEntry, 0)}
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		entry := parseJournalctlLine(line)
+		out.Entries = append(out.Entries, entry)
+	}
+	return out, nil
+}
+
+func parseJournalctlLine(line string) AuditLogEntry {
+	// Format: 2024-01-15T10:30:00+0000 hostname kernel: [  123.456] message
+	before, after, ok := strings.Cut(line, "kernel:")
+	if !ok {
+		return AuditLogEntry{Timestamp: line, Type: "unknown", Message: line}
+	}
+	parts := strings.SplitN(after, "]", 2)
+	msg := strings.TrimSpace(parts[len(parts)-1])
+	ts := strings.TrimSpace(before)
+	return AuditLogEntry{Timestamp: ts, Type: "kernel", Message: msg}
+}
+
+func gatherFromAuditLog(lines int) (*AuditLogsOutput, error) {
+	f, err := os.Open("/var/log/audit/audit.log")
+	if err != nil {
+		return nil, fmt.Errorf("cannot open audit log: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	out := &AuditLogsOutput{Entries: make([]AuditLogEntry, 0)}
+	var allLines []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		allLines = append(allLines, scanner.Text())
+	}
+
+	start := max(len(allLines)-lines, 0)
+	for _, line := range allLines[start:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		entry := parseAuditdLine(line)
+		out.Entries = append(out.Entries, entry)
+	}
+	return out, nil
+}
+
+func parseAuditdLine(line string) AuditLogEntry {
+	// Format: type=AVC msg=audit(1700000000.123:456): avc: denied { read }
+	parenIdx := strings.Index(line, "): ")
+	if parenIdx == -1 {
+		return AuditLogEntry{Type: "unknown", Message: line}
+	}
+
+	header := line[:parenIdx+1]
+	msg := line[parenIdx+3:]
+
+	// Extract type from header: type=AVC msg=audit(...)
+	typeStart := strings.Index(header, "type=")
+	if typeStart == -1 {
+		return AuditLogEntry{Type: "unknown", Message: line}
+	}
+	typeEnd := strings.Index(header[typeStart:], " ")
+	msgType := header[typeStart+5 : typeEnd]
+
+	// Extract timestamp from msg=audit(...)
+	tsStart := strings.Index(header, "audit(")
+	tsEnd := strings.LastIndex(header, ")")
+	ts := ""
+	if tsStart != -1 && tsEnd > tsStart {
+		ts = header[tsStart+6 : tsEnd]
+	}
+
+	return AuditLogEntry{
+		Timestamp: ts,
+		Type:      msgType,
+		Message:   msg,
+	}
+}
+
+func HandleGetAuditLogs(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	input GetAuditLogsInput,
+) (*mcp.CallToolResult, *AuditLogsOutput, error) {
+	lines := input.Lines
+	if lines <= 0 {
+		lines = 50
+	}
+	return handleToolCall(
+		ctx,
+		config.ToolNameGetAuditLogs,
+		0,
+		func(ctx context.Context) (*AuditLogsOutput, error) {
+			return GatherAuditLogs(ctx, lines, input.Source)
 		},
 	)
 }

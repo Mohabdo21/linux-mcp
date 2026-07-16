@@ -346,33 +346,15 @@ func RegisterTools(server *mcp.Server) {
 	)
 	registerTool(
 		server,
-		config.ToolNameGetSystemHealthCheck,
-		"Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL.",
-		HandleGetSystemHealthCheck,
-	)
-	registerTool(
-		server,
 		config.ToolNameGetSMARTHealth,
-		"Returns SMART disk health data via smartctl including health status, temperature, power-on hours, and key attributes. Zero-privilege read-only tool.",
+		"Returns SMART disk health data including health status, temperature, power-on hours, and key attributes. Accepts optional device name; checks all devices if empty.",
 		HandleGetSMARTHealth,
-	)
-	registerTool(
-		server,
-		config.ToolNameGetSystemHealthCheck,
-		"Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL.",
-		HandleGetSystemHealthCheck,
 	)
 	registerTool(
 		server,
 		config.ToolNameGetSecurityAudit,
 		"Returns a security audit covering firewall rules, SSH hardening, SUID binaries, world-writable files, umask, and password policy. Includes a security score from 0-100.",
 		HandleGetSecurityAudit,
-	)
-	registerTool(
-		server,
-		config.ToolNameGetSMARTHealth,
-		"Returns SMART disk health data including health status, temperature, power-on hours, and key attributes. Accepts optional device name; checks all devices if empty.",
-		HandleGetSMARTHealth,
 	)
 	registerTool(
 		server,
@@ -385,5 +367,23 @@ func RegisterTools(server *mcp.Server) {
 		config.ToolNameGetProcDiagnostics,
 		"Returns deep /proc diagnostics: interrupts, softirqs, vmstat, diskstats, filesystems, version, and slabinfo. Accepts optional comma-separated sections filter.",
 		HandleGetProcDiagnostics,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetAuditLogs,
+		"Returns kernel audit log entries from journalctl -k or /var/log/audit/audit.log. Shows security-relevant events like AVC denials and system calls.",
+		HandleGetAuditLogs,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetFileLocks,
+		"Returns active file locks from /proc/locks including lock type, access mode, PID, byte range, and locked file path.",
+		HandleGetFileLocks,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSharedMemorySegments,
+		"Returns System V shared memory segments from /proc/sysvipc/shm including key, size, attached processes, and timestamps.",
+		HandleGetSharedMemorySegments,
 	)
 }
