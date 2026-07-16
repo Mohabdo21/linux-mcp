@@ -64,6 +64,13 @@ const (
 	ToolNameGetPowerAnalytics         = "get_power_analytics"
 	ToolNameGetUserInfo               = "get_user_info"
 	ToolNameGetIPInfo                 = "get_ip_info"
+	ToolNameGetBlockDevices           = "get_block_devices"
+	ToolNameGetSELinuxAppArmorStatus  = "get_selinux_apparmor_status"
+	ToolNameGetTimeSyncStatus         = "get_time_sync_status"
+	ToolNameGetRAIDStatus             = "get_raid_status"
+	ToolNameGetLogrotateStatus        = "get_logrotate_status"
+	ToolNameGetCronJobs               = "get_cron_jobs"
+	ToolNameGetSystemHealthCheck      = "get_system_health_check"
 )
 
 type Config struct {
@@ -140,6 +147,13 @@ func defaultConfig() *Config {
 			ToolNameGetPowerAnalytics:         "10s",
 			ToolNameGetUserInfo:               "10s",
 			ToolNameGetIPInfo:                 "10s",
+			ToolNameGetBlockDevices:           "10s",
+			ToolNameGetSELinuxAppArmorStatus:  "5s",
+			ToolNameGetTimeSyncStatus:         "10s",
+			ToolNameGetRAIDStatus:             "5s",
+			ToolNameGetLogrotateStatus:        "10s",
+			ToolNameGetCronJobs:               "10s",
+			ToolNameGetSystemHealthCheck:      "30s",
 		},
 		Disabled: []string{},
 	}

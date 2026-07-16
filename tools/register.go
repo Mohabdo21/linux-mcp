@@ -302,4 +302,46 @@ func RegisterTools(server *mcp.Server) {
 		"Returns IP geolocation data, ASN/organization information, and known service provider tags (e.g. \"AWS\", \"Cloudflare\", \"GitHub\") for a given IP address or your own public IP. Uses the ip-api.com free geolocation service.",
 		HandleGetIPInfo,
 	)
+	registerTool(
+		server,
+		config.ToolNameGetBlockDevices,
+		"Returns block devices and partitions detected on the system. Reads from sysfs and /proc/mounts to show device names, sizes, filesystem types, and mount points.",
+		HandleGetBlockDevices,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSELinuxAppArmorStatus,
+		"Returns the status of SELinux and AppArmor security modules. Checks getenforce for SELinux and sysfs/aa-status for AppArmor.",
+		HandleGetSELinuxAppArmorStatus,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetTimeSyncStatus,
+		"Returns NTP/Chrony time synchronization status. Shows NTP service state, sync status, system clock time, RTC time, stratum, and last offset.",
+		HandleGetTimeSyncStatus,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetRAIDStatus,
+		"Returns software RAID status from /proc/mdstat. Shows RAID devices, levels, array sizes, active/total devices, and health status (active/degraded/inactive).",
+		HandleGetRAIDStatus,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetLogrotateStatus,
+		"Returns logrotate configuration files found under /etc/logrotate.conf and /etc/logrotate.d/, plus the state file path.",
+		HandleGetLogrotateStatus,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetCronJobs,
+		"Returns system-level cron jobs from /etc/crontab and the periodic cron directories (/etc/cron.daily, .weekly, .hourly). Does not require root.",
+		HandleGetCronJobs,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSystemHealthCheck,
+		"Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL.",
+		HandleGetSystemHealthCheck,
+	)
 }

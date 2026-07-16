@@ -41,6 +41,18 @@ func RegisterResources(server *mcp.Server) {
 			Description: "Listening ports and associated processes"},
 		{URI: scheme("failed_logins"), Name: "Failed Logins",
 			Description: "Recent failed login attempts"},
+		{URI: scheme("block_devices"), Name: "Block Devices",
+			Description: "Block devices and partitions detected on the system"},
+		{URI: scheme("raid"), Name: "RAID Status",
+			Description: "Software RAID status from /proc/mdstat"},
+		{URI: scheme("time_sync"), Name: "Time Sync Status",
+			Description: "NTP/Chrony time synchronization status"},
+		{URI: scheme("selinux_apparmor"), Name: "SELinux/AppArmor Status",
+			Description: "Status of SELinux and AppArmor security modules"},
+		{URI: scheme("logrotate"), Name: "Logrotate Status",
+			Description: "Logrotate configuration and state file"},
+		{URI: scheme("health"), Name: "System Health Check",
+			Description: "Comprehensive system health assessment"},
 	}
 	for _, r := range resources {
 		r.MIMEType = "application/json"
@@ -111,6 +123,18 @@ func handleReadResource(
 		data, nerr = GatherListeningPorts(ctx, "")
 	case path == "/failed_logins":
 		data, nerr = GatherFailedLogins(ctx, 20)
+	case path == "/block_devices":
+		data, nerr = GatherBlockDevices(ctx)
+	case path == "/raid":
+		data, nerr = GatherRAIDStatus(ctx)
+	case path == "/time_sync":
+		data, nerr = GatherTimeSyncStatus(ctx)
+	case path == "/selinux_apparmor":
+		data, nerr = GatherSELinuxAppArmorStatus(ctx)
+	case path == "/logrotate":
+		data, nerr = GatherLogrotateStatus(ctx)
+	case path == "/health":
+		data, nerr = GatherSystemHealthCheck(ctx)
 	case strings.HasPrefix(path, "/disk/"):
 		mountPoint := strings.TrimPrefix(path, "/disk/")
 		if mountPoint != "" && !strings.HasPrefix(mountPoint, "/") {
