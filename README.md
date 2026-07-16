@@ -18,12 +18,13 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Processes** - running processes sorted by CPU or memory, open file descriptors per process
 - **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
 - **Services & automation** - systemd units, service status, user timers, crontab, system cron jobs
-- **Security** - active user sessions, failed login detection, SELinux/AppArmor status
+- **Security** - active user sessions, failed login detection, SELinux/AppArmor status, firewall/SSH/SUID/world-writable audit with security score
 - **Packages** - installed packages and available updates (pacman, dpkg)
 - **Hardware** - GPU info, PCI/USB bus devices, power/battery analytics
 - **Desktop session** - Wayland/X11 protocol, DE identifiers, runtime config
-- **Storage health** - RAID status, logrotate configuration, time synchronization
+- **Storage health** - RAID status, logrotate configuration, time synchronization, SMART disk health, per-device I/O metrics
 - **System health** - comprehensive health assessment with memory, disk, load, and systemd checks
+- **/proc diagnostics** - deep /proc inspection: interrupts, softirqs, vmstat, diskstats, filesystems, kernel version, slabinfo
 - **Man pages** - system manual pages for any installed command
 - **Snapshot** - comprehensive system overview in a single call
 - **MCP Resources** - system data also accessible as readable resources
@@ -149,11 +150,15 @@ Add the following to your OpenCode configuration:
 | `get_systemd_units`            | Returns all systemd units and their states for full service inventory                                                                                                                                                   |
 | `get_block_devices`            | Returns block devices and partitions detected on the system. Reads from sysfs and /proc/mounts to show device names, sizes, filesystem types, and mount points                                                          |
 | `get_selinux_apparmor_status`  | Returns the status of SELinux and AppArmor security modules. Checks getenforce for SELinux and sysfs/aa-status for AppArmor                                                                                             |
+| `get_security_audit`           | Returns firewall rules, SSH hardening settings, SUID binaries, world-writable files, umask, password policy, and a 0-100 security score                                                                                 |
+| `get_smart_health`             | Returns SMART disk health data including health status, temperature, power-on hours, and key attributes. Accepts optional device name; checks all devices if empty                                                      |
+| `get_disk_io_metrics`          | Returns disk I/O metrics per device from /proc/diskstats including reads, writes, sectors, and timing                                                                                                                   |
 | `get_time_sync_status`         | Returns NTP/Chrony time synchronization status. Shows NTP service state, sync status, system clock time, RTC time, stratum, and last offset                                                                             |
 | `get_raid_status`              | Returns software RAID status from /proc/mdstat. Shows RAID devices, levels, array sizes, active/total devices, and health status (active/degraded/inactive)                                                             |
 | `get_logrotate_status`         | Returns logrotate configuration files found under /etc/logrotate.conf and /etc/logrotate.d/, plus the state file path                                                                                                   |
 | `get_cron_jobs`                | Returns system-level cron jobs from /etc/crontab and the periodic cron directories (/etc/cron.daily, .weekly, .hourly). Does not require root                                                                           |
 | `get_system_health_check`      | Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL |
+| `get_proc_diagnostics`         | Returns deep /proc diagnostics: interrupts, softirqs, vmstat, diskstats, filesystems, version, and slabinfo. Accepts optional comma-separated sections filter                                                           |
 
 ### Available resources
 

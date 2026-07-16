@@ -71,6 +71,10 @@ const (
 	ToolNameGetLogrotateStatus        = "get_logrotate_status"
 	ToolNameGetCronJobs               = "get_cron_jobs"
 	ToolNameGetSystemHealthCheck      = "get_system_health_check"
+	ToolNameGetSecurityAudit          = "get_security_audit"
+	ToolNameGetSMARTHealth            = "get_smart_health"
+	ToolNameGetDiskIOMetrics          = "get_disk_io_metrics"
+	ToolNameGetProcDiagnostics        = "get_proc_diagnostics"
 )
 
 type Config struct {
@@ -154,6 +158,10 @@ func defaultConfig() *Config {
 			ToolNameGetLogrotateStatus:        "10s",
 			ToolNameGetCronJobs:               "10s",
 			ToolNameGetSystemHealthCheck:      "30s",
+			ToolNameGetSecurityAudit:          "120s",
+			ToolNameGetSMARTHealth:            "30s",
+			ToolNameGetDiskIOMetrics:          "10s",
+			ToolNameGetProcDiagnostics:        "10s",
 		},
 		Disabled: []string{},
 	}

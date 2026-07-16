@@ -344,4 +344,46 @@ func RegisterTools(server *mcp.Server) {
 		"Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL.",
 		HandleGetSystemHealthCheck,
 	)
+	registerTool(
+		server,
+		config.ToolNameGetSystemHealthCheck,
+		"Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL.",
+		HandleGetSystemHealthCheck,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSMARTHealth,
+		"Returns SMART disk health data via smartctl including health status, temperature, power-on hours, and key attributes. Zero-privilege read-only tool.",
+		HandleGetSMARTHealth,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSystemHealthCheck,
+		"Returns a comprehensive system health assessment. Checks memory usage, disk usage (partitions at 80%+), load average relative to core count, and failed systemd units. Returns overall status: OK, WARNING, or CRITICAL.",
+		HandleGetSystemHealthCheck,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSecurityAudit,
+		"Returns a security audit covering firewall rules, SSH hardening, SUID binaries, world-writable files, umask, and password policy. Includes a security score from 0-100.",
+		HandleGetSecurityAudit,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetSMARTHealth,
+		"Returns SMART disk health data including health status, temperature, power-on hours, and key attributes. Accepts optional device name; checks all devices if empty.",
+		HandleGetSMARTHealth,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetDiskIOMetrics,
+		"Returns disk I/O metrics per device from /proc/diskstats including reads, writes, sectors, and timing.",
+		HandleGetDiskIOMetrics,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetProcDiagnostics,
+		"Returns deep /proc diagnostics: interrupts, softirqs, vmstat, diskstats, filesystems, version, and slabinfo. Accepts optional comma-separated sections filter.",
+		HandleGetProcDiagnostics,
+	)
 }
