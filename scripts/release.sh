@@ -27,6 +27,9 @@ preflight_checks() {
 	if ! command -v gh &>/dev/null; then
 		error "'gh' CLI not found. Install it: https://cli.github.com/"
 	fi
+	if ! command -v cosign &>/dev/null; then
+		error "'cosign' not found. Install it: https://docs.sigstore.dev/cosign/installation/"
+	fi
 	if [ -z "${MCP_GITHUB_TOKEN:-}" ]; then
 		error "MCP_GITHUB_TOKEN is not set. Create a PAT at https://github.com/settings/tokens/new (repo + read:user) and set it as an env var."
 	fi
@@ -118,6 +121,14 @@ build_binaries() {
 	make build build-static VERSION="$VERSION"
 }
 
+sign_binaries() {
+	info "Signing binaries with Sigstore/Cosign (keyless)..."
+	info "A browser window will open for GitHub authentication."
+	cosign sign-blob --yes --bundle bin/linux-mcp.sigstore.json bin/linux-mcp
+	cosign sign-blob --yes --bundle bin/linux-mcp_static.sigstore.json bin/linux-mcp_static
+	info "Binaries signed successfully"
+}
+
 update_server_json() {
 	local version_no_v="${VERSION#v}"
 	local sha url
@@ -158,7 +169,9 @@ create_release() {
 	fi
 	gh release create "$VERSION" \
 		bin/linux-mcp \
+		bin/linux-mcp.sigstore.json \
 		bin/linux-mcp_static \
+		bin/linux-mcp_static.sigstore.json \
 		--title "$VERSION" \
 		--notes-file "$CHANGELOG_FILE"
 	rm -f "$CHANGELOG_FILE"
@@ -187,6 +200,7 @@ main() {
 	commit_server_json
 	tag_and_push
 	build_binaries
+	sign_binaries
 	create_release
 	publish_to_registry
 }
