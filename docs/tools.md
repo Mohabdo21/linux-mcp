@@ -9,14 +9,14 @@
 | `get_cpu_temperature`          | Returns current CPU temperature if sensor data is available                                                                                                                                                             |
 | `get_desktop_session_info`     | Returns display protocol (Wayland/X11), desktop environment identifiers, and runtime configuration                                                                                                                      |
 | `get_memory_info`              | Returns memory usage including RAM and swap statistics                                                                                                                                                                  |
-| `get_disk_info`                | Returns disk usage for mounted partitions, optionally filtered by mount point                                                                                                                                           |
+| `get_disk_info`                | Returns disk usage for mounted partitions, optionally filtered by mount point and usage threshold                                                                                                                       |
 | `get_network_info`             | Returns network I/O statistics per interface                                                                                                                                                                            |
-| `get_process_info`             | Returns list of running processes sortable by CPU or memory, with RSS/PSS/Swap bytes and cgroup path                                                                                                                    |
+| `get_process_info`             | Returns list of running processes sortable by CPU, memory, or both, with RSS/PSS/Swap bytes and cgroup path                                                                                                             |
 | `get_process_fds`              | Lists open file descriptors (files, sockets, pipes) and total count for a specific process ID                                                                                                                           |
 | `get_docker_info`              | Returns Docker containers and images if Docker is installed                                                                                                                                                             |
 | `get_docker_container_details` | Returns detailed container state, config, env, mounts, and network settings                                                                                                                                             |
 | `get_docker_container_logs`    | Returns log lines from a container with optional tail count and timestamps                                                                                                                                              |
-| `get_docker_container_stats`   | Returns live CPU, memory, network I/O, and PIDs for one or more containers (comma-separated names/IDs, or `all`)                                                                                                        |
+| `get_docker_container_stats`   | Returns live CPU, memory, network I/O, and PIDs for one or more containers (comma-separated names/IDs, or `all`). Note: using `all` is equivalent to calling `get_docker_stats_all`.                                    |
 | `get_docker_container_top`     | Returns running processes inside a Docker container                                                                                                                                                                     |
 | `get_docker_container_diff`    | Returns filesystem changes in a container since it was started                                                                                                                                                          |
 | `get_docker_image_history`     | Returns layer history of a Docker image including commands, sizes, and creation times                                                                                                                                   |
@@ -36,7 +36,7 @@
 | `get_service_status`           | Returns detailed status of a systemd service; set `user=true` to query user-level service                                                                                                                               |
 | `get_top_io_processes`         | Returns processes with the highest disk I/O activity to diagnose system lag                                                                                                                                             |
 | `get_user_automation`          | Aggregates crontab entries and systemd user timers for a complete view of user-level scheduled tasks                                                                                                                    |
-| `get_failed_logins`            | Returns recent failed login attempts to detect brute-force attacks                                                                                                                                                      |
+| `get_failed_logins`            | Returns recent failed login attempts (excluding Boot records) with summary statistics                                                                                                                                   |
 | `get_gpu_info`                 | Returns GPU information including usage, memory, temperature, and power draw (supports NVIDIA, AMD, Intel)                                                                                                              |
 | `get_power_analytics`          | Returns battery status, charge percentage, discharge rate, capacity degradation, and AC power state                                                                                                                     |
 | `get_hardware_bus_info`        | Lists detected PCI and USB devices for driver troubleshooting and hardware identification                                                                                                                               |
@@ -46,7 +46,7 @@
 | `check_updates`                | Count or list available package updates without applying them (pacman -Qu or apt list --upgradable)                                                                                                                     |
 | `get_load_average`             | Returns 1-, 5-, and 15-minute load averages as a universal system health check                                                                                                                                          |
 | `get_logged_in_users`          | Returns active user sessions for security and workload awareness                                                                                                                                                        |
-| `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit                                                                                                                          |
+| `get_man_page`                 | Returns the full system manual page for a given command as plain text with optional line limit and case-insensitive search with context lines                                                                           |
 | `resolve_dns`                  | Resolves a hostname to IP addresses to distinguish DNS failures from network failures                                                                                                                                   |
 | `get_ip_info`                  | Returns IP geolocation (country, city, region), ASN/organization, and detected service provider tags (e.g. "AWS", "Cloudflare", "GitHub"). Uses ip-api.com free geolocation API                                         |
 | `get_user_info`                | Lists system users parsed from /etc/passwd and /etc/group including username, UID, GID, home directory, shell, and supplementary group memberships. Supports optional username filtering.                               |
@@ -71,24 +71,24 @@
 
 In addition to tools, the server exposes system data as MCP resources that clients can read and subscribe to:
 
-| Resource                                  | Description                                                          |
-| ----------------------------------------- | -------------------------------------------------------------------- |
-| `system:///info`                          | Hostname, OS, kernel version, architecture, and uptime               |
-| `system:///cpu`                           | CPU usage, model, frequency, and core counts                         |
-| `system:///memory`                        | RAM and swap usage statistics                                        |
-| `system:///disk`                          | Disk usage for all mounted partitions                                |
-| `system:///disk/{mount_point}` (template) | Disk usage for a specific mount point (e.g. `system:///disk//`)      |
-| `system:///network`                       | Network I/O statistics per interface                                 |
-| `system:///load`                          | 1-, 5-, and 15-minute load averages                                  |
-| `system:///temperature`                   | Current CPU temperature from available sensors                       |
-| `system:///gpu`                           | GPU usage, memory, temperature, and power (NVIDIA/AMD/Intel)         |
-| `system:///logged_in_users`               | Active user sessions                                                 |
-| `system:///listening_ports`               | Listening ports and associated processes                             |
-| `system:///failed_logins`                 | Recent failed login attempts                                         |
-| `system:///service/{name}` (template)     | Detailed status of a systemd service (e.g. `system:///service/sshd`) |
-| `system:///block_devices`                 | Block devices and partitions detected on the system                  |
-| `system:///raid`                          | Software RAID status from /proc/mdstat                               |
-| `system:///time_sync`                     | NTP/Chrony time synchronization status                               |
-| `system:///selinux_apparmor`              | Status of SELinux and AppArmor security modules                      |
-| `system:///logrotate`                     | Logrotate configuration and state file                               |
-| `system:///health`                        | Comprehensive system health assessment                               |
+| Resource                                  | Description                                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `system:///info`                          | Hostname, OS, kernel version, architecture, and uptime                                                   |
+| `system:///cpu`                           | CPU usage, model, frequency, and core counts                                                             |
+| `system:///memory`                        | RAM and swap usage statistics                                                                            |
+| `system:///disk`                          | Disk usage for all mounted partitions                                                                    |
+| `system:///disk/{mount_point}` (template) | Disk usage for a specific mount point (e.g. `system:///disk/` for root, `system:///disk/boot` for /boot) |
+| `system:///network`                       | Network I/O statistics per interface                                                                     |
+| `system:///load`                          | 1-, 5-, and 15-minute load averages                                                                      |
+| `system:///temperature`                   | Current CPU temperature from available sensors                                                           |
+| `system:///gpu`                           | GPU usage, memory, temperature, and power (NVIDIA/AMD/Intel)                                             |
+| `system:///logged_in_users`               | Active user sessions                                                                                     |
+| `system:///listening_ports`               | Listening ports and associated processes                                                                 |
+| `system:///failed_logins`                 | Recent failed login attempts                                                                             |
+| `system:///service/{name}` (template)     | Detailed status of a systemd service (e.g. `system:///service/sshd`)                                     |
+| `system:///block_devices`                 | Block devices and partitions detected on the system                                                      |
+| `system:///raid`                          | Software RAID status from /proc/mdstat                                                                   |
+| `system:///time_sync`                     | NTP/Chrony time synchronization status                                                                   |
+| `system:///selinux_apparmor`              | Status of SELinux and AppArmor security modules                                                          |
+| `system:///logrotate`                     | Logrotate configuration and state file                                                                   |
+| `system:///health`                        | Comprehensive system health assessment                                                                   |
