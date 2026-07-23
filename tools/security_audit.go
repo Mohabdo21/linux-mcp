@@ -2,11 +2,13 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -179,12 +181,10 @@ func gatherWorldWritable(ctx context.Context) []string {
 	return files
 }
 
-func gatherUmask(ctx context.Context) string {
-	out, err := execOutput(ctx, "bash", "-c", "umask")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(out)
+func gatherUmask() string {
+	mask := syscall.Umask(0)
+	syscall.Umask(mask)
+	return fmt.Sprintf("%04o", mask)
 }
 
 func gatherPasswordPolicy() PasswordPolicyInfo {
@@ -251,7 +251,7 @@ func GatherSecurityAudit(ctx context.Context) (*SecurityAuditOutput, error) {
 	out.SSHHardening = gatherSSHHardening()
 	out.SUIDBinaries = nilToEmpty(gatherSUIDBinaries(ctx))
 	out.WorldWritable = nilToEmpty(gatherWorldWritable(ctx))
-	out.Umask = gatherUmask(ctx)
+	out.Umask = gatherUmask()
 	out.PasswordPolicy = gatherPasswordPolicy()
 	out.Score = computeSecurityScore(out)
 

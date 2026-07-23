@@ -1127,24 +1127,6 @@ func TestHumanSize(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
-	cases := []struct {
-		input string
-		want  string
-	}{
-		{"simple", "'simple'"},
-		{"path with spaces", "'path with spaces'"},
-		{"it's", "'it'\\''s'"},
-		{"/home/user", "'/home/user'"},
-	}
-	for _, c := range cases {
-		got := ShellQuote(c.input)
-		if got != c.want {
-			t.Errorf("ShellQuote(%q) = %q, want %q", c.input, got, c.want)
-		}
-	}
-}
-
 func TestGatherUserAutomation(t *testing.T) {
 	out, err := GatherUserAutomation(t.Context())
 	skipOnErr(t, err, "GatherUserAutomation() error: %v", err)

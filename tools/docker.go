@@ -240,14 +240,7 @@ func GatherContainerDetail(
 			if c.Config != nil {
 				env = c.Config.Env
 			}
-			env = nilToEmpty(env)
-			for i, e := range env {
-				if before, _, ok := strings.Cut(e, "="); ok {
-					if isSensitiveEnvVar(before) {
-						env[i] = before + "=***"
-					}
-				}
-			}
+			env = redactSensitiveEnv(env)
 
 			status, _ := state["status"].(string)
 
@@ -942,6 +935,7 @@ func GatherImageDetail(
 				workingDir = result.Config.WorkingDir
 				labels = result.Config.Labels
 			}
+			env = redactSensitiveEnv(env)
 
 			repoTags := result.RepoTags
 			repoTags = nilToEmpty(repoTags)

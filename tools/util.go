@@ -32,10 +32,6 @@ func HumanSize(bytes int64) string {
 		"%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-func ShellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-}
-
 func SplitHostPort(s string) (string, string, bool) {
 	idx := strings.LastIndex(s, ":")
 	if idx >= 0 {
@@ -204,6 +200,18 @@ func shortID(id string) string {
 var sensitiveEnvPatterns = []string{
 	"SECRET", "TOKEN", "PASSWORD", "CREDENTIAL",
 	"API_KEY", "PRIVATE_KEY", "DATABASE_URL",
+}
+
+func redactSensitiveEnv(env []string) []string {
+	env = nilToEmpty(env)
+	for i, e := range env {
+		if before, _, ok := strings.Cut(e, "="); ok {
+			if isSensitiveEnvVar(before) {
+				env[i] = before + "=***"
+			}
+		}
+	}
+	return env
 }
 
 func isSensitiveEnvVar(name string) bool {

@@ -457,7 +457,7 @@ func parseASN(asField string) string {
 	return parts[0]
 }
 
-const ipAPIURL = "http://ip-api.com/json/"
+const ipAPIURL = "https://ip-api.com/json/"
 
 func GatherIPInfo(ctx context.Context, ip string) (*IPInfoOutput, error) {
 	url := ipAPIURL

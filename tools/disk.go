@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -179,6 +180,7 @@ func GatherLargestFiles(
 	if path == "" {
 		path = "."
 	}
+	path = filepath.Clean(path)
 	dirEntries, err := os.ReadDir(path)
 	if err != nil {
 		return &LargestFilesOutput{
