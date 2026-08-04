@@ -1,6 +1,7 @@
 # linux-mcp - Linux MCP Server
 
-[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-linux--mcp-000?style=flat-square&logo=github)](https://registry.modelcontextprotocol.io)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-linux--mcp-000?style=flat-square&logo=github)](https://registry.modelcontextprotocol.io) [![linux-mcp MCP server](https://glama.ai/mcp/servers/Mohabdo21/linux-mcp/badges/score.svg)](https://glama.ai/mcp/servers/Mohabdo21/linux-mcp)
+[![linux-mcp MCP server](https://glama.ai/mcp/servers/Mohabdo21/linux-mcp/badges/card.svg)](https://glama.ai/mcp/servers/Mohabdo21/linux-mcp)
 
 A Linux system monitoring server built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Provides real-time system information - CPU, memory, disk, network, processes, Docker, and more - via MCP tools over STDIO transport.
 
