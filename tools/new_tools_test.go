@@ -183,8 +183,11 @@ func TestParseLoginDefs(t *testing.T) {
 	if vals == nil {
 		t.Skip("Cannot read /etc/login.defs")
 	}
-	if _, ok := vals["PASS_MAX_DAYS"]; !ok {
-		t.Error("Expected PASS_MAX_DAYS in login.defs")
+	// PASS_MAX_DAYS is optional; the file varies by distro (rolling releases
+	// often leave password-policy defaults commented out). The parser's
+	// contract is key/value extraction, so assert it parsed real directives.
+	if len(vals) == 0 {
+		t.Error("Expected non-empty config values")
 	}
 }
 
