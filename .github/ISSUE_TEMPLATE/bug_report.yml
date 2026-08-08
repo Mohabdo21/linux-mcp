@@ -1,0 +1,41 @@
+---
+name: Bug report
+description: Report a bug to help us improve linux-mcp
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps, commands, and MCP tool calls used.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Paste relevant error output or stack traces.
+      render: bash
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, kernel, Go version, linux-mcp version (or commit).
+      value: |
+        - OS:
+        - Kernel:
+        - Go:
+        - Version:
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might help.

@@ -1,0 +1,24 @@
+---
+name: Feature request
+description: Suggest a new tool, resource, or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that linux-mcp can't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Sketch of the new tool/resource and its expected output.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds or alternative designs you considered.
