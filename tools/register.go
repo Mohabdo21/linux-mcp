@@ -256,6 +256,24 @@ func RegisterTools(server *mcp.Server) {
 	)
 	registerTool(
 		server,
+		config.ToolNameGetBootTime,
+		"Returns the boot-time breakdown from systemd-analyze time: per-phase durations (firmware, loader, kernel, initrd, userspace), total startup time, and the reached target. Read-only; fatal only if systemd-analyze is missing or fails. Use to quantify where boot time goes.",
+		HandleGetBootTime,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetBootBlame,
+		"Returns systemd units ordered by init time from systemd-analyze blame: unit names with their start durations. Read-only; fatal only if systemd-analyze is missing or fails. Use to find slow-starting services; get_boot_critical_chain for the dependency chain.",
+		HandleGetBootBlame,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetBootCriticalChain,
+		"Returns the time-critical boot chain from systemd-analyze critical-chain: a dependency tree of units with their active-time point and start duration. Optional unit param starts the chain from a specific unit. Read-only; fatal only if systemd-analyze is missing or fails. Use to find what delays the boot target.",
+		HandleGetBootCriticalChain,
+	)
+	registerTool(
+		server,
 		config.ToolNameGetManPage,
 		"Fetches the authoritative man page for a command as plain text. command is required and validated. Read-only via man -P cat. Options: max_lines (500-10000) with a truncated flag, case-insensitive search with context_lines, and offset. Fatal if man is missing or there is no manual entry. Use when the user asks about flags, syntax, or edge cases.",
 		HandleGetManPage,

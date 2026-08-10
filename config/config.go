@@ -56,6 +56,9 @@ const (
 	ToolNameResolveDNS                = "resolve_dns"
 	ToolNameGetMountOptions           = "get_mount_options"
 	ToolNameGetSystemdUnits           = "get_systemd_units"
+	ToolNameGetBootTime               = "get_boot_time"
+	ToolNameGetBootBlame              = "get_boot_blame"
+	ToolNameGetBootCriticalChain      = "get_boot_critical_chain"
 	ToolNameGetManPage                = "get_man_page"
 	ToolNameGetEnvironmentVariables   = "get_environment_variables"
 	ToolNameGetHardwareBusInfo        = "get_hardware_bus_info"
@@ -150,6 +153,9 @@ func defaultConfig() *Config {
 			ToolNameResolveDNS:                "10s",
 			ToolNameGetMountOptions:           "10s",
 			ToolNameGetSystemdUnits:           "10s",
+			ToolNameGetBootTime:               "10s",
+			ToolNameGetBootBlame:              "10s",
+			ToolNameGetBootCriticalChain:      "10s",
 			ToolNameGetNetworkConnections:     "10s",
 			ToolNameGetPowerAnalytics:         "10s",
 			ToolNameGetUserInfo:               "10s",
