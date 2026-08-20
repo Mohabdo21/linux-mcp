@@ -464,10 +464,10 @@ func GatherIPInfo(ctx context.Context, ip string) (*IPInfoOutput, error) {
 	if ip != "" {
 		if parsed := net.ParseIP(ip); parsed == nil {
 			return &IPInfoOutput{
-					IP: ip,
-				}, net.InvalidAddrError(
-					"invalid IP address",
-				)
+				IP: ip,
+			}, net.InvalidAddrError(
+				"invalid IP address",
+			)
 		}
 		url += ip
 	}

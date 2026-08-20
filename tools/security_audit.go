@@ -133,13 +133,13 @@ func gatherSSHHardening() SSHHardeningInfo {
 		if vals == nil {
 			continue
 		}
-		info := SSHHardeningInfo{ConfigPresent: true}
-		info.PermitRootLogin = vals["permitrootlogin"]
-		info.PasswordAuthentication = vals["passwordauthentication"]
-		info.PubkeyAuthentication = vals["pubkeyauthentication"]
-		info.X11Forwarding = vals["x11forwarding"]
-		info.MaxAuthTries = vals["maxauthtries"]
-		info.Protocol = vals["protocol"]
+		info := SSHHardeningInfo{ConfigPresent: true,
+			PermitRootLogin:        vals["permitrootlogin"],
+			PasswordAuthentication: vals["passwordauthentication"],
+			PubkeyAuthentication:   vals["pubkeyauthentication"],
+			X11Forwarding:          vals["x11forwarding"],
+			MaxAuthTries:           vals["maxauthtries"],
+			Protocol:               vals["protocol"]}
 		return info
 	}
 	return SSHHardeningInfo{}
@@ -192,10 +192,10 @@ func gatherPasswordPolicy() PasswordPolicyInfo {
 	if defs == nil {
 		return PasswordPolicyInfo{}
 	}
-	info := PasswordPolicyInfo{}
-	info.PassMaxDays = defs["PASS_MAX_DAYS"]
-	info.PassMinDays = defs["PASS_MIN_DAYS"]
-	info.PassWarnAge = defs["PASS_WARN_AGE"]
+	info := PasswordPolicyInfo{
+		PassMaxDays: defs["PASS_MAX_DAYS"],
+		PassMinDays: defs["PASS_MIN_DAYS"],
+		PassWarnAge: defs["PASS_WARN_AGE"]}
 	return info
 }
 
