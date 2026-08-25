@@ -269,7 +269,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetBootCriticalChain,
-		"Returns the time-critical boot chain from systemd-analyze critical-chain: a dependency tree of units with their active-time point and start duration. Optional unit param starts the chain from a specific unit. Read-only; fatal only if systemd-analyze is missing or fails. Use to find what delays the boot target.",
+		"Returns the time-critical boot chain from systemd-analyze critical-chain: a dependency tree of units with their active-time point and start duration. Read-only; fatal only if systemd-analyze is missing or fails. When unit is omitted, returns the full chain to the default target (usually graphical.target). When unit is provided (e.g. 'nginx.service'), returns only the chain from that unit downward. Use to find what delays the boot target; for raw per-unit durations prefer get_boot_blame, for phase-level breakdown prefer get_boot_time.",
 		HandleGetBootCriticalChain,
 	)
 	registerTool(
@@ -407,7 +407,7 @@ func RegisterTools(server *mcp.Server) {
 	registerTool(
 		server,
 		config.ToolNameGetProcessTree,
-		"Returns a flat process list with depth info showing parent-child hierarchy. Optional pid param shows only the subtree rooted at that PID. Read-only from /proc/*/stat and /proc/*/comm. Use to understand process hierarchy and trace spawned children.",
+		"Returns a flat process list with depth info showing parent-child hierarchy. Read-only from /proc/*/stat and /proc/*/comm. When pid is omitted, returns all processes rooted at init (ppid 0). When pid is provided, returns only that subtree. Invalid or missing PIDs return empty nodes with no error. Use to understand process hierarchy and trace spawned children; for per-process resource usage prefer get_process_info.",
 		HandleGetProcessTree,
 	)
 	registerTool(
