@@ -31,7 +31,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 
 ## Prerequisites
 
-- **Go 1.26+** (to build from source)
+- **Go 1.27+** (to build from source)
 - **Linux** (the server targets Linux; some tools use Linux-specific paths)
 - **Docker** (optional - only needed for Docker tools)
 
@@ -98,7 +98,7 @@ Add the following to your OpenCode configuration:
 
 ### Tools and resources
 
-62 tools and 19 resources covering system, CPU, memory, disk, network, processes, Docker, security, packages, hardware, and more.
+69 tools and 19 resources covering system, CPU, memory, disk, network, processes, Docker, security, packages, hardware, and more.
 
 **[Full tool and resource reference](docs/tools.md)**
 
