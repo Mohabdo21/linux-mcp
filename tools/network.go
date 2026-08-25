@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -519,5 +520,101 @@ func HandleGetIPInfo(
 		func(ctx context.Context) (*IPInfoOutput, error) {
 			return GatherIPInfo(ctx, input.IP)
 		},
+	)
+}
+
+type RouteEntry struct {
+	Destination string `json:"destination"`
+	Gateway     string `json:"gateway,omitempty"`
+	Interface   string `json:"interface"`
+	Proto       string `json:"proto,omitempty"`
+	Scope       string `json:"scope,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Metric      int    `json:"metric,omitempty"`
+	MTU         int    `json:"mtu,omitempty"`
+}
+
+type RoutingTableOutput struct {
+	Routes []RouteEntry `json:"routes"`
+	Total  int          `json:"total"`
+	OutputErrors
+}
+
+func GatherRoutingTable(
+	ctx context.Context,
+) (*RoutingTableOutput, error) {
+	lines, err := execLines(ctx, "ip", "route", "show")
+	if err != nil {
+		return nil, err
+	}
+
+	var routes []RouteEntry
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		entry := RouteEntry{
+			Destination: fields[0],
+		}
+
+		for i := 1; i < len(fields); i++ {
+			switch fields[i] {
+			case "via":
+				if i+1 < len(fields) {
+					entry.Gateway = fields[i+1]
+					i++
+				}
+			case "dev":
+				if i+1 < len(fields) {
+					entry.Interface = fields[i+1]
+					i++
+				}
+			case "proto":
+				if i+1 < len(fields) {
+					entry.Proto = fields[i+1]
+					i++
+				}
+			case "scope":
+				if i+1 < len(fields) {
+					entry.Scope = fields[i+1]
+					i++
+				}
+			case "metric":
+				if i+1 < len(fields) {
+					entry.Metric, _ = strconv.Atoi(fields[i+1])
+					i++
+				}
+			case "mtu":
+				if i+1 < len(fields) {
+					entry.MTU, _ = strconv.Atoi(fields[i+1])
+					i++
+				}
+			case "kernel", "connected", "static", "broadcast", "local",
+				"multicast", "unreachable", "prohibit", "blackhole":
+				entry.Type = fields[i]
+			}
+		}
+
+		routes = append(routes, entry)
+	}
+
+	return &RoutingTableOutput{
+		Routes: nilToEmpty(routes),
+		Total:  len(routes),
+	}, nil
+}
+
+func HandleGetRoutingTable(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	_ NoArgs,
+) (*mcp.CallToolResult, *RoutingTableOutput, error) {
+	return handleToolCall(
+		ctx,
+		config.ToolNameGetRoutingTable,
+		0,
+		GatherRoutingTable,
 	)
 }

@@ -404,4 +404,28 @@ func RegisterTools(server *mcp.Server) {
 		"Returns System V shared memory segments from /proc/sysvipc/shm: key, size, attached processes, and timestamps. Read-only; an unreadable file is silently swallowed. Use for IPC and leak investigation.",
 		HandleGetSharedMemorySegments,
 	)
+	registerTool(
+		server,
+		config.ToolNameGetProcessTree,
+		"Returns a flat process list with depth info showing parent-child hierarchy. Optional pid param shows only the subtree rooted at that PID. Read-only from /proc/*/stat and /proc/*/comm. Use to understand process hierarchy and trace spawned children.",
+		HandleGetProcessTree,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetKernelModules,
+		"Returns loaded kernel modules with size, reference count, and dependency info. Read-only from /proc/modules. Use for driver and module troubleshooting.",
+		HandleGetKernelModules,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetRoutingTable,
+		"Returns the kernel routing table: destination, gateway, interface, proto, scope, metric, and MTU. Read-only via ip route show. Use for network path and gateway troubleshooting.",
+		HandleGetRoutingTable,
+	)
+	registerTool(
+		server,
+		config.ToolNameGetIOStats,
+		"Returns per-device extended I/O statistics: throughput, IOPS, latency, queue depth, and utilization. Read-only via iostat -xd 1 1. Requires sysstat/iostat installed. Use for storage performance analysis; get_disk_io_metrics for cumulative counters.",
+		HandleGetIOStats,
+	)
 }

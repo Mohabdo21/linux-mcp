@@ -324,3 +324,160 @@ func readCgroupPath(pid int32) string {
 	}
 	return ""
 }
+
+type GetProcessTreeInput struct {
+	PID *int32 `json:"pid,omitempty" jsonschema:"optional PID to show subtree from (omit for full tree)"`
+}
+
+type ProcessTreeNode struct {
+	PID    int32  `json:"pid"`
+	PPID   int32  `json:"ppid"`
+	Name   string `json:"name"`
+	Depth  int    `json:"depth"`
+	IsLeaf bool   `json:"is_leaf"`
+}
+
+type ProcessTreeOutput struct {
+	Nodes    []ProcessTreeNode `json:"nodes"`
+	Total    int               `json:"total"`
+	Filtered bool              `json:"filtered,omitempty"`
+	OutputErrors
+}
+
+func parseProcStat() (map[int32]struct {
+	ppid int32
+	name string
+}, error) {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return nil, err
+	}
+	procs := make(map[int32]struct {
+		ppid int32
+		name string
+	})
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		pid, err := strconv.ParseInt(e.Name(), 10, 32)
+		if err != nil {
+			continue
+		}
+		statPath := fmt.Sprintf("/proc/%d/stat", pid)
+		data, err := os.ReadFile(statPath)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		// Find the last ) to handle executable names with spaces/parens.
+		idx := strings.LastIndex(content, ")")
+		if idx < 0 {
+			continue
+		}
+		fields := strings.Fields(content[idx+2:])
+		if len(fields) < 2 {
+			continue
+		}
+		ppid, _ := strconv.ParseInt(fields[1], 10, 32)
+		commPath := fmt.Sprintf("/proc/%d/comm", pid)
+		name, err := os.ReadFile(commPath)
+		comm := ""
+		if err == nil {
+			comm = strings.TrimSpace(string(name))
+		}
+		procs[int32(pid)] = struct {
+			ppid int32
+			name string
+		}{ppid: int32(ppid), name: comm}
+	}
+	return procs, nil
+}
+
+func flattenTree(
+	procs map[int32]struct {
+		ppid int32
+		name string
+	},
+	rootPID int32,
+) []ProcessTreeNode {
+	childrenMap := make(map[int32][]int32)
+	for pid, info := range procs {
+		if pid != rootPID {
+			childrenMap[info.ppid] = append(childrenMap[info.ppid], pid)
+		}
+	}
+
+	var nodes []ProcessTreeNode
+	var walk func(pid, depth int32)
+	walk = func(pid, depth int32) {
+		info := procs[pid]
+		children := childrenMap[pid]
+		nodes = append(nodes, ProcessTreeNode{
+			PID:    pid,
+			PPID:   info.ppid,
+			Name:   info.name,
+			Depth:  int(depth),
+			IsLeaf: len(children) == 0,
+		})
+		for _, childPID := range children {
+			walk(childPID, depth+1)
+		}
+	}
+
+	if rootPID != 0 {
+		if _, ok := procs[rootPID]; ok {
+			walk(rootPID, 0)
+		}
+	} else {
+		// Find all root processes (ppid == 0 or self).
+		var roots []int32
+		for pid, info := range procs {
+			if info.ppid == 0 || info.ppid == pid {
+				roots = append(roots, pid)
+			}
+		}
+		for _, r := range roots {
+			walk(r, 0)
+		}
+	}
+
+	return nodes
+}
+
+func GatherProcessTree(
+	ctx context.Context,
+	pid *int32,
+) (*ProcessTreeOutput, error) {
+	procs, err := parseProcStat()
+	if err != nil {
+		return nil, err
+	}
+
+	var rootPID int32
+	if pid != nil {
+		rootPID = *pid
+	}
+
+	nodes := flattenTree(procs, rootPID)
+	return &ProcessTreeOutput{
+		Nodes:    nilToEmpty(nodes),
+		Total:    len(nodes),
+		Filtered: pid != nil,
+	}, nil
+}
+
+func HandleGetProcessTree(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	input GetProcessTreeInput,
+) (*mcp.CallToolResult, *ProcessTreeOutput, error) {
+	return handleToolCall(
+		ctx,
+		config.ToolNameGetProcessTree,
+		0,
+		func(ctx context.Context) (*ProcessTreeOutput, error) {
+			return GatherProcessTree(ctx, input.PID)
+		},
+	)
+}

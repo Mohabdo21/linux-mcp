@@ -277,3 +277,116 @@ func HandleGetDiskIOMetrics(
 		GatherDiskIOMetrics,
 	)
 }
+
+type IOStatDevice struct {
+	Device     string  `json:"device"`
+	ReadKBs    float64 `json:"read_kBs"`
+	WriteKBs   float64 `json:"write_kBs"`
+	DiscardKBs float64 `json:"discard_kBs,omitempty"`
+	ReadsPerS  float64 `json:"reads_per_s"`
+	WritesPerS float64 `json:"writes_per_s"`
+	AVGWaitMs  float64 `json:"avg_wait_ms"`
+	AVGReadMs  float64 `json:"avg_read_ms"`
+	AVGWriteMs float64 `json:"avg_write_ms"`
+	QueueSize  float64 `json:"queue_size,omitempty"`
+	UtilPct    float64 `json:"util_pct,omitempty"`
+}
+
+type IOStatsOutput struct {
+	Devices []IOStatDevice `json:"devices"`
+	OutputErrors
+}
+
+func GatherIOStats(
+	ctx context.Context,
+) (*IOStatsOutput, error) {
+	lines, err := execLines(ctx, "iostat", "-xd", "1", "1")
+	if err != nil {
+		return nil, fmt.Errorf("iostat not found or failed: %w", err)
+	}
+
+	var devices []IOStatDevice
+	headerFound := false
+	for _, line := range lines {
+		// Skip until we find the device header line.
+		if strings.Contains(line, "Device") {
+			headerFound = true
+			continue
+		}
+		if !headerFound {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		// Extended stats: device, r_await, w_await, rareq-sz, wareq-sz,
+		// aqu-sz, %util, rkB/s, wkB/s, rrqm/s, wrqm/s, r/s, w/s
+		// iostat -xd output columns (varies by version, but typical):
+		// Device  r/s  rkB/s  rrqm/s  %rrqm  r_await  rareq-sz  ...  w/s  wkB/s  wrqm/s  %wrqm  w_await  wareq-sz  ...  d/s  dkB/s  drqm/s  %drqm  d_await  dareq-sz  ...  f/s  f_await  aqu-sz  %util
+		if len(fields) < 4 {
+			continue
+		}
+		name := fields[0]
+		if strings.HasPrefix(name, "loop") ||
+			strings.HasPrefix(name, "ram") ||
+			strings.HasPrefix(name, "zram") {
+			continue
+		}
+
+		dev := IOStatDevice{Device: name}
+
+		// Parse known fields by searching for the key columns.
+		// iostat -xd has many columns; we parse what's available.
+		// Column positions depend on the iostat version, so we use
+		// a robust approach: find known column headers or parse by position.
+		// Typical columns after device name:
+		// r/s rkB/s rrqm/s %rrm r_await rareq-sz w/s wkB/s wrqm/s %wrm w_await wareq-sz d/s dkB/s drqm/s %drm d_await dareq-sz f/s f_await aqu-sz %util
+		//
+		// We handle both 14-column (older) and 20+ column (newer) layouts.
+		n := len(fields) - 1 // number of numeric fields after device name
+
+		switch {
+		case n >= 19:
+			// Newer iostat: device r/s rkB/s rrqm/s %rrqm r_await rareq-sz w/s wkB/s wrqm/s %wrqm w_await wareq-sz d/s dkB/s drqm/s %drqm d_await dareq-sz f/s f_await aqu-sz %util
+			dev.ReadsPerS, _ = strconv.ParseFloat(fields[1], 64)
+			dev.ReadKBs, _ = strconv.ParseFloat(fields[2], 64)
+			dev.AVGReadMs, _ = strconv.ParseFloat(fields[5], 64)
+			dev.WritesPerS, _ = strconv.ParseFloat(fields[7], 64)
+			dev.WriteKBs, _ = strconv.ParseFloat(fields[8], 64)
+			dev.AVGWriteMs, _ = strconv.ParseFloat(fields[11], 64)
+			dev.DiscardKBs, _ = strconv.ParseFloat(fields[14], 64)
+			dev.AVGWaitMs, _ = strconv.ParseFloat(fields[17], 64)
+			dev.QueueSize, _ = strconv.ParseFloat(fields[20], 64)
+			dev.UtilPct, _ = strconv.ParseFloat(fields[21], 64)
+		case n >= 14:
+			// Older iostat -xd: device rrqm/s wrqm/s r/s w/s rkB/s wkB/s avgrq-sz avgqu-sz await r_await w_await svctm %util
+			dev.ReadsPerS, _ = strconv.ParseFloat(fields[3], 64)
+			dev.ReadKBs, _ = strconv.ParseFloat(fields[5], 64)
+			dev.WritesPerS, _ = strconv.ParseFloat(fields[4], 64)
+			dev.WriteKBs, _ = strconv.ParseFloat(fields[6], 64)
+			dev.QueueSize, _ = strconv.ParseFloat(fields[8], 64)
+			dev.AVGWaitMs, _ = strconv.ParseFloat(fields[9], 64)
+			dev.AVGReadMs, _ = strconv.ParseFloat(fields[10], 64)
+			dev.AVGWriteMs, _ = strconv.ParseFloat(fields[11], 64)
+			dev.UtilPct, _ = strconv.ParseFloat(fields[13], 64)
+		default:
+			continue
+		}
+
+		devices = append(devices, dev)
+	}
+
+	return &IOStatsOutput{Devices: nilToEmpty(devices)}, nil
+}
+
+func HandleGetIOStats(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	_ NoArgs,
+) (*mcp.CallToolResult, *IOStatsOutput, error) {
+	return handleToolCall(
+		ctx,
+		config.ToolNameGetIOStats,
+		0,
+		GatherIOStats,
+	)
+}

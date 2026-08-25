@@ -81,6 +81,10 @@ const (
 	ToolNameGetAuditLogs              = "get_audit_logs"
 	ToolNameGetFileLocks              = "get_file_locks"
 	ToolNameGetSharedMemorySegments   = "get_shared_memory_segments"
+	ToolNameGetProcessTree            = "get_process_tree"
+	ToolNameGetKernelModules          = "get_kernel_modules"
+	ToolNameGetRoutingTable           = "get_routing_table"
+	ToolNameGetIOStats                = "get_io_stats"
 )
 
 type Config struct {
@@ -174,6 +178,10 @@ func defaultConfig() *Config {
 			ToolNameGetAuditLogs:              "15s",
 			ToolNameGetFileLocks:              "5s",
 			ToolNameGetSharedMemorySegments:   "5s",
+			ToolNameGetProcessTree:            "10s",
+			ToolNameGetKernelModules:          "5s",
+			ToolNameGetRoutingTable:           "5s",
+			ToolNameGetIOStats:                "10s",
 		},
 		Disabled: []string{},
 	}

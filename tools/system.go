@@ -662,3 +662,78 @@ func HandleGetDesktopSessionInfo(
 		GatherDesktopSessionInfo,
 	)
 }
+
+type KernelModule struct {
+	Name     string   `json:"name"`
+	Size     int64    `json:"size"`
+	UsedBy   int      `json:"used_by"`
+	RefCount int      `json:"ref_count"`
+	Deps     []string `json:"deps,omitempty"`
+}
+
+type KernelModulesOutput struct {
+	Modules []KernelModule `json:"modules"`
+	Total   int            `json:"total"`
+	OutputErrors
+}
+
+func GatherKernelModules(
+	ctx context.Context,
+) (*KernelModulesOutput, error) {
+	data, err := os.ReadFile("/proc/modules")
+	if err != nil {
+		return nil, err
+	}
+
+	var modules []KernelModule
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		name := fields[0]
+		size, _ := strconv.ParseInt(fields[1], 10, 64)
+		refCount, _ := strconv.Atoi(fields[2])
+
+		usedBy := 0
+		var deps []string
+		if len(fields) >= 4 && fields[3] != "-" {
+			for dep := range strings.SplitSeq(fields[3], ",") {
+				dep = strings.TrimSpace(dep)
+				if dep != "" {
+					deps = append(deps, dep)
+					usedBy++
+				}
+			}
+		}
+		modules = append(modules, KernelModule{
+			Name:     name,
+			Size:     size,
+			UsedBy:   usedBy,
+			RefCount: refCount,
+			Deps:     deps,
+		})
+	}
+
+	return &KernelModulesOutput{
+		Modules: nilToEmpty(modules),
+		Total:   len(modules),
+	}, nil
+}
+
+func HandleGetKernelModules(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	_ NoArgs,
+) (*mcp.CallToolResult, *KernelModulesOutput, error) {
+	return handleToolCall(
+		ctx,
+		config.ToolNameGetKernelModules,
+		0,
+		GatherKernelModules,
+	)
+}
