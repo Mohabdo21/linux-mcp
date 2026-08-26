@@ -70,7 +70,7 @@ make build-static
 
 ## Usage
 
-The server communicates over STDIO transport, following the MCP standard. It is designed to be launched by an MCP client (e.g., Claude Desktop, OpenCode, or any MCP host).
+The server communicates over STDIO transport, following the MCP standard. It is designed to be launched by an MCP client (e.g., Claude Desktop, Claude Code, Codex, OpenCode, or any MCP host).
 
 ### Running directly
 
@@ -80,7 +80,10 @@ The server communicates over STDIO transport, following the MCP standard. It is 
 
 This starts the server and listens for MCP requests on STDIN/STDOUT.
 
-### Integration with OpenCode
+### Integration
+
+<details>
+<summary><h4>OpenCode</h4></summary>
 
 Add the following to your OpenCode configuration:
 
@@ -95,6 +98,60 @@ Add the following to your OpenCode configuration:
   }
 }
 ```
+
+</details>
+
+<details>
+<summary><h4>Claude Code</h4></summary>
+
+Add the server via the CLI:
+
+```bash
+claude mcp add linux-mcp -- /path/to/linux-mcp
+```
+
+To scope it to all your projects instead of just the current one:
+
+```bash
+claude mcp add linux-mcp --scope user -- /path/to/linux-mcp
+```
+
+Or create a `.mcp.json` file in your project root for team-shared configuration:
+
+```json
+{
+  "mcpServers": {
+    "linux-mcp": {
+      "type": "stdio",
+      "command": "/path/to/linux-mcp"
+    }
+  }
+}
+```
+
+Verify the connection inside a Claude Code session with `/mcp`.
+
+</details>
+
+<details>
+<summary><h4>Codex</h4></summary>
+
+Add the server via the CLI:
+
+```bash
+codex mcp add linux-mcp -- /path/to/linux-mcp
+```
+
+Or add it manually to `~/.codex/config.toml` (or `.codex/config.toml` for project-scoped config):
+
+```toml
+[mcp_servers.linux-mcp]
+command = "/path/to/linux-mcp"
+```
+
+Verify the connection with `codex mcp list`.
+
+</details>
 
 ### Tools and resources
 
