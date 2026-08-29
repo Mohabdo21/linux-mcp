@@ -159,10 +159,23 @@ func GatherTopIOProcesses(
 		out.Add("pidstat", err)
 		return out, nil
 	}
+	procs := parsePIDStatOutput(lines)
+	sort.Slice(procs, func(i, j int) bool {
+		return procs[i].KbRdS+procs[i].KbWrS > procs[j].KbRdS+procs[j].KbWrS
+	})
+	if len(procs) > limit {
+		procs = procs[:limit]
+	}
+	return &TopIOProcessesOutput{Processes: procs}, nil
+}
+
+func parsePIDStatOutput(lines []string) []IOProcessStat {
 	procs := make([]IOProcessStat, 0)
 	for _, line := range lines {
 		fields := strings.Fields(line)
-		if len(fields) < 6 || fields[0] == "Linux" || fields[0] == "#" {
+		if len(fields) < 7 || fields[0] == "Linux" || fields[0] == "#" ||
+			fields[0] == "Time" || fields[0] == "Average:" ||
+			fields[0] == "PID" {
 			continue
 		}
 		pid, _ := strconv.Atoi(fields[1])
@@ -173,16 +186,10 @@ func GatherTopIOProcesses(
 			PID:     pid,
 			KbRdS:   rdS,
 			KbWrS:   wrS,
-			Command: strings.Join(fields[5:], " "),
+			Command: strings.Join(fields[6:], " "),
 		})
 	}
-	sort.Slice(procs, func(i, j int) bool {
-		return procs[i].KbRdS+procs[i].KbWrS > procs[j].KbRdS+procs[j].KbWrS
-	})
-	if len(procs) > limit {
-		procs = procs[:limit]
-	}
-	return &TopIOProcessesOutput{Processes: procs}, nil
+	return procs
 }
 
 func classifyFD(target string) string {

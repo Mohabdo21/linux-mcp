@@ -213,23 +213,21 @@ func parseAptListOutput(output string) *CheckUpdatesOutput {
 		if before, after, ok := strings.Cut(line, "/"); ok {
 			name := before
 			rest := after
-			if before, after, ok := strings.Cut(rest, " "); ok {
-				version := before
-				if _, after0, ok0 := strings.Cut(after, "from: "); ok0 {
-					current := after0
-					current = strings.TrimRight(current, "]")
-					current = strings.TrimSpace(current)
-					updates = append(updates, AvailableUpdate{
-						Name:    name,
-						Current: current,
-						New:     version,
-					})
-				} else {
-					updates = append(updates, AvailableUpdate{
-						Name: name,
-						New:  version,
-					})
+			fields := strings.Fields(rest)
+			if len(fields) >= 2 {
+				version := fields[1]
+				current := ""
+				for i, f := range fields[2:] {
+					if f == "from:" && i+3 < len(fields) {
+						current = strings.TrimRight(fields[i+3], "]")
+						break
+					}
 				}
+				updates = append(updates, AvailableUpdate{
+					Name:    name,
+					Current: current,
+					New:     version,
+				})
 			}
 		}
 	}

@@ -17,7 +17,6 @@ type ShmSegment struct {
 	Owner     string `json:"owner"`
 	Bytes     int64  `json:"bytes"`
 	Nattch    int32  `json:"nattch"`
-	Status    string `json:"status"`
 	CPID      int32  `json:"cpid"`
 	LPID      int32  `json:"lpid"`
 	AttachAt  string `json:"attach_at"`
@@ -62,7 +61,7 @@ func GatherSharedMemorySegments() (*SharedMemoryOutput, error) {
 }
 
 func parseShmLine(line string) (ShmSegment, error) {
-	// Format: key shmid perms size cpid lpid nattch status uid gid cuid cgid atime dtime ctime
+	// Format: key shmid perms size cpid lpid nattch uid gid cuid cgid atime dtime ctime rss swap
 	fields := strings.Fields(line)
 	if len(fields) < 14 {
 		return ShmSegment{}, fmt.Errorf(
@@ -81,9 +80,9 @@ func parseShmLine(line string) (ShmSegment, error) {
 	return ShmSegment{
 		Key:       key,
 		ID:        id,
+		Owner:     fields[7],
 		Bytes:     size,
 		Nattch:    int32(nattch),
-		Status:    fields[7],
 		CPID:      int32(cpid),
 		LPID:      int32(lpid),
 		AttachAt:  fields[11],

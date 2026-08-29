@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -409,8 +410,8 @@ func TestParseShmLine(t *testing.T) {
 	if seg.Nattch != 2 {
 		t.Errorf("Nattch = %d, want 2", seg.Nattch)
 	}
-	if seg.Status != "dest" {
-		t.Errorf("Status = %s, want dest", seg.Status)
+	if seg.Owner != "dest" {
+		t.Errorf("Owner = %s, want dest (field[7] is the owner UID)", seg.Owner)
 	}
 }
 
@@ -489,4 +490,155 @@ func TestGatherAuditLogsAuditLog(t *testing.T) {
 		t.Skipf("GatherAuditLogs (audit.log) failed: %v", err)
 	}
 	t.Logf("Found %d audit.log entries", len(out.Entries))
+}
+
+// /proc/sysvipc/shm has no status column; field[7] is the owner UID.
+func TestParseShmLineOwnerNotStatus(t *testing.T) {
+	line := "300 900 660 4096 5 6 0 1000 1000 1000 1000 12345 0 54321 0 0"
+	seg, err := parseShmLine(line)
+	if err != nil {
+		t.Fatalf("parseShmLine() error: %v", err)
+	}
+	if seg.Owner != "1000" {
+		t.Errorf(
+			"Owner = %q, want %q (field[7] is the owner UID)",
+			seg.Owner,
+			"1000",
+		)
+	}
+}
+
+// parseMDStat misparsed the array-defining line, always reporting inactive
+// with no level, and emitted a phantom "Personalities" device.
+func TestParseMDStatHealthyRaid1(t *testing.T) {
+	md := `Personalities : [raid1]
+md0 : active raid1 sda1[0] sdb1[1]
+      1047552 blocks super 1.2 [2/2] [UU]
+
+unused devices: <none>
+`
+	out := parseMDStat(md)
+	if len(out.Devices) != 1 {
+		t.Fatalf(
+			"expected exactly 1 device (no phantom), got %d: %+v",
+			len(out.Devices),
+			out.Devices,
+		)
+	}
+	d := out.Devices[0]
+	if d.Name != "md0" {
+		t.Errorf("Name = %q, want %q", d.Name, "md0")
+	}
+	if d.Level != "raid1" {
+		t.Errorf("Level = %q, want %q", d.Level, "raid1")
+	}
+	if d.Status != "active" {
+		t.Errorf("Status = %q, want %q", d.Status, "active")
+	}
+	if d.ActiveDevs != 2 || d.TotalDevs != 2 {
+		t.Errorf(
+			"ActiveDevs=%d TotalDevs=%d, want 2/2",
+			d.ActiveDevs,
+			d.TotalDevs,
+		)
+	}
+	if !strings.Contains(d.Devices, "sda1") ||
+		!strings.Contains(d.Devices, "sdb1") {
+		t.Errorf("Devices = %q, want to contain sda1 and sdb1", d.Devices)
+	}
+}
+
+// parseAptListOutput reported the apt suite/repo name as the new version.
+func TestParseAptListOutputUsesVersionNotSuite(t *testing.T) {
+	out := parseAptListOutput(
+		"vim/stable 2:9.0.454-1 amd64 [upgradable from: 2:9.0.313-1]\n",
+	)
+	if len(out.Updates) != 1 {
+		t.Fatalf("expected 1 update, got %d", len(out.Updates))
+	}
+	u := out.Updates[0]
+	if u.Name != "vim" {
+		t.Errorf("Name = %q, want %q", u.Name, "vim")
+	}
+	if u.New != "2:9.0.454-1" {
+		t.Errorf("New (target version) = %q, want %q", u.New, "2:9.0.454-1")
+	}
+	if u.Current != "2:9.0.313-1" {
+		t.Errorf("Current = %q, want %q", u.Current, "2:9.0.313-1")
+	}
+}
+
+// pidstat Command included the numeric iodelay column, and the trailing
+// Average: summary row produced a bogus process.
+func TestParsePIDStatOutputExcludesIODelayAndAverage(t *testing.T) {
+	lines := []string{
+		"Linux 5.15.0 (host) \t08/30/26 \t_x86_64_\t(8 CPU)",
+		"Time        PID    kB_rd/s    kB_wr/s   kB_ccwr/s iodelay  Command",
+		"08:00:01     1234      12.34      56.78       0.00     345  myproc",
+		"Average:      1234      12.34      56.78       0.00     345  myproc",
+	}
+	procs := parsePIDStatOutput(lines)
+	if len(procs) != 1 {
+		t.Fatalf(
+			"expected exactly 1 process (no Average row), got %d: %+v",
+			len(procs),
+			procs,
+		)
+	}
+	if procs[0].Command != "myproc" {
+		t.Errorf(
+			"Command = %q, want %q (iodelay must not be prepended)",
+			procs[0].Command,
+			"myproc",
+		)
+	}
+	if procs[0].PID != 1234 {
+		t.Errorf("PID = %d, want 1234", procs[0].PID)
+	}
+}
+
+// find was passed a literal redirection operand, so SUID/world-writable
+// scans always returned empty.
+func TestGatherSUIDBinariesFindsFiles(t *testing.T) {
+	bins := gatherSUIDBinaries(t.Context())
+	if len(bins) == 0 {
+		t.Fatal(
+			"gatherSUIDBinaries returned no files; the 2>/dev/null literal made find error",
+		)
+	}
+}
+
+// partition attributes were read from /sys/block/<part> instead of
+// /sys/block/<parent>/<part>, so size/ro/type were always empty.
+func TestGatherBlockDevicesPartitionAttrs(t *testing.T) {
+	out, err := GatherBlockDevices(t.Context())
+	if err != nil {
+		t.Skipf("GatherBlockDevices() error: %v", err)
+	}
+	// A partition is an entry whose name is another (parent) entry's name
+	// plus a suffix (e.g. nvme0n1 -> nvme0n1p1, sda -> sda2).
+	names := make(map[string]bool)
+	for _, d := range out.Devices {
+		names[d.Name] = true
+	}
+	partitions := make([]BlockDevice, 0)
+	for _, d := range out.Devices {
+		for parent := range names {
+			if parent != d.Name && strings.HasPrefix(d.Name, parent) {
+				partitions = append(partitions, d)
+				break
+			}
+		}
+	}
+	if len(partitions) == 0 {
+		t.Skip("no partitions present on this host")
+	}
+	for _, p := range partitions {
+		if p.Size == "" {
+			t.Errorf(
+				"partition %s has empty Size (wrong sysfs path); want non-empty size value",
+				p.Name,
+			)
+		}
+	}
 }

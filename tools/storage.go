@@ -36,6 +36,11 @@ func readBlockAttr(dev, attr string) string {
 	return s
 }
 
+func readPartitionAttr(partsDir, pname, attr string) string {
+	s, _ := readSysfsFile(filepath.Join(partsDir, pname, attr))
+	return s
+}
+
 func GatherBlockDevices(ctx context.Context) (*BlockDevicesOutput, error) {
 	var out BlockDevicesOutput
 	var errs []string
@@ -98,16 +103,20 @@ func GatherBlockDevices(ctx context.Context) (*BlockDevicesOutput, error) {
 			}
 			part := BlockDevice{
 				Name: pname,
-				RO:   readBlockAttr(pname, "ro") == "1",
+				RO:   readPartitionAttr(partsDir, pname, "ro") == "1",
 			}
-			pSizeRaw := readBlockAttr(pname, "size")
+			pSizeRaw := readPartitionAttr(partsDir, pname, "size")
 			if pSizeRaw != "" {
 				var sizeKB int64
 				if _, perr := fmt.Sscanf(pSizeRaw, "%d", &sizeKB); perr == nil {
 					part.Size = HumanSize(sizeKB * 512)
 				}
 			}
-			if fsRaw := readBlockAttr(pname, "queue/rotational"); fsRaw == "0" {
+			if fsRaw := readPartitionAttr(
+				partsDir,
+				pname,
+				"queue/rotational",
+			); fsRaw == "0" {
 				part.Type = "ssd"
 			}
 			out.Devices = append(out.Devices, part)
@@ -319,71 +328,91 @@ type RAIDStatusOutput struct {
 }
 
 func GatherRAIDStatus(ctx context.Context) (*RAIDStatusOutput, error) {
-	out := RAIDStatusOutput{Devices: make([]RAIDDevice, 0)}
-
 	data, err := os.ReadFile("/proc/mdstat")
 	if err != nil {
-		return &out, nil
+		return &RAIDStatusOutput{Devices: make([]RAIDDevice, 0)}, nil
 	}
+	return parseMDStat(string(data)), nil
+}
 
+func parseMDStat(data string) *RAIDStatusOutput {
+	out := RAIDStatusOutput{Devices: make([]RAIDDevice, 0)}
 	var current *RAIDDevice
-	for line := range strings.SplitSeq(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "Personalities") ||
-			strings.HasPrefix(line, "md") {
-			if current != nil {
-				out.Devices = append(out.Devices, *current)
-				current = nil
-			}
-		}
-		if line == "" {
-			continue
-		}
-		if current == nil && !strings.HasPrefix(line, "unused") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				current = &RAIDDevice{Name: fields[0]}
-			}
-			continue
-		}
-		if current != nil {
-			fields := strings.Fields(line)
-			for i, f := range fields {
-				switch {
-				case strings.HasPrefix(f, "raid"):
-					current.Level = f
-				case f == "blocks":
-					if i > 0 {
-						current.ArraySize = fields[i-1]
-					}
-				case f == "super":
 
-				case strings.Count(f, "/") == 1:
-					parts := strings.Split(f, "/")
-					if len(parts) == 2 {
-						_, _ = fmt.Sscanf(parts[0], "%d", &current.ActiveDevs)
-						_, _ = fmt.Sscanf(parts[1], "%d", &current.TotalDevs)
-					}
-				case f == "[" && i+2 < len(fields):
-					if fields[i+1] == "U" || fields[i+1] == "_" {
-						current.Devices = strings.Join(fields[i:], " ")
-					}
-				}
-			}
+	flush := func() {
+		if current != nil {
 			if current.ActiveDevs == current.TotalDevs {
 				current.Status = "active"
-			} else if current.ActiveDevs > 0 {
+			} else if current.ActiveDevs > 0 && current.TotalDevs > 0 {
 				current.Status = "degraded"
 			} else {
 				current.Status = "inactive"
 			}
+			out.Devices = append(out.Devices, *current)
+			current = nil
 		}
 	}
-	if current != nil {
-		out.Devices = append(out.Devices, *current)
-	}
 
-	return &out, nil
+	for line := range strings.SplitSeq(data, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Personalities") ||
+			strings.HasPrefix(line, "unused") {
+			continue
+		}
+		fields := strings.Fields(line)
+		// New array header: "<name> : <state> [raidN] <member>[P] ..."
+		if current == nil && len(fields) >= 3 && fields[1] == ":" {
+			flush()
+			current = &RAIDDevice{Name: fields[0]}
+			for _, f := range fields[2:] {
+				switch {
+				case f == "active" || f == "inactive" || f == "readonly":
+					current.Status = f
+				case strings.HasPrefix(f, "raid"):
+					current.Level = f
+				case strings.HasPrefix(f, "linear") || strings.HasPrefix(f, "multipath"):
+					current.Level = f
+				}
+			}
+			// Member devices: tokens like sda1[0], sdb1[1].
+			members := make([]string, 0)
+			for _, f := range fields[2:] {
+				if i := strings.IndexByte(
+					f,
+					'[',
+				); i > 0 &&
+					strings.HasSuffix(f, "]") {
+					members = append(members, f[:i])
+				}
+			}
+			if len(members) > 0 {
+				current.Devices = strings.Join(members, " ")
+			}
+			continue
+		}
+		if current != nil {
+			for i, f := range fields {
+				if f == "blocks" && i > 0 {
+					current.ArraySize = fields[i-1]
+				}
+				if rest, found := strings.CutPrefix(f, "["); found {
+					// [2/2] active/total device counts
+					if body, ok := strings.CutSuffix(
+						rest,
+						"]",
+					); ok &&
+						strings.Count(body, "/") == 1 {
+						parts := strings.Split(body, "/")
+						_, _ = fmt.Sscanf(parts[0], "%d", &current.ActiveDevs)
+						_, _ = fmt.Sscanf(parts[1], "%d", &current.TotalDevs)
+					}
+				}
+			}
+		}
+	}
+	flush()
+
+	return &out
 }
 
 func HandleGetRAIDStatus(

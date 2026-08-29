@@ -148,9 +148,8 @@ func gatherSSHHardening() SSHHardeningInfo {
 func gatherSUIDBinaries(ctx context.Context) []string {
 	out, err := execOutput(ctx, "find", "/",
 		"-perm", "-4000", "-type", "f",
-		"-maxdepth", "4",
-		"2>/dev/null")
-	if err != nil || out == "" {
+		"-maxdepth", "4")
+	if err != nil && out == "" {
 		return []string{}
 	}
 	var bins []string
@@ -166,9 +165,8 @@ func gatherSUIDBinaries(ctx context.Context) []string {
 func gatherWorldWritable(ctx context.Context) []string {
 	out, err := execOutput(ctx, "find", "/etc", "/usr", "/var",
 		"-perm", "-0002", "-type", "f",
-		"-maxdepth", "4",
-		"2>/dev/null")
-	if err != nil || out == "" {
+		"-maxdepth", "4")
+	if err != nil && out == "" {
 		return []string{}
 	}
 	var files []string
