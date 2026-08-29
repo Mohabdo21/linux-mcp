@@ -294,6 +294,9 @@ func gatherFromJournalctl(
 		entry := parseJournalctlLine(line)
 		out.Entries = append(out.Entries, entry)
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("cannot read journalctl output: %w", err)
+	}
 	return out, nil
 }
 
@@ -321,6 +324,9 @@ func gatherFromAuditLog(lines int) (*AuditLogsOutput, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		allLines = append(allLines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("cannot read audit log: %w", err)
 	}
 
 	start := max(len(allLines)-lines, 0)

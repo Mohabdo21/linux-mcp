@@ -79,7 +79,11 @@ func GatherBlockDevices(ctx context.Context) (*BlockDevicesOutput, error) {
 		}
 
 		partsDir := filepath.Join(sysfsBlock, name)
-		pentries, _ := os.ReadDir(partsDir)
+		pentries, err := os.ReadDir(partsDir)
+		if err != nil {
+			appendErr(&errs, name, err)
+			continue
+		}
 		for _, pe := range pentries {
 			pname := pe.Name()
 			if !strings.HasPrefix(pname, name) {
@@ -106,7 +110,6 @@ func GatherBlockDevices(ctx context.Context) (*BlockDevicesOutput, error) {
 			if fsRaw := readBlockAttr(pname, "queue/rotational"); fsRaw == "0" {
 				part.Type = "ssd"
 			}
-			part.FSType = readBlockAttr(pname, "queue/rotational")
 			out.Devices = append(out.Devices, part)
 		}
 
@@ -134,6 +137,7 @@ func GatherBlockDevices(ctx context.Context) (*BlockDevicesOutput, error) {
 				}
 			}
 		}
+		appendErr(&errs, "mounts", scanner.Err())
 	} else {
 		appendErr(&errs, "mounts", err)
 	}
