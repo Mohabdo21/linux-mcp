@@ -5,7 +5,7 @@ BUILD_DIR = bin
 VERSION ?= dev
 LD_FLAGS = -X main.Version=$(VERSION)
 
-.PHONY: build build-static test check release
+.PHONY: build build-static test upgrade check release
 
 build:
 	CGO_ENABLED=0 go build -ldflags="$(LD_FLAGS)" -o $(BUILD_DIR)/$(BINARY) .
@@ -20,6 +20,10 @@ build-static:
 test: check
 	@echo "Running tests..."
 	go test -race -v ./...
+
+upgrade:
+	go get -u ./...
+	go mod tidy
 
 check:
 	go fmt ./...
