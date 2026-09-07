@@ -1333,21 +1333,6 @@ func TestExecOutput(t *testing.T) {
 	})
 }
 
-func TestExecCombinedOutput(t *testing.T) {
-	out, err := execCombinedOutput(
-		t.Context(),
-		"sh",
-		"-c",
-		"echo stdout; echo stderr >&2",
-	)
-	if err != nil {
-		t.Fatalf("execCombinedOutput() error: %v", err)
-	}
-	if !strings.Contains(out, "stdout") || !strings.Contains(out, "stderr") {
-		t.Errorf("execCombinedOutput() = %q, want both stdout and stderr", out)
-	}
-}
-
 func TestExecLines(t *testing.T) {
 	t.Run("MultiLine", func(t *testing.T) {
 		lines, err := execLines(t.Context(), "printf", "a\nb\nc\n")

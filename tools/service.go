@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strings"
 
@@ -41,7 +42,9 @@ func GatherServiceStatus(
 	if user {
 		args = append([]string{"--user"}, args...)
 	}
-	output, err := execCombinedOutput(ctx, "systemctl", args...)
+	cmd := exec.CommandContext(ctx, "systemctl", args...)
+	raw, err := cmd.CombinedOutput()
+	output := strings.TrimSpace(string(raw))
 	loaded := ExtractField(output, "Loaded:")
 	active := ExtractField(output, "Active:")
 	pid := ExtractField(output, "Main PID:")
