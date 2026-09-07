@@ -11,72 +11,152 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func RegisterResources(server *mcp.Server) {
-	resources := []*mcp.Resource{
-		{
-			URI:         scheme("info"),
-			Name:        "System Information",
-			Description: "Hostname, OS, kernel version, architecture, and uptime",
-		},
-		{URI: scheme("cpu"), Name: "CPU Information",
-			Description: "CPU usage, model, frequency, and core counts"},
-		{URI: scheme("memory"), Name: "Memory Information",
-			Description: "RAM and swap usage statistics"},
-		{URI: scheme("disk"), Name: "Disk Information",
-			Description: "Disk usage for all mounted partitions"},
-		{URI: scheme("network"), Name: "Network Information",
-			Description: "Network I/O statistics per interface"},
-		{URI: scheme("load"), Name: "Load Average",
-			Description: "1-, 5-, and 15-minute load averages"},
-		{URI: scheme("temperature"), Name: "CPU Temperature",
-			Description: "Current CPU temperature from available sensors"},
-		{
-			URI:         scheme("gpu"),
-			Name:        "GPU Information",
-			Description: "GPU usage, memory, temperature, and power (NVIDIA/AMD/Intel)",
-		},
-		{URI: scheme("logged_in_users"), Name: "Logged In Users",
-			Description: "Active user sessions"},
-		{URI: scheme("listening_ports"), Name: "Listening Ports",
-			Description: "Listening ports and associated processes"},
-		{URI: scheme("failed_logins"), Name: "Failed Logins",
-			Description: "Recent failed login attempts"},
-		{URI: scheme("block_devices"), Name: "Block Devices",
-			Description: "Block devices and partitions detected on the system"},
-		{URI: scheme("raid"), Name: "RAID Status",
-			Description: "Software RAID status from /proc/mdstat"},
-		{URI: scheme("time_sync"), Name: "Time Sync Status",
-			Description: "NTP/Chrony time synchronization status"},
-		{URI: scheme("selinux_apparmor"), Name: "SELinux/AppArmor Status",
-			Description: "Status of SELinux and AppArmor security modules"},
-		{URI: scheme("logrotate"), Name: "Logrotate Status",
-			Description: "Logrotate configuration and state file"},
-		{URI: scheme("health"), Name: "System Health Check",
-			Description: "Comprehensive system health assessment"},
-	}
-	for _, r := range resources {
-		r.MIMEType = "application/json"
-		server.AddResource(r, handleReadResource)
-	}
+// resourceDef carries one resource's metadata and how to resolve its content.
+type resourceDef struct {
+	Path        string
+	Name        string
+	Description string
+	resolver    func(ctx context.Context, rest string) (any, error)
+}
 
-	templates := []*mcp.ResourceTemplate{
-		{URITemplate: scheme("disk/{mount_point}"),
-			Name: "Disk Information (filtered)",
-			Description: "Disk usage for a specific mount point, " +
-				"e.g. system:///disk/ (root) or system:///disk/boot"},
-		{URITemplate: scheme("service/{name}"),
-			Name: "Service Status",
-			Description: "Detailed status of a systemd service, " +
-				"e.g. system:///service/sshd or system:///service/nginx.service"},
+// staticResource builds a resourceDef from a no-argument gather.
+func staticResource[Out any](
+	path, name, description string,
+	gather func(context.Context) (Out, error),
+) resourceDef {
+	r := resourceDef{Path: path, Name: name, Description: description,
+		resolver: func(ctx context.Context, _ string) (any, error) {
+			return gather(ctx)
+		}}
+	return r
+}
+
+// URI returns the fully-qualified resource URI for the entry.
+func (r *resourceDef) URI() string {
+	return scheme(strings.TrimPrefix(r.Path, "/"))
+}
+
+// prefix returns the static prefix before the first template parameter,
+// or an empty string for static resources.
+func (r *resourceDef) prefix() string {
+	if i := strings.Index(r.Path, "{"); i >= 0 {
+		return r.Path[:i]
 	}
-	for _, t := range templates {
-		t.MIMEType = "application/json"
-		server.AddResourceTemplate(t, handleReadResource)
+	return ""
+}
+
+func (r *resourceDef) isTemplate() bool { return r.prefix() != "" }
+
+var resourceRegistry = []resourceDef{
+	staticResource(
+		"/info",
+		"System Information",
+		"Hostname, OS, kernel version, architecture, and uptime",
+		GatherSystemInfo,
+	),
+	staticResource("/cpu", "CPU Information",
+		"CPU usage, model, frequency, and core counts", GatherCPUInfo),
+	staticResource("/memory", "Memory Information",
+		"RAM and swap usage statistics", GatherMemoryInfo),
+	{Path: "/disk", Name: "Disk Information",
+		Description: "Disk usage for all mounted partitions",
+		resolver: func(ctx context.Context, _ string) (any, error) {
+			return GatherDiskInfo(ctx, "", 0)
+		}},
+	staticResource("/network", "Network Information",
+		"Network I/O statistics per interface", GatherNetworkInfo),
+	staticResource("/load", "Load Average",
+		"1-, 5-, and 15-minute load averages", GatherLoadAverage),
+	staticResource("/temperature", "CPU Temperature",
+		"Current CPU temperature from available sensors", GatherCPUTemperature),
+	staticResource("/gpu", "GPU Information",
+		"GPU usage, memory, temperature, and power "+
+			"(NVIDIA/AMD/Intel)", GatherGPUInfo),
+	staticResource("/logged_in_users", "Logged In Users",
+		"Active user sessions", GatherLoggedInUsers),
+	{Path: "/listening_ports", Name: "Listening Ports",
+		Description: "Listening ports and associated processes",
+		resolver: func(ctx context.Context, _ string) (any, error) {
+			return GatherListeningPorts(ctx, "")
+		}},
+	{Path: "/failed_logins", Name: "Failed Logins",
+		Description: "Recent failed login attempts",
+		resolver: func(ctx context.Context, _ string) (any, error) {
+			return GatherFailedLogins(ctx, 20)
+		}},
+	staticResource(
+		"/block_devices",
+		"Block Devices",
+		"Block devices and partitions detected on the system",
+		GatherBlockDevices,
+	),
+	staticResource("/raid", "RAID Status",
+		"Software RAID status from /proc/mdstat", GatherRAIDStatus),
+	staticResource("/time_sync", "Time Sync Status",
+		"NTP/Chrony time synchronization status", GatherTimeSyncStatus),
+	staticResource(
+		"/selinux_apparmor",
+		"SELinux/AppArmor Status",
+		"Status of SELinux and AppArmor security modules",
+		GatherSELinuxAppArmorStatus,
+	),
+	staticResource("/logrotate", "Logrotate Status",
+		"Logrotate configuration and state file", GatherLogrotateStatus),
+	staticResource("/health", "System Health Check",
+		"Comprehensive system health assessment", GatherSystemHealthCheck),
+	{Path: "/disk/{mount_point}", Name: "Disk Information (filtered)",
+		Description: "Disk usage for a specific mount point, e.g. " +
+			"system:///disk/ (root) or system:///disk/boot",
+		resolver: func(ctx context.Context, rest string) (any, error) {
+			mountPoint := rest
+			if mountPoint != "" && !strings.HasPrefix(mountPoint, "/") {
+				mountPoint = "/" + mountPoint
+			}
+			return GatherDiskInfo(ctx, mountPoint, 0)
+		}},
+	{Path: "/service/{name}", Name: "Service Status",
+		Description: "Detailed status of a systemd service, e.g. " +
+			"system:///service/sshd or system:///service/nginx.service",
+		resolver: func(ctx context.Context, rest string) (any, error) {
+			return GatherServiceStatus(ctx, rest, false)
+		}},
+}
+
+func RegisterResources(server *mcp.Server) {
+	for i := range resourceRegistry {
+		r := &resourceRegistry[i]
+		if r.isTemplate() {
+			server.AddResourceTemplate(&mcp.ResourceTemplate{
+				URITemplate: r.URI(), Name: r.Name,
+				Description: r.Description, MIMEType: "application/json",
+			}, handleReadResource)
+			continue
+		}
+		server.AddResource(&mcp.Resource{
+			URI: r.URI(), Name: r.Name,
+			Description: r.Description, MIMEType: "application/json",
+		}, handleReadResource)
 	}
 }
 
 func scheme(path string) string {
 	return "system:///" + path
+}
+
+// findResource returns the registry entry matching a resource path and the
+// remainder left after stripping its template prefix (empty for statics).
+func findResource(path string) (*resourceDef, string) {
+	for i := range resourceRegistry {
+		r := &resourceRegistry[i]
+		if prefix := r.prefix(); prefix != "" {
+			if after, ok := strings.CutPrefix(path, prefix); ok {
+				return r, after
+			}
+		} else if path == r.Path {
+			return r, ""
+		}
+	}
+	return nil, ""
 }
 
 func handleReadResource(
@@ -92,65 +172,15 @@ func handleReadResource(
 		return nil, mcp.ResourceNotFoundError(uri)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	var (
-		data any
-		nerr error
-	)
-
-	switch path := u.Path; {
-	case path == "/info":
-		data, nerr = GatherSystemInfo(ctx)
-	case path == "/cpu":
-		data, nerr = GatherCPUInfo(ctx)
-	case path == "/memory":
-		data, nerr = GatherMemoryInfo(ctx)
-	case path == "/disk":
-		data, nerr = GatherDiskInfo(ctx, "", 0)
-	case path == "/network":
-		data, nerr = GatherNetworkInfo(ctx)
-	case path == "/load":
-		data, nerr = GatherLoadAverage(ctx)
-	case path == "/temperature":
-		data, nerr = GatherCPUTemperature(ctx)
-	case path == "/gpu":
-		data, nerr = GatherGPUInfo(ctx)
-	case path == "/logged_in_users":
-		data, nerr = GatherLoggedInUsers(ctx)
-	case path == "/listening_ports":
-		data, nerr = GatherListeningPorts(ctx, "")
-	case path == "/failed_logins":
-		data, nerr = GatherFailedLogins(ctx, 20)
-	case path == "/block_devices":
-		data, nerr = GatherBlockDevices(ctx)
-	case path == "/raid":
-		data, nerr = GatherRAIDStatus(ctx)
-	case path == "/time_sync":
-		data, nerr = GatherTimeSyncStatus(ctx)
-	case path == "/selinux_apparmor":
-		data, nerr = GatherSELinuxAppArmorStatus(ctx)
-	case path == "/logrotate":
-		data, nerr = GatherLogrotateStatus(ctx)
-	case path == "/health":
-		data, nerr = GatherSystemHealthCheck(ctx)
-	case strings.HasPrefix(path, "/disk/"):
-		mountPoint := strings.TrimPrefix(path, "/disk/")
-		if mountPoint != "" && !strings.HasPrefix(mountPoint, "/") {
-			mountPoint = "/" + mountPoint
-		}
-		data, nerr = GatherDiskInfo(ctx, mountPoint, 0)
-	case strings.HasPrefix(path, "/service/"):
-		data, nerr = GatherServiceStatus(
-			ctx,
-			strings.TrimPrefix(path, "/service/"),
-			false,
-		)
-	default:
+	r, rest := findResource(u.Path)
+	if r == nil {
 		return nil, mcp.ResourceNotFoundError(uri)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	data, nerr := r.resolver(ctx, rest)
 	if data == nil {
 		if nerr != nil {
 			return nil, fmt.Errorf("resource unavailable: %w", nerr)
