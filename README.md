@@ -52,6 +52,14 @@ chmod +x linux-mcp
 
 A fully static build (no libc dependency) is also available as `linux-mcp_static`.
 
+### Via `go install`
+
+```bash
+go install github.com/Mohabdo21/linux-mcp@latest
+```
+
+The binary is placed in `$GOPATH/bin/` (typically `~/go/bin/`).
+
 ### Build from source
 
 ```bash
