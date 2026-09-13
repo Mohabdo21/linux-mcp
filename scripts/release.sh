@@ -16,6 +16,23 @@ error() {
 	exit 1
 }
 
+EXPECTED_REPO="Mohabdo21/linux-mcp"
+
+isCanonicalRemote() {
+	local origin canonical
+	origin=$(git remote get-url origin)
+	canonical=$(sed -E 's#\.git$##' <<<"$origin" |
+		sed -E -n 's#.*[:/]([^/]*)/([^/]*)$#\1/\2#p')
+	[ "$canonical" = "$EXPECTED_REPO" ]
+}
+
+hasPushPermission() {
+	local user perm
+	user=$(gh api user --jq .login) || return 1
+	perm=$(gh api "repos/$EXPECTED_REPO/collaborators/$user" --jq .permissions.push) || return 1
+	[ "$perm" = "true" ]
+}
+
 preflight_checks() {
 	if ! git diff --quiet HEAD; then
 		error "Working tree has uncommitted changes. Commit or stash first."
@@ -23,6 +40,9 @@ preflight_checks() {
 	branch=$(git rev-parse --abbrev-ref HEAD)
 	if [ "$branch" != "main" ]; then
 		error "Releases must be cut from 'main', currently on '$branch'"
+	fi
+	if ! isCanonicalRemote; then
+		error "origin must be $EXPECTED_REPO (refusing to release to a fork/mirror)"
 	fi
 	if ! command -v gh &>/dev/null; then
 		error "'gh' CLI not found. Install it: https://cli.github.com/"
@@ -32,6 +52,9 @@ preflight_checks() {
 	fi
 	if [ -z "${MCP_GITHUB_TOKEN:-}" ]; then
 		error "MCP_GITHUB_TOKEN is not set. Create a PAT at https://github.com/settings/tokens/new (repo + read:user) and set it as an env var."
+	fi
+	if ! hasPushPermission; then
+		error "current gh user has no push rights on $EXPECTED_REPO; aborting"
 	fi
 	git fetch --tags origin
 	info "Pre-flight checks passed"
