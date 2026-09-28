@@ -177,10 +177,10 @@ generate_changelog() {
 	local prev body
 	prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
 	if [[ -z $prev ]]; then
-		body=$(git log --format="format:- %s (%h)" --reverse)
+		body=$(git log --format="format:- %s (%h)" --topo-order --no-merges --reverse)
 		info "first release: including all commits"
 	else
-		body=$(git log --format="format:- %s (%h)" "$prev"..HEAD)
+		body=$(git log --format="format:- %s (%h)" --topo-order --no-merges --reverse "$prev"..HEAD)
 		info "changelog: commits since $prev"
 	fi
 	if [[ -z $body ]]; then
