@@ -3,6 +3,7 @@ package tools
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -106,6 +107,52 @@ func TestGatherInstalledPackagesRPMNameFilter(t *testing.T) {
 			"rpm args = %q, want the name filter passed as a name= selector",
 			got,
 		)
+	}
+}
+
+// pacman -Qs follows each package line with an indented description.
+func TestParsePacmanQOutputSearch(t *testing.T) {
+	raw := "local/alsa-lib 1.2.16.1-1\n" +
+		"    An alternative implementation of Linux sound support\n" +
+		"local/alsa-utils 1.2.16.1-1\n" +
+		"    Advanced Linux Sound Architecture - Utilities\n" +
+		"local/apparmor 4.1.7-1\n" +
+		"    Mandatory Access Control (MAC) using Linux Security Module (LSM)\n"
+
+	out := parsePacmanQOutput(raw)
+
+	want := []InstalledPackage{
+		{Name: "alsa-lib", Version: "1.2.16.1-1"},
+		{Name: "alsa-utils", Version: "1.2.16.1-1"},
+		{Name: "apparmor", Version: "4.1.7-1"},
+	}
+	if !reflect.DeepEqual(out.Packages, want) {
+		t.Errorf("parsePacmanQOutput() = %+v, want %+v", out.Packages, want)
+	}
+	if out.Total != len(want) {
+		t.Errorf(
+			"Total = %d, want %d: description lines must not count as packages",
+			out.Total,
+			len(want),
+		)
+	}
+}
+
+// pacman -Q emits no description lines.
+func TestParsePacmanQOutputList(t *testing.T) {
+	raw := "local/alsa-lib 1.2.16.1-1\nlocal/apparmor 4.1.7-1\n"
+
+	out := parsePacmanQOutput(raw)
+
+	want := []InstalledPackage{
+		{Name: "alsa-lib", Version: "1.2.16.1-1"},
+		{Name: "apparmor", Version: "4.1.7-1"},
+	}
+	if !reflect.DeepEqual(out.Packages, want) {
+		t.Errorf("parsePacmanQOutput() = %+v, want %+v", out.Packages, want)
+	}
+	if out.Total != 2 {
+		t.Errorf("Total = %d, want 2", out.Total)
 	}
 }
 

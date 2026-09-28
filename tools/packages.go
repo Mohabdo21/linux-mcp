@@ -95,11 +95,12 @@ func gatherPacmanPackages(
 
 func parsePacmanQOutput(output string) *InstalledPackagesOutput {
 	pkgs := make([]InstalledPackage, 0)
-	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
-		line = strings.TrimSpace(line)
+	for line := range strings.SplitSeq(output, "\n") {
+		// pacman -Qs indents description lines; test before trimming.
 		if line == "" || strings.HasPrefix(line, " ") {
 			continue
 		}
+		line = strings.TrimSpace(line)
 		if idx := strings.Index(line, "/"); idx >= 0 {
 			line = line[idx+1:]
 		}

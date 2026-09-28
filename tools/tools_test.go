@@ -829,6 +829,14 @@ func TestGatherInstalledPackages(t *testing.T) {
 }
 
 func TestGatherInstalledPackagesFilter(t *testing.T) {
+	all, err := GatherInstalledPackages(t.Context(), "")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skip("no supported package manager found")
+		}
+		t.Skipf("GatherInstalledPackages() error: %v", err)
+	}
+
 	out, err := GatherInstalledPackages(t.Context(), "linux")
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
@@ -837,6 +845,18 @@ func TestGatherInstalledPackagesFilter(t *testing.T) {
 		t.Skipf("GatherInstalledPackages() error: %v", err)
 	}
 	t.Logf("Found %d packages matching filter", out.Total)
+
+	// A filtered query is a subset of the unfiltered one. Anything else means
+	// the parser is inventing packages, e.g. from pacman -Qs descriptions.
+	installed := make(map[string]bool, all.Total)
+	for _, p := range all.Packages {
+		installed[p.Name] = true
+	}
+	for _, p := range out.Packages {
+		if !installed[p.Name] {
+			t.Errorf("filtered result %q is not in the installed set", p.Name)
+		}
+	}
 }
 
 func TestGatherAvailableUpdates(t *testing.T) {
