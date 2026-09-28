@@ -84,10 +84,7 @@ remote_is_canonical() {
 }
 
 has_push_permission() {
-	local user perm
-	user=$(gh api user --jq .login 2>/dev/null) || return 1
-	perm=$(gh api "repos/$EXPECTED_REPO/collaborators/$user" --jq .permissions.push 2>/dev/null) || return 1
-	[[ $perm == true ]]
+	[[ $(gh api "repos/$EXPECTED_REPO" --jq .permissions.push 2>/dev/null) == true ]]
 }
 
 # steps
