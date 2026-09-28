@@ -20,7 +20,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
 - **Services & automation** - systemd units, service status, user timers, crontab, system cron jobs
 - **Security** - active user sessions, failed login detection, SELinux/AppArmor status, firewall/SSH/SUID/world-writable audit with security score
-- **Packages** - installed packages and available updates (pacman, dpkg)
+- **Packages** - installed packages and available updates (pacman, dpkg, rpm/dnf, apk)
 - **Hardware** - GPU info, PCI/USB bus devices, power/battery analytics
 - **Desktop session** - Wayland/X11 protocol, DE identifiers, runtime config
 - **Storage health** - RAID status, logrotate configuration, time synchronization, SMART disk health, per-device I/O metrics

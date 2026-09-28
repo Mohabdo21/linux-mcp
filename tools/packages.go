@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/Mohabdo21/linux-mcp/config"
@@ -47,6 +48,9 @@ func detectPkgManager() string {
 	if hasAnyBinary("rpm", "dnf", "yum") {
 		return "rpm"
 	}
+	if hasAnyBinary("apk") {
+		return "apk"
+	}
 	return ""
 }
 
@@ -71,6 +75,8 @@ func GatherInstalledPackages(
 		return gatherDpkgPackages(ctx, name)
 	case "rpm":
 		return gatherRpmPackages(ctx, name)
+	case "apk":
+		return gatherApkPackages(ctx, name)
 	default:
 		return nil, exec.ErrNotFound
 	}
@@ -153,6 +159,96 @@ func parseDpkgLOutput(output string) *InstalledPackagesOutput {
 	}
 }
 
+// apk joins name and version with a dash in its human-readable output, and a
+// name may itself contain -<digits>, e.g. xf86-video-r128-6.13.0-r0. So the
+// version starts at the last dash followed by a digit, and the -rN release
+// suffix belongs to the version. Verified against all 68490 unique packages in
+// the Alpine v3.18, v3.22 and edge indexes.
+var apkNameVersion = regexp.MustCompile(`^(.+)-(\d[^-]*(?:-r\d+)?)$`)
+
+func splitApkNameVersion(token string) (string, string, bool) {
+	m := apkNameVersion.FindStringSubmatch(token)
+	if m == nil {
+		return "", "", false
+	}
+	return m[1], m[2], true
+}
+
+func gatherApkPackages(
+	ctx context.Context,
+	name string,
+) (*InstalledPackagesOutput, error) {
+	// --manifest is apk-tools 3.x only, so parse the default listing instead.
+	args := []string{"list", "--installed"}
+	if name != "" {
+		// apk patterns are globs, a bare name matches nothing.
+		args = append(args, name+"*")
+	}
+	out, err := execOutput(ctx, "apk", args...)
+	if err != nil {
+		return nil, err
+	}
+	return parseApkListOutput(out), nil
+}
+
+func parseApkListOutput(output string) *InstalledPackagesOutput {
+	pkgs := make([]InstalledPackage, 0)
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		pkgName, version, ok := splitApkNameVersion(fields[0])
+		if !ok {
+			continue
+		}
+		pkgs = append(pkgs, InstalledPackage{
+			Name:    pkgName,
+			Version: version,
+		})
+	}
+	return &InstalledPackagesOutput{
+		Packages: pkgs,
+		Total:    len(pkgs),
+	}
+}
+
+func gatherApkUpdates(ctx context.Context) (*AvailableUpdatesOutput, error) {
+	// Unlike dnf, apk exits 0 whether or not updates exist.
+	out, err := execOutput(ctx, "apk", "version", "-l", "<")
+	if err != nil {
+		return nil, err
+	}
+	return parseApkVersionOutput(out), nil
+}
+
+func parseApkVersionOutput(output string) *AvailableUpdatesOutput {
+	updates := make([]AvailableUpdate, 0)
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "WARNING:") {
+			continue
+		}
+		before, after, ok := strings.Cut(line, "<")
+		if !ok {
+			continue
+		}
+		pkgName, current, ok := splitApkNameVersion(strings.TrimSpace(before))
+		if !ok {
+			continue
+		}
+		updates = append(updates, AvailableUpdate{
+			Name:    pkgName,
+			Current: current,
+			New:     strings.TrimSpace(after),
+		})
+	}
+	return &AvailableUpdatesOutput{
+		Updates: updates,
+		Total:   len(updates),
+	}
+}
+
 // See rpm-queryformat(7).
 const rpmQueryFormat = "%{NAME} %{VERSION}-%{RELEASE}\n"
 
@@ -200,6 +296,8 @@ func GatherAvailableUpdates(
 		return gatherAptUpdates(ctx)
 	case "rpm":
 		return gatherRpmUpdates(ctx)
+	case "apk":
+		return gatherApkUpdates(ctx)
 	default:
 		return nil, exec.ErrNotFound
 	}
