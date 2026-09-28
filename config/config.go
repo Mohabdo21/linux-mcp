@@ -50,7 +50,7 @@ const (
 	ToolNameGetLargestFiles           = "get_largest_files"
 	ToolNamePingHost                  = "ping_host"
 	ToolNameGetInstalledPackages      = "get_installed_packages"
-	ToolNameCheckUpdates              = "check_updates"
+	ToolNameGetAvailableUpdates       = "get_available_updates"
 	ToolNameGetLoadAverage            = "get_load_average"
 	ToolNameGetLoggedInUsers          = "get_logged_in_users"
 	ToolNameResolveDNS                = "resolve_dns"
@@ -151,7 +151,7 @@ func defaultConfig() *Config {
 			ToolNameGetLargestFiles:           "30s",
 			ToolNamePingHost:                  "10s",
 			ToolNameGetInstalledPackages:      "15s",
-			ToolNameCheckUpdates:              "15s",
+			ToolNameGetAvailableUpdates:       "15s",
 			ToolNameGetLoadAverage:            "5s",
 			ToolNameGetLoggedInUsers:          "5s",
 			ToolNameResolveDNS:                "10s",

@@ -211,7 +211,7 @@ libfoo 1.1-2
 
   trailing-indented  2.0-1
 `
-	want := &CheckUpdatesOutput{
+	want := &AvailableUpdatesOutput{
 		Updates: []AvailableUpdate{
 			{Name: "glibc", Current: "2.39-8", New: "2.39-9"},
 			{Name: "libfoo", Current: "", New: "1.1-2"},

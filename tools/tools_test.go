@@ -839,13 +839,13 @@ func TestGatherInstalledPackagesFilter(t *testing.T) {
 	t.Logf("Found %d packages matching filter", out.Total)
 }
 
-func TestGatherCheckUpdates(t *testing.T) {
-	out, err := GatherCheckUpdates(t.Context())
+func TestGatherAvailableUpdates(t *testing.T) {
+	out, err := GatherAvailableUpdates(t.Context())
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			t.Skip("no supported package manager found")
 		}
-		t.Skipf("GatherCheckUpdates() error: %v", err)
+		t.Skipf("GatherAvailableUpdates() error: %v", err)
 	}
 	t.Logf("Found %d available updates", out.Total)
 }

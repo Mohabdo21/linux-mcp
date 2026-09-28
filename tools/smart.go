@@ -171,7 +171,9 @@ func GatherSMARTHealth(
 ) (*SMARTHealthOutput, error) {
 	_, err := execOutput(ctx, "smartctl", "--version")
 	if err != nil {
-		return nil, fmt.Errorf("smartctl not found or not executable")
+		out := &SMARTHealthOutput{Devices: []SMARTDeviceHealth{}}
+		out.Add("smartctl", err)
+		return out, nil
 	}
 
 	var devices []string
@@ -302,7 +304,9 @@ func GatherIOStats(
 ) (*IOStatsOutput, error) {
 	lines, err := execLines(ctx, "iostat", "-xd", "1", "1")
 	if err != nil {
-		return nil, fmt.Errorf("iostat not found or failed: %w", err)
+		out := &IOStatsOutput{Devices: []IOStatDevice{}}
+		out.Add("iostat", err)
+		return out, nil
 	}
 
 	var devices []IOStatDevice

@@ -192,13 +192,13 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetInstalledPackages,
-		"Queries installed packages: pacman -Q on Arch, dpkg -l on Debian. Optional name filter. Read-only. Fatal if the package manager is unsupported (e.g. rpm/dnf) or the query fails. Use to check what is installed; check_updates for available upgrades.",
+		"Queries installed packages: pacman -Q on Arch, dpkg -l on Debian, rpm -qa on rpm/dnf. Optional name filter, resolved by the package manager itself. Read-only. Fatal only if no supported package manager is present or the query fails. Use to check what is installed; get_available_updates for pending upgrades.",
 		HandleGetInstalledPackages,
 	),
 	defineTool(
-		config.ToolNameCheckUpdates,
-		"Counts or lists available package updates without applying them (pacman -Qu or apt list --upgradable). Read-only, no cache refresh. Fatal if the package manager is unsupported; a pacman error with empty output returns an empty list. Use to see pending updates; get_installed_packages for current versions.",
-		HandleCheckUpdates,
+		config.ToolNameGetAvailableUpdates,
+		"Lists available package updates without applying them (pacman -Qu, apt list --upgradable, dnf check-update). Read-only, no cache refresh, nothing is installed. A clean manager with nothing to report returns an empty list. Fatal only if no supported package manager is present. Use to see pending updates; get_installed_packages for current versions.",
+		HandleGetAvailableUpdates,
 	),
 	defineTool(
 		config.ToolNameGetLoadAverage,

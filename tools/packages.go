@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"strings"
 
@@ -30,7 +31,7 @@ type AvailableUpdate struct {
 	New     string `json:"new,omitempty"`
 }
 
-type CheckUpdatesOutput struct {
+type AvailableUpdatesOutput struct {
 	Updates []AvailableUpdate `json:"updates"`
 	Total   int               `json:"total"`
 	OutputErrors
@@ -43,7 +44,19 @@ func detectPkgManager() string {
 	if _, err := exec.LookPath("dpkg"); err == nil {
 		return "dpkg"
 	}
+	if hasAnyBinary("rpm", "dnf", "yum") {
+		return "rpm"
+	}
 	return ""
+}
+
+func hasAnyBinary(names ...string) bool {
+	for _, name := range names {
+		if _, err := exec.LookPath(name); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func GatherInstalledPackages(
@@ -56,6 +69,8 @@ func GatherInstalledPackages(
 		return gatherPacmanPackages(ctx, name)
 	case "dpkg":
 		return gatherDpkgPackages(ctx, name)
+	case "rpm":
+		return gatherRpmPackages(ctx, name)
 	default:
 		return nil, exec.ErrNotFound
 	}
@@ -137,29 +152,69 @@ func parseDpkgLOutput(output string) *InstalledPackagesOutput {
 	}
 }
 
-func GatherCheckUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
+// See rpm-queryformat(7).
+const rpmQueryFormat = "%{NAME} %{VERSION}-%{RELEASE}\n"
+
+func gatherRpmPackages(
+	ctx context.Context,
+	name string,
+) (*InstalledPackagesOutput, error) {
+	args := []string{"-qa", "--qf", rpmQueryFormat}
+	if name != "" {
+		args = append(args, `name="`+name+`*"`)
+	}
+	out, err := execOutput(ctx, "rpm", args...)
+	if err != nil {
+		return nil, err
+	}
+	return parseRpmQOutput(out), nil
+}
+
+func parseRpmQOutput(output string) *InstalledPackagesOutput {
+	pkgs := make([]InstalledPackage, 0)
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		pkgs = append(pkgs, InstalledPackage{
+			Name:    fields[0],
+			Version: fields[1],
+		})
+	}
+	return &InstalledPackagesOutput{
+		Packages: pkgs,
+		Total:    len(pkgs),
+	}
+}
+
+func GatherAvailableUpdates(
+	ctx context.Context,
+) (*AvailableUpdatesOutput, error) {
 	pm := detectPkgManager()
 	switch pm {
 	case "pacman":
 		return gatherPacmanUpdates(ctx)
 	case "dpkg":
 		return gatherAptUpdates(ctx)
+	case "rpm":
+		return gatherRpmUpdates(ctx)
 	default:
 		return nil, exec.ErrNotFound
 	}
 }
 
-func gatherPacmanUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
+func gatherPacmanUpdates(ctx context.Context) (*AvailableUpdatesOutput, error) {
 	out, err := execOutput(ctx, "pacman", "-Qu")
 	if err != nil {
 		if out == "" {
-			return &CheckUpdatesOutput{Updates: []AvailableUpdate{}}, nil
+			return &AvailableUpdatesOutput{Updates: []AvailableUpdate{}}, nil
 		}
 	}
 	return parsePacmanQuOutput(out), nil
 }
 
-func parsePacmanQuOutput(output string) *CheckUpdatesOutput {
+func parsePacmanQuOutput(output string) *AvailableUpdatesOutput {
 	updates := make([]AvailableUpdate, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -185,13 +240,13 @@ func parsePacmanQuOutput(output string) *CheckUpdatesOutput {
 			}
 		}
 	}
-	return &CheckUpdatesOutput{
+	return &AvailableUpdatesOutput{
 		Updates: updates,
 		Total:   len(updates),
 	}
 }
 
-func gatherAptUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
+func gatherAptUpdates(ctx context.Context) (*AvailableUpdatesOutput, error) {
 	out, err := execOutput(ctx, "apt", "list", "--upgradable")
 	if err != nil {
 		if out == "" {
@@ -201,7 +256,7 @@ func gatherAptUpdates(ctx context.Context) (*CheckUpdatesOutput, error) {
 	return parseAptListOutput(out), nil
 }
 
-func parseAptListOutput(output string) *CheckUpdatesOutput {
+func parseAptListOutput(output string) *AvailableUpdatesOutput {
 	updates := make([]AvailableUpdate, 0)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -231,10 +286,75 @@ func parseAptListOutput(output string) *CheckUpdatesOutput {
 			}
 		}
 	}
-	return &CheckUpdatesOutput{
+	return &AvailableUpdatesOutput{
 		Updates: updates,
 		Total:   len(updates),
 	}
+}
+
+// dnf: 0 = no updates, 100 = updates available, 1 = error. yum matches.
+const dnfUpdatesExit = 100
+
+func gatherRpmUpdates(ctx context.Context) (*AvailableUpdatesOutput, error) {
+	bin := ""
+	if hasAnyBinary("dnf") {
+		bin = "dnf"
+	} else if hasAnyBinary("yum") {
+		bin = "yum"
+	}
+	if bin == "" {
+		return nil, exec.ErrNotFound
+	}
+
+	out, err := execOutput(ctx, bin, "check-update")
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != dnfUpdatesExit {
+			return nil, err
+		}
+	}
+	return parseDnfCheckUpdateOutput(out), nil
+}
+
+func parseDnfCheckUpdateOutput(output string) *AvailableUpdatesOutput {
+	updates := make([]AvailableUpdate, 0)
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" ||
+			strings.HasPrefix(line, "Last metadata expiration") ||
+			strings.HasPrefix(line, "Obsoleting Packages") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		updates = append(updates, AvailableUpdate{
+			Name: stripRPMArch(fields[0]),
+			New:  fields[1],
+		})
+	}
+	return &AvailableUpdatesOutput{
+		Updates: updates,
+		Total:   len(updates),
+	}
+}
+
+// Split on the last dot: package names can contain one, e.g. python3.11.x86_64.
+var rpmArches = map[string]bool{
+	"noarch": true, "x86_64": true, "x86": true,
+	"i386": true, "i486": true, "i586": true, "i686": true,
+	"aarch64": true, "armv7hl": true, "armv6hl": true,
+	"ppc64": true, "ppc64le": true, "s390x": true,
+	"riscv64": true, "src": true,
+}
+
+func stripRPMArch(name string) string {
+	idx := strings.LastIndex(name, ".")
+	if idx < 0 || !rpmArches[name[idx+1:]] {
+		return name
+	}
+	return name[:idx]
 }
 
 func HandleGetInstalledPackages(
@@ -252,15 +372,15 @@ func HandleGetInstalledPackages(
 	)
 }
 
-func HandleCheckUpdates(
+func HandleGetAvailableUpdates(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
 	_ NoArgs,
-) (*mcp.CallToolResult, *CheckUpdatesOutput, error) {
+) (*mcp.CallToolResult, *AvailableUpdatesOutput, error) {
 	return handleToolCall(
 		ctx,
-		config.ToolNameCheckUpdates,
+		config.ToolNameGetAvailableUpdates,
 		0,
-		GatherCheckUpdates,
+		GatherAvailableUpdates,
 	)
 }
