@@ -551,10 +551,6 @@ func HandleGetContainerStats(
 
 // --- All Containers Stats (bulk) ---
 
-type GetDockerStatsAllInput struct {
-	Containers []string `json:"containers,omitempty" jsonschema:"optional list of container names or IDs to filter"`
-}
-
 type DockerContainerStatEntry struct {
 	ID            string                       `json:"id"`
 	Name          string                       `json:"name"`
@@ -660,21 +656,6 @@ func GatherDockerStatsAll(
 			out := &DockerStatsAllOutput{Containers: entries}
 			out.Errors = errs
 			return out, nil
-		},
-	)
-}
-
-func HandleGetDockerStatsAll(
-	ctx context.Context,
-	_ *mcp.CallToolRequest,
-	input GetDockerStatsAllInput,
-) (*mcp.CallToolResult, *DockerStatsAllOutput, error) {
-	return handleToolCall(
-		ctx,
-		config.ToolNameGetDockerStatsAll,
-		0,
-		func(ctx context.Context) (*DockerStatsAllOutput, error) {
-			return GatherDockerStatsAll(ctx, input.Containers)
 		},
 	)
 }
@@ -1274,50 +1255,5 @@ func HandleGetDockerDiskUsage(
 		config.ToolNameGetDockerDiskUsage,
 		0,
 		GatherDockerDiskUsage,
-	)
-}
-
-// --- Docker System Snapshot ---
-
-type DockerSystemSnapshotOutput struct {
-	Info      DockerInfoOutput      `json:"info"`
-	Stats     DockerStatsAllOutput  `json:"stats"`
-	DiskUsage DockerDiskUsageOutput `json:"disk_usage"`
-	OutputErrors
-}
-
-func HandleGetDockerSystemSnapshot(
-	ctx context.Context,
-	_ *mcp.CallToolRequest,
-	_ NoArgs,
-) (*mcp.CallToolResult, *DockerSystemSnapshotOutput, error) {
-	return handleToolCall(
-		ctx,
-		config.ToolNameGetDockerSystemSnapshot,
-		0,
-		func(ctx context.Context) (*DockerSystemSnapshotOutput, error) {
-			var snapshot DockerSystemSnapshotOutput
-			var errs []string
-
-			snapshot.Info = collectOrFallback(ctx,
-				"info", GatherDockerInfo,
-				DockerInfoOutput{Containers: []DockerContainer{},
-					Images: []DockerImage{}}, &errs)
-			snapshot.Stats = collectOrFallback(
-				ctx,
-				"stats",
-				func(ctx context.Context) (*DockerStatsAllOutput, error) {
-					return GatherDockerStatsAll(ctx, nil)
-				},
-				DockerStatsAllOutput{Containers: []DockerContainerStatEntry{}},
-				&errs,
-			)
-			snapshot.DiskUsage = collectOrFallback(ctx,
-				"disk_usage", GatherDockerDiskUsage,
-				DockerDiskUsageOutput{}, &errs)
-
-			snapshot.Errors = errs
-			return &snapshot, nil
-		},
 	)
 }

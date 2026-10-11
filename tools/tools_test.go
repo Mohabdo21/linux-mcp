@@ -684,32 +684,6 @@ func TestGatherDockerStatsAll(t *testing.T) {
 	}
 }
 
-func TestGatherDockerSystemSnapshot(t *testing.T) {
-	ctx := t.Context()
-	result, snapshot, err := HandleGetDockerSystemSnapshot(
-		ctx,
-		nil,
-		NoArgs{},
-	)
-	if err != nil {
-		t.Fatalf("%s error: %v", config.ToolNameGetDockerSystemSnapshot, err)
-	}
-	if result != nil {
-		t.Error("CallToolResult should be nil (structured output path)")
-	}
-	t.Logf(
-		"Containers=%d Images=%d Stats=%d DiskContainers=%d/%d",
-		len(snapshot.Info.Containers),
-		len(snapshot.Info.Images),
-		len(snapshot.Stats.Containers),
-		snapshot.DiskUsage.Containers.ActiveCount,
-		snapshot.DiskUsage.Containers.TotalCount,
-	)
-	if len(snapshot.Errors) > 0 {
-		t.Logf("Errors: %v", snapshot.Errors)
-	}
-}
-
 func TestGatherSystemSnapshot(t *testing.T) {
 	ctx := t.Context()
 	result, snapshot, err := HandleGetSystemSnapshot(

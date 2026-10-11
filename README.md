@@ -17,7 +17,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 - **Disk** - per-partition usage, inodes, mount options, largest files, block devices
 - **Network** - interface stats, active connections, listening ports, DNS, ping, IP geolocation & ASN lookup
 - **Processes** - running processes sorted by CPU or memory, open file descriptors per process
-- **Docker** - containers, images, networks, volumes, disk usage, system info, stats for all containers, system snapshot
+- **Docker** - containers, images, networks, volumes, disk usage, system info, and container stats
 - **Services & automation** - systemd units, service status, user timers, crontab, system cron jobs
 - **Security** - active user sessions, failed login detection, SELinux/AppArmor status, firewall/SSH/SUID/world-writable audit with security score
 - **Packages** - installed packages and available updates (pacman, dpkg, rpm/dnf, apk)
@@ -164,7 +164,7 @@ Verify the connection with `codex mcp list`.
 
 ### Tools and resources
 
-69 tools and 19 resources covering system, CPU, memory, disk, network, processes, Docker, security, packages, hardware, and more.
+65 tools and 19 resources covering system, CPU, memory, disk, network, processes, Docker, security, packages, hardware, and more.
 
 **[Full tool and resource reference](docs/tools.md)**
 

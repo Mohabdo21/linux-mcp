@@ -45,6 +45,31 @@ type JournalLogsOutput struct {
 	OutputErrors
 }
 
+// journalMessage extracts MESSAGE, which systemd encodes as a string or, for
+// non-UTF-8 text, a byte array.
+func journalMessage(raw map[string]any) string {
+	msg, ok := raw["MESSAGE"]
+	if !ok {
+		return ""
+	}
+	switch v := msg.(type) {
+	case string:
+		return v
+	case []any:
+		buf := make([]byte, 0, len(v))
+		for _, item := range v {
+			n, ok := item.(float64)
+			if !ok || n < 0 || n > 255 {
+				return ""
+			}
+			buf = append(buf, byte(n))
+		}
+		return string(buf)
+	default:
+		return ""
+	}
+}
+
 func GatherJournalLogs(
 	ctx context.Context, unit, priority, since, until string,
 	lines int, user bool,
@@ -86,9 +111,7 @@ func GatherJournalLogs(
 		}
 		entry := JournalLogEntry{}
 
-		if msg, ok := raw["MESSAGE"]; ok {
-			entry.Message, _ = msg.(string)
-		}
+		entry.Message = journalMessage(raw)
 
 		if ts, ok := raw["__REALTIME_TIMESTAMP"]; ok {
 			if tsStr, ok := ts.(string); ok {

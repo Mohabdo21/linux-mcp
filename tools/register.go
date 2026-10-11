@@ -62,7 +62,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetDockerInfo,
-		"Returns Docker containers (including stopped) and images. Read-only via the Docker API. Fatal if the daemon is unreachable. Use for a Docker inventory; get_docker_system_snapshot for a fuller view.",
+		"Returns Docker containers (including stopped) and images. Read-only via the Docker API. Fatal if the daemon is unreachable. Use for the Docker inventory of containers and images; get_docker_container_details to inspect one container, get_docker_disk_usage for space accounting.",
 		HandleGetDockerInfo,
 	),
 	defineTool(
@@ -77,7 +77,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetDockerContainerStats,
-		"Returns live CPU, memory, network I/O, and PID stats for running containers. Params: container_ids comma-separated or 'all' (running only). Read-only, one-shot sample. Stats only exist for running containers; unknown or stopped ids error. For all containers in one call use get_docker_stats_all.",
+		"Returns live CPU, memory, network I/O, and PID stats for running containers. Params: container_ids comma-separated or 'all' (running only). Read-only, one-shot sample. Stats only exist for running containers; unknown or stopped ids error. Use container_ids 'all' to cover every running container in one call.",
 		HandleGetContainerStats,
 	),
 	defineTool(
@@ -121,23 +121,13 @@ var toolRegistry = []toolDef{
 		HandleGetDockerDiskUsage,
 	),
 	defineTool(
-		config.ToolNameGetDockerStatsAll,
-		"Returns CPU, memory, network, and block I/O for all running containers in one call. Optional containers param filters by name or ID. Read-only, one-shot. Use instead of repeated get_docker_container_stats calls for a fleet overview.",
-		HandleGetDockerStatsAll,
-	),
-	defineTool(
-		config.ToolNameGetDockerSystemSnapshot,
-		"Returns a combined Docker snapshot: containers, images, running stats, disk usage, and networks. Read-only via the Docker API. Per-part failures land in the errors field; the call still succeeds. Heaviest Docker call - prefer narrower get_docker_* tools for a specific question.",
-		HandleGetDockerSystemSnapshot,
-	),
-	defineTool(
 		config.ToolNameGetSystemSnapshot,
-		"Returns a comprehensive snapshot combining system, CPU, temperature, memory, disk, network, load, top processes, and Docker data in one call. Read-only. Individual gather failures fall back to zero values in the errors field - never fatal, but the heaviest call in the server. Use for a broad overview; prefer targeted tools for deep questions.",
+		"Returns one broad snapshot combining system, CPU, temperature, memory, disk, network, load, top processes, and Docker data in a single call. Read-only. Individual gather failures fall back to zero values in the errors field - never fatal, but the heaviest call in the server. Use as the single entry point for a wide overview; for a pass/fail status use get_system_health_check, and for focused detail prefer the targeted tools.",
 		HandleGetSystemSnapshot,
 	),
 	defineTool(
 		config.ToolNameGetJournalLogs,
-		"Reads systemd journal entries with optional filtering by unit, priority, and time range (since/until). Set user=true for the user journal. Read-only via journalctl. Fatal only if journalctl fails or an invalid unit is given. Returns structured entries with timestamp, message, priority, unit, and PID. For kernel-only events use get_audit_logs.",
+		"Reads systemd journal entries with optional filtering by unit, priority, and time range (since/until). Set user=true for the user journal. Read-only via journalctl. Fatal only if journalctl fails or an invalid unit is given. Returns structured entries with timestamp, message, priority, unit, and PID. For auditd AVC/syscall events use get_audit_logs.",
 		HandleGetJournalLogs,
 	),
 	defineTool(
@@ -147,13 +137,8 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetNetworkConnections,
-		"Returns active TCP/UDP connections with state, addresses, process info, and optional reverse-DNS hostnames. Read-only from /proc/net. Params: status and type filters, grouped by PID, max_connections (0-200). resolve_hostnames does network lookups and is slow - keep it off unless needed. For listening sockets prefer get_listening_ports, which also gives process names.",
+		"Returns TCP/UDP sockets with state, addresses, process info, and optional reverse-DNS hostnames. Read-only from /proc/net. Params: status and type filters, grouped by PID, max_connections (0-200). resolve_hostnames does network lookups and is slow - keep it off unless needed. For listening sockets pass status=LISTEN; process names are included.",
 		HandleGetNetworkConnections,
-	),
-	defineTool(
-		config.ToolNameGetListeningPorts,
-		"Returns listening TCP/UDP ports and associated processes via ss -tulnp. protocol filters to tcp or udp. Read-only; fatal if ss is missing. Process names may be empty without root. Use for port-conflict and exposure checks; get_network_connections for established connections.",
-		HandleGetListeningPorts,
 	),
 	defineTool(
 		config.ToolNameGetServiceStatus,
@@ -172,7 +157,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetFailedLogins,
-		"Returns recent failed login attempts (excluding Boot records) with summary statistics. Read-only: lastb -n N, falling back to journalctl if btmp is not readable. Default 20 entries. Errors are non-fatal. Use for security triage; get_audit_logs for kernel and auditd events.",
+		"Returns recent failed login attempts (excluding Boot records) with summary statistics. Read-only: lastb -n N, falling back to journalctl if btmp is not readable. Default 20 entries. Errors are non-fatal. Use for login-attempt triage; get_audit_logs for auditd AVC and syscall events.",
 		HandleGetFailedLogins,
 	),
 	defineTool(
@@ -227,17 +212,17 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetBootTime,
-		"Returns the boot-time breakdown from systemd-analyze time: per-phase durations (firmware, loader, kernel, initrd, userspace), total startup time, and the reached target. Read-only; fatal only if systemd-analyze is missing or fails. Use to quantify where boot time goes.",
+		"Returns the phase-level boot breakdown from systemd-analyze time: firmware, loader, kernel, initrd, and userspace durations plus total startup and the reached target. Read-only; fatal only if systemd-analyze is missing or fails. Use to see which boot phase dominates; get_boot_blame ranks slow units, get_boot_critical_chain traces the dependency path.",
 		HandleGetBootTime,
 	),
 	defineTool(
 		config.ToolNameGetBootBlame,
-		"Returns systemd units ordered by init time from systemd-analyze blame: unit names with their start durations. Read-only; fatal only if systemd-analyze is missing or fails. Use to find slow-starting services; get_boot_critical_chain for the dependency chain.",
+		"Returns systemd units ranked by their own start duration from systemd-analyze blame. Read-only; fatal only if systemd-analyze is missing or fails. Use for a flat ranking of the slowest units by self-time; get_boot_critical_chain for the dependency path that gates the target, get_boot_time for phase totals.",
 		HandleGetBootBlame,
 	),
 	defineTool(
 		config.ToolNameGetBootCriticalChain,
-		"Returns the time-critical boot chain from systemd-analyze critical-chain: a dependency tree of units with their active-time point and start duration. Read-only; fatal only if systemd-analyze is missing or fails. When unit is omitted, returns the full chain to the default target (usually graphical.target). When unit is provided (e.g. 'nginx.service'), returns only the chain from that unit downward. Use to find what delays the boot target; for raw per-unit durations prefer get_boot_blame, for phase-level breakdown prefer get_boot_time.",
+		"Returns the time-critical boot chain from systemd-analyze critical-chain: a dependency tree of units with their active-time point and start duration. Read-only; fatal only if systemd-analyze is missing or fails. When unit is omitted, returns the full chain to the default target (usually graphical.target). When unit is provided (e.g. 'nginx.service'), returns only the chain from that unit downward. Use to find the dependency path that delays the boot target; get_boot_blame for a flat per-unit ranking, get_boot_time for phase totals.",
 		HandleGetBootCriticalChain,
 	),
 	defineTool(
@@ -312,7 +297,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetSystemHealthCheck,
-		"Returns an overall OK/WARNING/CRITICAL verdict from memory, disk (partitions at 80%+), load vs core count, and failed systemd units. Read-only aggregate; sub-failures land in the errors field, never fatal. Use as the first-line health check; get_system_snapshot for full detail.",
+		"Returns a single OK/WARNING/CRITICAL verdict derived from memory, disk (partitions at 80%+), load vs core count, and failed systemd units. Read-only aggregate; sub-failures land in the errors field, never fatal. Use for a first-line pass/fail status; it reports no raw metrics - use get_system_snapshot or the targeted tools for detail.",
 		HandleGetSystemHealthCheck,
 	),
 	defineTool(
@@ -327,7 +312,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetDiskIOMetrics,
-		"Returns per-device disk I/O: reads, writes, sectors, and timings. Read-only from /proc/diskstats (loop/ram/zram skipped); fatal only if unreadable. Use for storage performance; get_top_io_processes for per-process I/O.",
+		"Returns per-device disk I/O counters cumulative since boot: reads, writes, sectors, and timings. Read-only from /proc/diskstats (loop/ram/zram skipped); fatal only if unreadable. Use to attribute I/O across devices; get_top_io_processes for the processes driving it.",
 		HandleGetDiskIOMetrics,
 	),
 	defineTool(
@@ -337,7 +322,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetAuditLogs,
-		"Returns kernel audit events from journalctl -k or /var/log/audit/audit.log (AVC denials, system calls). source param: journalctl, audit.log, or auto (default). lines defaults to 50. Read-only; fatal if the chosen source is unavailable. Use for security forensics; get_failed_logins for login attempts.",
+		"Returns Linux audit (auditd) events from /var/log/audit/audit.log: AVC denials and syscall records. lines defaults to 50. Read-only; fatal if the file is unreadable (auditd not installed or not readable). Use for auditd denial and syscall forensics; get_journal_logs for the systemd journal and kernel messages, get_failed_logins for login attempts.",
 		HandleGetAuditLogs,
 	),
 	defineTool(
@@ -364,11 +349,6 @@ var toolRegistry = []toolDef{
 		config.ToolNameGetRoutingTable,
 		"Returns the kernel routing table: destination, gateway, interface, proto, scope, metric, and MTU. Read-only via ip route show. Use for network path and gateway troubleshooting.",
 		HandleGetRoutingTable,
-	),
-	defineTool(
-		config.ToolNameGetIOStats,
-		"Returns per-device extended I/O statistics: throughput, IOPS, latency, queue depth, and utilization. Read-only via iostat -xd 1 1. Requires sysstat/iostat installed. Use for storage performance analysis; get_disk_io_metrics for cumulative counters.",
-		HandleGetIOStats,
 	),
 }
 

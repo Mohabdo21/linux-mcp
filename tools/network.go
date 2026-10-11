@@ -73,10 +73,6 @@ func HandleGetNetworkInfo(
 	)
 }
 
-type GetListeningPortsInput struct {
-	Protocol string `json:"protocol,omitempty" jsonschema:"optional protocol filter: tcp, udp"`
-}
-
 type ListeningPort struct {
 	Protocol string `json:"protocol"`
 	Address  string `json:"address"`
@@ -120,21 +116,6 @@ func GatherListeningPorts(
 		})
 	}
 	return &ListeningPortsOutput{Ports: ports}, nil
-}
-
-func HandleGetListeningPorts(
-	ctx context.Context,
-	_ *mcp.CallToolRequest,
-	input GetListeningPortsInput,
-) (*mcp.CallToolResult, *ListeningPortsOutput, error) {
-	return handleToolCall(
-		ctx,
-		config.ToolNameGetListeningPorts,
-		0,
-		func(ctx context.Context) (*ListeningPortsOutput, error) {
-			return GatherListeningPorts(ctx, input.Protocol)
-		},
-	)
 }
 
 type ResolveDNSInput struct {

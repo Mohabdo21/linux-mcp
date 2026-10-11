@@ -35,13 +35,10 @@ const (
 	ToolNameGetDockerVolumes          = "get_docker_volumes"
 	ToolNameGetDockerSystemInfo       = "get_docker_system_info"
 	ToolNameGetDockerDiskUsage        = "get_docker_disk_usage"
-	ToolNameGetDockerStatsAll         = "get_docker_stats_all"
-	ToolNameGetDockerSystemSnapshot   = "get_docker_system_snapshot"
 	ToolNameGetSystemSnapshot         = "get_system_snapshot"
 	ToolNameGetJournalLogs            = "get_journal_logs"
 	ToolNameGetInodeUsage             = "get_inode_usage"
 	ToolNameGetNetworkConnections     = "get_network_connections"
-	ToolNameGetListeningPorts         = "get_listening_ports"
 	ToolNameGetServiceStatus          = "get_service_status"
 	ToolNameGetProcessFDs             = "get_process_fds"
 	ToolNameGetTopIOProcesses         = "get_top_io_processes"
@@ -84,7 +81,6 @@ const (
 	ToolNameGetProcessTree            = "get_process_tree"
 	ToolNameGetKernelModules          = "get_kernel_modules"
 	ToolNameGetRoutingTable           = "get_routing_table"
-	ToolNameGetIOStats                = "get_io_stats"
 )
 
 type Config struct {
@@ -138,12 +134,9 @@ func defaultConfig() *Config {
 			ToolNameGetDockerVolumes:          "10s",
 			ToolNameGetDockerSystemInfo:       "10s",
 			ToolNameGetDockerDiskUsage:        "10s",
-			ToolNameGetDockerStatsAll:         "30s",
-			ToolNameGetDockerSystemSnapshot:   "60s",
 			ToolNameGetDockerInfo:             "10s",
 			ToolNameGetSystemSnapshot:         "120s",
 			ToolNameGetJournalLogs:            "20s",
-			ToolNameGetListeningPorts:         "10s",
 			ToolNameGetServiceStatus:          "10s",
 			ToolNameGetTopIOProcesses:         "15s",
 			ToolNameGetFailedLogins:           "10s",
@@ -181,7 +174,6 @@ func defaultConfig() *Config {
 			ToolNameGetProcessTree:            "10s",
 			ToolNameGetKernelModules:          "5s",
 			ToolNameGetRoutingTable:           "5s",
-			ToolNameGetIOStats:                "10s",
 		},
 		Disabled: []string{},
 	}

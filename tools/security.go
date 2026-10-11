@@ -224,8 +224,7 @@ func HandleGetFailedLogins(
 }
 
 type GetAuditLogsInput struct {
-	Lines  int    `json:"lines,omitempty"  jsonschema:"number of recent entries (default: 50)"`
-	Source string `json:"source,omitempty" jsonschema:"audit source: 'journalctl', 'audit.log', or 'auto' (default: auto)"`
+	Lines int `json:"lines,omitempty" jsonschema:"number of recent entries (default: 50)"`
 }
 
 type AuditLogEntry struct {
@@ -239,77 +238,11 @@ type AuditLogsOutput struct {
 	OutputErrors
 }
 
-func GatherAuditLogs(
-	ctx context.Context,
-	lines int,
-	source string,
-) (*AuditLogsOutput, error) {
+func GatherAuditLogs(lines int) (*AuditLogsOutput, error) {
 	if lines <= 0 {
 		lines = 50
 	}
-
-	if source == "" {
-		source = "auto"
-	}
-
-	switch source {
-	case "journalctl":
-		return gatherFromJournalctl(ctx, lines)
-	case "audit.log":
-		return gatherFromAuditLog(lines)
-	default:
-		out, err := gatherFromJournalctl(ctx, lines)
-		if err == nil && len(out.Entries) > 0 {
-			return out, nil
-		}
-		return gatherFromAuditLog(lines)
-	}
-}
-
-func gatherFromJournalctl(
-	ctx context.Context,
-	lines int,
-) (*AuditLogsOutput, error) {
-	cmd := exec.CommandContext(
-		ctx,
-		"journalctl",
-		"-k",
-		"--no-pager",
-		"-n",
-		fmt.Sprintf("%d", lines),
-		"--output=short-iso",
-	)
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("journalctl failed: %w", err)
-	}
-
-	out := &AuditLogsOutput{Entries: make([]AuditLogEntry, 0)}
-	scanner := bufio.NewScanner(strings.NewReader(string(output)))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		entry := parseJournalctlLine(line)
-		out.Entries = append(out.Entries, entry)
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("cannot read journalctl output: %w", err)
-	}
-	return out, nil
-}
-
-func parseJournalctlLine(line string) AuditLogEntry {
-	// Format: 2024-01-15T10:30:00+0000 hostname kernel: [  123.456] message
-	before, after, ok := strings.Cut(line, "kernel:")
-	if !ok {
-		return AuditLogEntry{Timestamp: line, Type: "unknown", Message: line}
-	}
-	parts := strings.SplitN(after, "]", 2)
-	msg := strings.TrimSpace(parts[len(parts)-1])
-	ts := strings.TrimSpace(before)
-	return AuditLogEntry{Timestamp: ts, Type: "kernel", Message: msg}
+	return gatherFromAuditLog(lines)
 }
 
 func gatherFromAuditLog(lines int) (*AuditLogsOutput, error) {
@@ -387,8 +320,8 @@ func HandleGetAuditLogs(
 		ctx,
 		config.ToolNameGetAuditLogs,
 		0,
-		func(ctx context.Context) (*AuditLogsOutput, error) {
-			return GatherAuditLogs(ctx, lines, input.Source)
+		func(context.Context) (*AuditLogsOutput, error) {
+			return GatherAuditLogs(lines)
 		},
 	)
 }

@@ -430,23 +430,6 @@ func TestGatherSharedMemorySegments(t *testing.T) {
 	t.Logf("Found %d shared memory segments", len(out.Segments))
 }
 
-func TestParseJournalctlLine(t *testing.T) {
-	input := "2024-01-15T10:30:00+0000 myhost kernel: [  123.456] avc: denied { read }"
-	entry := parseJournalctlLine(input)
-	if entry.Timestamp != "2024-01-15T10:30:00+0000 myhost" {
-		t.Errorf(
-			"Timestamp = %s, want '2024-01-15T10:30:00+0000 myhost'",
-			entry.Timestamp,
-		)
-	}
-	if entry.Type != "kernel" {
-		t.Errorf("Type = %s, want kernel", entry.Type)
-	}
-	if entry.Message != "avc: denied { read }" {
-		t.Errorf("Message = %s, want 'avc: denied { read }'", entry.Message)
-	}
-}
-
 func TestParseAuditdLine(t *testing.T) {
 	input := "type=AVC msg=audit(1700000000.123:456): avc: denied { read }"
 	entry := parseAuditdLine(input)
@@ -469,27 +452,11 @@ func TestParseAuditdLineInsufficientFields(t *testing.T) {
 }
 
 func TestGatherAuditLogs(t *testing.T) {
-	out, err := GatherAuditLogs(t.Context(), 10, "auto")
+	out, err := GatherAuditLogs(10)
 	if err != nil {
 		t.Skipf("GatherAuditLogs failed (auditd may not be available): %v", err)
 	}
 	t.Logf("Found %d audit log entries", len(out.Entries))
-}
-
-func TestGatherAuditLogsJournalctl(t *testing.T) {
-	out, err := GatherAuditLogs(t.Context(), 5, "journalctl")
-	if err != nil {
-		t.Skipf("GatherAuditLogs (journalctl) failed: %v", err)
-	}
-	t.Logf("Found %d journalctl entries", len(out.Entries))
-}
-
-func TestGatherAuditLogsAuditLog(t *testing.T) {
-	out, err := GatherAuditLogs(t.Context(), 5, "audit.log")
-	if err != nil {
-		t.Skipf("GatherAuditLogs (audit.log) failed: %v", err)
-	}
-	t.Logf("Found %d audit.log entries", len(out.Entries))
 }
 
 // /proc/sysvipc/shm has no status column; field[7] is the owner UID.
