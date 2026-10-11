@@ -1,0 +1,6 @@
+.git
+.github
+bin
+docs
+assets
+*.md
