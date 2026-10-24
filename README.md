@@ -4,6 +4,7 @@ A Linux system monitoring server built on the [Model Context Protocol (MCP)](htt
 
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-linux--mcp-000?style=flat-square&logo=github)](https://registry.modelcontextprotocol.io) [![linux-mcp MCP server](https://glama.ai/mcp/servers/Mohabdo21/linux-mcp/badges/score.svg)](https://glama.ai/mcp/servers/Mohabdo21/linux-mcp)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Mohabdo21/linux-mcp/total)
+[![Linux MCP on mcprush](https://mcprush.com/badge/mohabdo21-linux-mcp/score.svg)](https://mcprush.com/to/mohabdo21-linux-mcp?ref=badge)
 
 <p align="center">
   <img src="assets/demo.gif" alt="linux-mcp demo" width="100%">
