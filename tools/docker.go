@@ -161,9 +161,9 @@ type DockerContainerDetail struct {
 	Created string                 `json:"created"`
 	State   map[string]any         `json:"state"`
 	Status  string                 `json:"status"`
-	Path    string                 `json:"path"`
-	Args    []string               `json:"args"`
-	Env     []string               `json:"env"`
+	Path    string                 `json:"path"    jsonschema:"always redacted to prevent command disclosure"`
+	Args    []string               `json:"args"    jsonschema:"always empty to prevent command argument disclosure"`
+	Env     []string               `json:"env"     jsonschema:"environment names with all values redacted"`
 	Mounts  []DockerContainerMount `json:"mounts"`
 	Network map[string]any         `json:"network"`
 	Ports   map[string]any         `json:"ports"`
@@ -244,9 +244,6 @@ func GatherContainerDetail(
 
 			status, _ := state["status"].(string)
 
-			args := c.Args
-			args = nilToEmpty(args)
-
 			return &DockerContainerDetailOutput{
 				Container: DockerContainerDetail{
 					ID:      id,
@@ -255,8 +252,8 @@ func GatherContainerDetail(
 					Created: c.Created,
 					State:   state,
 					Status:  status,
-					Path:    c.Path,
-					Args:    args,
+					Path:    "***",
+					Args:    []string{},
 					Env:     env,
 					Mounts:  mounts,
 					Network: network,
@@ -664,7 +661,7 @@ func GatherDockerStatsAll(
 
 type GetDockerContainerTopInput struct {
 	ContainerID string   `json:"container_id"   jsonschema:"container name or ID"`
-	Args        []string `json:"args,omitempty" jsonschema:"optional arguments to ps (e.g. aux)"`
+	Args        []string `json:"args,omitempty" jsonschema:"legacy field; ignored to prevent command and environment disclosure"`
 }
 
 type DockerContainerTopOutput struct {
@@ -676,7 +673,7 @@ type DockerContainerTopOutput struct {
 func GatherContainerTop(
 	ctx context.Context,
 	containerID string,
-	args []string,
+	_ []string,
 ) (*DockerContainerTopOutput, error) {
 	return withDockerClient(
 		ctx,
@@ -685,7 +682,7 @@ func GatherContainerTop(
 				ctx,
 				containerID,
 				mobyclient.ContainerTopOptions{
-					Arguments: args,
+					Arguments: []string{"-eo", "pid,ppid,user,stat,comm"},
 				},
 			)
 			if err != nil {
@@ -806,7 +803,7 @@ type GetDockerImageHistoryInput struct {
 type DockerImageLayer struct {
 	ID        string   `json:"id"`
 	Created   int64    `json:"created"`
-	CreatedBy string   `json:"created_by"`
+	CreatedBy string   `json:"created_by"        jsonschema:"always redacted to prevent build command disclosure"`
 	Size      string   `json:"size"`
 	Tags      []string `json:"tags,omitempty"`
 	Comment   string   `json:"comment,omitempty"`
@@ -835,7 +832,7 @@ func GatherImageHistory(
 				layers = append(layers, DockerImageLayer{
 					ID:        id,
 					Created:   item.Created,
-					CreatedBy: item.CreatedBy,
+					CreatedBy: "***",
 					Size:      HumanSize(item.Size),
 					Tags:      item.Tags,
 					Comment:   item.Comment,
@@ -879,9 +876,9 @@ type DockerImageDetail struct {
 	Architecture string            `json:"architecture"`
 	OS           string            `json:"os"`
 	Size         string            `json:"size"`
-	Entrypoint   []string          `json:"entrypoint,omitempty"`
-	Cmd          []string          `json:"cmd,omitempty"`
-	Env          []string          `json:"env,omitempty"`
+	Entrypoint   []string          `json:"entrypoint,omitempty"  jsonschema:"omitted to prevent command argument disclosure"`
+	Cmd          []string          `json:"cmd,omitempty"         jsonschema:"omitted to prevent command argument disclosure"`
+	Env          []string          `json:"env,omitempty"         jsonschema:"environment names with all values redacted"`
 	WorkingDir   string            `json:"working_dir,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty"`
 	Layers       []string          `json:"layers,omitempty"`
@@ -906,12 +903,10 @@ func GatherImageDetail(
 
 			id := shortID(result.ID)
 
-			var entrypoint, cmd, env []string
+			var env []string
 			var workingDir string
 			var labels map[string]string
 			if result.Config != nil {
-				entrypoint = result.Config.Entrypoint
-				cmd = result.Config.Cmd
 				env = result.Config.Env
 				workingDir = result.Config.WorkingDir
 				labels = result.Config.Labels
@@ -933,8 +928,6 @@ func GatherImageDetail(
 					Architecture: result.Architecture,
 					OS:           result.Os,
 					Size:         HumanSize(result.Size),
-					Entrypoint:   entrypoint,
-					Cmd:          cmd,
 					Env:          env,
 					WorkingDir:   workingDir,
 					Labels:       labels,

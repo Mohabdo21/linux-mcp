@@ -196,9 +196,9 @@ func redactSensitiveEnv(env []string) []string {
 	env = nilToEmpty(env)
 	for i, e := range env {
 		if before, _, ok := strings.Cut(e, "="); ok {
-			if isSensitiveEnvVar(before) {
-				env[i] = before + "=***"
-			}
+			env[i] = before + "=***"
+		} else {
+			env[i] = "***"
 		}
 	}
 	return env
