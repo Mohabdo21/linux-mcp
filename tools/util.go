@@ -93,7 +93,7 @@ func collectOrFallback[T any](
 	fallback T,
 	errs *[]string,
 ) T {
-	out, err := gather(ctx)
+	out, err := gatherEnabled(ctx, name, gather)
 	if err != nil {
 		appendErr(errs, name, err)
 		return fallback

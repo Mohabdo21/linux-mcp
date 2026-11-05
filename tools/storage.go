@@ -597,7 +597,11 @@ func GatherSystemHealthCheck(
 	hasWarning := false
 	hasCritical := false
 
-	mem, err := GatherMemoryInfo(ctx)
+	mem, err := gatherEnabled(
+		ctx,
+		config.ToolNameGetMemoryInfo,
+		GatherMemoryInfo,
+	)
 	if err == nil {
 		if mem.UsedPercent > 90 {
 			hasCritical = true
@@ -618,10 +622,13 @@ func GatherSystemHealthCheck(
 			})
 		}
 	} else {
-		appendErr(&errs, "memory", err)
+		appendErr(&errs, config.ToolNameGetMemoryInfo, err)
 	}
 
-	disk, err := GatherDiskInfo(ctx, "", 80)
+	disk, err := gatherEnabled(ctx, config.ToolNameGetDiskInfo,
+		func(ctx context.Context) (*DiskInfoOutput, error) {
+			return GatherDiskInfo(ctx, "", 80)
+		})
 	if err == nil {
 		for _, p := range disk.Partitions {
 			item := HealthCheckItem{Component: "disk:" + p.MountPoint}
@@ -647,13 +654,18 @@ func GatherSystemHealthCheck(
 			})
 		}
 	} else {
-		appendErr(&errs, "disk", err)
+		appendErr(&errs, config.ToolNameGetDiskInfo, err)
 	}
 
-	load, err := GatherLoadAverage(ctx)
+	cpu, cpuErr := gatherEnabled(ctx, config.ToolNameGetCPUInfo, GatherCPUInfo)
+	appendErr(&errs, config.ToolNameGetCPUInfo, cpuErr)
+	load, err := gatherEnabled(
+		ctx,
+		config.ToolNameGetLoadAverage,
+		GatherLoadAverage,
+	)
 	if err == nil {
-		cpu, err2 := GatherCPUInfo(ctx)
-		if err2 == nil && cpu.PhysicalCoreCount > 0 {
+		if cpuErr == nil && cpu.PhysicalCoreCount > 0 {
 			ratio := load.Load15 / float64(cpu.PhysicalCoreCount)
 			item := HealthCheckItem{Component: "load"}
 			if ratio > 2 {
@@ -674,11 +686,16 @@ func GatherSystemHealthCheck(
 			out.Checks = append(out.Checks, item)
 		}
 	} else {
-		appendErr(&errs, "load", err)
+		appendErr(&errs, config.ToolNameGetLoadAverage, err)
 	}
 
-	units, err := GatherSystemdUnits(ctx, "failed")
-	if err == nil && len(units.Units) > 0 {
+	units, err := gatherEnabled(ctx, config.ToolNameGetSystemdUnits,
+		func(ctx context.Context) (*SystemdUnitsOutput, error) {
+			return GatherSystemdUnits(ctx, "failed")
+		})
+	if err != nil {
+		appendErr(&errs, config.ToolNameGetSystemdUnits, err)
+	} else if len(units.Units) > 0 {
 		hasCritical = true
 		var failed []string
 		for _, u := range units.Units {
@@ -699,6 +716,8 @@ func GatherSystemHealthCheck(
 		out.Overall = "CRITICAL"
 	case hasWarning:
 		out.Overall = "WARNING"
+	case len(errs) > 0:
+		out.Overall = "UNKNOWN"
 	default:
 		out.Overall = "OK"
 	}

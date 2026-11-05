@@ -38,16 +38,11 @@ func handleToolCall[Out toolOutput](
 	fallback time.Duration,
 	gather func(context.Context) (Out, error),
 ) (*mcp.CallToolResult, Out, error) {
-	if config.IsDisabled(name) {
-		var zero Out
-		return nil, zero, errors.New("tool disabled by configuration")
-	}
-
 	ctx, cancel := WithToolTimeout(ctx, name, fallback)
 	defer cancel()
 
 	start := time.Now()
-	out, err := gather(ctx)
+	out, err := gatherEnabled(ctx, name, gather)
 	if !isOutNil(out) {
 		LogToolCall(ctx, name, time.Since(start), out.ErrorCount())
 		if err != nil {
@@ -65,4 +60,16 @@ func handleToolCall[Out toolOutput](
 	}
 	var zero Out
 	return nil, zero, nil
+}
+
+func gatherEnabled[Out any](
+	ctx context.Context,
+	name string,
+	gather func(context.Context) (Out, error),
+) (Out, error) {
+	if config.IsDisabled(name) {
+		var zero Out
+		return zero, errors.New("tool disabled by configuration")
+	}
+	return gather(ctx)
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Mohabdo21/linux-mcp/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -16,15 +17,17 @@ type resourceDef struct {
 	Path        string
 	Name        string
 	Description string
+	ToolName    string
 	resolver    func(ctx context.Context, rest string) (any, error)
 }
 
 // staticResource builds a resourceDef from a no-argument gather.
 func staticResource[Out any](
-	path, name, description string,
+	path, name, description, toolName string,
 	gather func(context.Context) (Out, error),
 ) resourceDef {
 	r := resourceDef{Path: path, Name: name, Description: description,
+		ToolName: toolName,
 		resolver: func(ctx context.Context, _ string) (any, error) {
 			return gather(ctx)
 		}}
@@ -52,34 +55,68 @@ var resourceRegistry = []resourceDef{
 		"/info",
 		"System Information",
 		"Hostname, OS, kernel version, architecture, and uptime",
+		config.ToolNameGetSystemInfo,
 		GatherSystemInfo,
 	),
-	staticResource("/cpu", "CPU Information",
-		"CPU usage, model, frequency, and core counts", GatherCPUInfo),
-	staticResource("/memory", "Memory Information",
-		"RAM and swap usage statistics", GatherMemoryInfo),
+	staticResource(
+		"/cpu",
+		"CPU Information",
+		"CPU usage, model, frequency, and core counts",
+		config.ToolNameGetCPUInfo,
+		GatherCPUInfo,
+	),
+	staticResource(
+		"/memory",
+		"Memory Information",
+		"RAM and swap usage statistics",
+		config.ToolNameGetMemoryInfo,
+		GatherMemoryInfo,
+	),
 	{Path: "/disk", Name: "Disk Information",
+		ToolName:    config.ToolNameGetDiskInfo,
 		Description: "Disk usage for all mounted partitions",
 		resolver: func(ctx context.Context, _ string) (any, error) {
 			return GatherDiskInfo(ctx, "", 0)
 		}},
-	staticResource("/network", "Network Information",
-		"Network I/O statistics per interface", GatherNetworkInfo),
-	staticResource("/load", "Load Average",
-		"1-, 5-, and 15-minute load averages", GatherLoadAverage),
-	staticResource("/temperature", "CPU Temperature",
-		"Current CPU temperature from available sensors", GatherCPUTemperature),
+	staticResource(
+		"/network",
+		"Network Information",
+		"Network I/O statistics per interface",
+		config.ToolNameGetNetworkInfo,
+		GatherNetworkInfo,
+	),
+	staticResource(
+		"/load",
+		"Load Average",
+		"1-, 5-, and 15-minute load averages",
+		config.ToolNameGetLoadAverage,
+		GatherLoadAverage,
+	),
+	staticResource(
+		"/temperature",
+		"CPU Temperature",
+		"Current CPU temperature from available sensors",
+		config.ToolNameGetCPUTemperature,
+		GatherCPUTemperature,
+	),
 	staticResource("/gpu", "GPU Information",
 		"GPU usage, memory, temperature, and power "+
-			"(NVIDIA/AMD/Intel)", GatherGPUInfo),
-	staticResource("/logged_in_users", "Logged In Users",
-		"Active user sessions", GatherLoggedInUsers),
+			"(NVIDIA/AMD/Intel)", config.ToolNameGetGPUInfo, GatherGPUInfo),
+	staticResource(
+		"/logged_in_users",
+		"Logged In Users",
+		"Active user sessions",
+		config.ToolNameGetLoggedInUsers,
+		GatherLoggedInUsers,
+	),
 	{Path: "/listening_ports", Name: "Listening Ports",
+		ToolName:    config.ToolNameGetNetworkConnections,
 		Description: "Listening ports and associated processes",
 		resolver: func(ctx context.Context, _ string) (any, error) {
 			return GatherListeningPorts(ctx, "")
 		}},
 	{Path: "/failed_logins", Name: "Failed Logins",
+		ToolName:    config.ToolNameGetFailedLogins,
 		Description: "Recent failed login attempts",
 		resolver: func(ctx context.Context, _ string) (any, error) {
 			return GatherFailedLogins(ctx, 20)
@@ -88,23 +125,46 @@ var resourceRegistry = []resourceDef{
 		"/block_devices",
 		"Block Devices",
 		"Block devices and partitions detected on the system",
+		config.ToolNameGetBlockDevices,
 		GatherBlockDevices,
 	),
-	staticResource("/raid", "RAID Status",
-		"Software RAID status from /proc/mdstat", GatherRAIDStatus),
-	staticResource("/time_sync", "Time Sync Status",
-		"NTP/Chrony time synchronization status", GatherTimeSyncStatus),
+	staticResource(
+		"/raid",
+		"RAID Status",
+		"Software RAID status from /proc/mdstat",
+		config.ToolNameGetRAIDStatus,
+		GatherRAIDStatus,
+	),
+	staticResource(
+		"/time_sync",
+		"Time Sync Status",
+		"NTP/Chrony time synchronization status",
+		config.ToolNameGetTimeSyncStatus,
+		GatherTimeSyncStatus,
+	),
 	staticResource(
 		"/selinux_apparmor",
 		"SELinux/AppArmor Status",
 		"Status of SELinux and AppArmor security modules",
+		config.ToolNameGetSELinuxAppArmorStatus,
 		GatherSELinuxAppArmorStatus,
 	),
-	staticResource("/logrotate", "Logrotate Status",
-		"Logrotate configuration and state file", GatherLogrotateStatus),
-	staticResource("/health", "System Health Check",
-		"Comprehensive system health assessment", GatherSystemHealthCheck),
+	staticResource(
+		"/logrotate",
+		"Logrotate Status",
+		"Logrotate configuration and state file",
+		config.ToolNameGetLogrotateStatus,
+		GatherLogrotateStatus,
+	),
+	staticResource(
+		"/health",
+		"System Health Check",
+		"Comprehensive system health assessment",
+		config.ToolNameGetSystemHealthCheck,
+		GatherSystemHealthCheck,
+	),
 	{Path: "/disk/{mount_point}", Name: "Disk Information (filtered)",
+		ToolName: config.ToolNameGetDiskInfo,
 		Description: "Disk usage for a specific mount point, e.g. " +
 			"system:///disk/ (root) or system:///disk/boot",
 		resolver: func(ctx context.Context, rest string) (any, error) {
@@ -115,6 +175,7 @@ var resourceRegistry = []resourceDef{
 			return GatherDiskInfo(ctx, mountPoint, 0)
 		}},
 	{Path: "/service/{name}", Name: "Service Status",
+		ToolName: config.ToolNameGetServiceStatus,
 		Description: "Detailed status of a systemd service, e.g. " +
 			"system:///service/sshd or system:///service/nginx.service",
 		resolver: func(ctx context.Context, rest string) (any, error) {
@@ -180,7 +241,13 @@ func handleReadResource(
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	data, nerr := r.resolver(ctx, rest)
+	data, nerr := gatherEnabled(
+		ctx,
+		r.ToolName,
+		func(ctx context.Context) (any, error) {
+			return r.resolver(ctx, rest)
+		},
+	)
 	if data == nil {
 		if nerr != nil {
 			return nil, fmt.Errorf("resource unavailable: %w", nerr)

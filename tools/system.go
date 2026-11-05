@@ -129,30 +129,35 @@ func HandleGetSystemSnapshot(
 			var errs []string
 
 			snapshot.System = collectOrFallback(ctx,
-				"system", GatherSystemInfo,
+				config.ToolNameGetSystemInfo, GatherSystemInfo,
 				SystemInfoOutput{}, &errs)
 			snapshot.CPU = collectOrFallback(ctx,
-				"cpu", GatherCPUInfo,
+				config.ToolNameGetCPUInfo, GatherCPUInfo,
 				CPUInfoOutput{Cores: []CPUDetails{}}, &errs)
 			snapshot.Temperature = collectOrFallback(ctx,
-				"temperature", GatherCPUTemperature,
+				config.ToolNameGetCPUTemperature, GatherCPUTemperature,
 				CPUTemperatureOutput{Temperatures: []TemperatureStat{}}, &errs)
 			snapshot.Memory = collectOrFallback(ctx,
-				"memory", GatherMemoryInfo,
+				config.ToolNameGetMemoryInfo, GatherMemoryInfo,
 				MemoryInfoOutput{}, &errs)
-			snapshot.Disk = collectOrFallback(ctx,
-				"disk", func(ctx context.Context) (*DiskInfoOutput, error) {
+			snapshot.Disk = collectOrFallback(
+				ctx,
+				config.ToolNameGetDiskInfo,
+				func(ctx context.Context) (*DiskInfoOutput, error) {
 					return GatherDiskInfo(ctx, "", 0)
-				}, DiskInfoOutput{Partitions: []DiskUsageStat{}}, &errs)
+				},
+				DiskInfoOutput{Partitions: []DiskUsageStat{}},
+				&errs,
+			)
 			snapshot.Network = collectOrFallback(ctx,
-				"network", GatherNetworkInfo,
+				config.ToolNameGetNetworkInfo, GatherNetworkInfo,
 				NetworkInfoOutput{Interfaces: []InterfaceStats{}}, &errs)
 			snapshot.LoadAverage = collectOrFallback(ctx,
-				"load_average", GatherLoadAverage,
+				config.ToolNameGetLoadAverage, GatherLoadAverage,
 				LoadAverageOutput{}, &errs)
 			snapshot.Processes = collectOrFallback(
 				ctx,
-				"processes",
+				config.ToolNameGetProcessInfo,
 				func(ctx context.Context) (*ProcessInfoOutput, error) {
 					return GatherProcessInfo(ctx, "cpu", 10)
 				},
@@ -160,7 +165,7 @@ func HandleGetSystemSnapshot(
 				&errs,
 			)
 			snapshot.Docker = collectOrFallback(ctx,
-				"docker", GatherDockerInfo,
+				config.ToolNameGetDockerInfo, GatherDockerInfo,
 				DockerInfoOutput{
 					Containers: []DockerContainer{},
 					Images:     []DockerImage{},
