@@ -1,7 +1,12 @@
-name: Publish to MCP Registry
+name: Retry MCP Registry Publication
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to publish (vX.Y.Z)
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -9,38 +14,87 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      MCP_PUBLISHER_VERSION: v1.8.1
 
     steps:
-      - name: Checkout code
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::release_tag must be an explicit vX.Y.Z release tag'
+            exit 1
+          fi
+          printf 'RELEASE_DIR=%s/mcp-registry-release\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Checkout release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ inputs.release_tag }}
           persist-credentials: false
 
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.26"
-
-      - name: Run tests
-        run: make test
-
-      - name: Build binaries
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: make build build-static VERSION="$VERSION"
-
-      - name: Compute SHA256
+      - name: Download existing release assets
+        shell: bash
         run: |
-          SHA=$(openssl dgst -sha256 bin/linux-mcp | awk '{print $2}')
-          VERSION=${GITHUB_REF_NAME#v}
-          jq --arg v "$VERSION" --arg sha "$SHA" '.version = $v | .packages[0].version = $v | .packages[0].fileSha256 = $sha' server.json > server.tmp && mv server.tmp server.json
+          set -euo pipefail
+          mkdir -p "$RELEASE_DIR"
+          base_url="https://github.com/Mohabdo21/linux-mcp/releases/download/${RELEASE_TAG}"
+          for asset in server.json linux-mcp; do
+            if ! curl --fail --location --silent --show-error --retry 3 \
+              --output "$RELEASE_DIR/$asset" "$base_url/$asset"; then
+              echo "::error::Release must already contain both server.json and linux-mcp assets; failed to download $asset"
+              exit 1
+            fi
+          done
 
-      - name: Install mcp-publisher
+      - name: Verify release manifest
+        shell: bash
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          url="https://github.com/Mohabdo21/linux-mcp/releases/download/${RELEASE_TAG}/linux-mcp"
+          sha="$(sha256sum "$RELEASE_DIR/linux-mcp" | cut -d ' ' -f 1)"
+          if ! jq -e --arg version "$version" --arg url "$url" --arg sha "$sha" '
+            .version == $version and
+            (.packages | type == "array" and length == 1) and
+            .packages[0].version == $version and
+            .packages[0].registryType == "mcpb" and
+            .packages[0].identifier == $url and
+            .packages[0].fileSha256 == $sha
+          ' "$RELEASE_DIR/server.json"; then
+            echo '::error::Release manifest version, package URL, or SHA256 does not match the release assets'
+            exit 1
+          fi
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Download and verify mcp-publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RELEASE_DIR"
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          archive="mcp-publisher_${os}_${arch}.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --retry 3 --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --retry 3 --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+
+      - name: Validate downloaded manifest
+        run: '"$RELEASE_DIR/mcp-publisher" validate "$RELEASE_DIR/server.json"'
 
       - name: Authenticate to MCP Registry
-        run: ./mcp-publisher login github-oidc
+        run: '"$RELEASE_DIR/mcp-publisher" login github-oidc'
 
       - name: Publish server to MCP Registry
-        run: ./mcp-publisher publish
+        run: '"$RELEASE_DIR/mcp-publisher" publish "$RELEASE_DIR/server.json"'

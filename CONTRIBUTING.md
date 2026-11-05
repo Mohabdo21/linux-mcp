@@ -46,3 +46,31 @@ Use the bug report or feature request template. Include OS/kernel/version info a
 ## Security
 
 Found a vulnerability? Don't open a public issue - email the maintainers privately.
+
+## Release
+
+Release from a clean `main` synchronized with `origin/main`, on Linux amd64 with a matching Go target and GNU `timeout`. Commit and push fixes before starting, including any changes made by formatting or lint autofixes.
+
+```bash
+make release RELEASE_VERSION=vX.Y.Z
+```
+
+`VERSION=vX.Y.Z` remains supported. Bare `make release` prompts with the next patch version. Run `scripts/release.sh --help` for usage.
+
+The release script tags the final source commit before building in a detached worktree. Both binaries must report that tag, its commit, and a clean checkout in their Go build metadata, and return the expected application version through MCP initialization. Signing stays local and uses the maintainer identity expected by `scripts/verify-signature.sh`.
+
+- Tracked `server.json` is the manifest template, not the file to publish directly.
+- Generated `bin/server.json` contains the release version, download URL, and checksum of the final binary. It is uploaded as the `server.json` release asset.
+- Verification, signing, uploads, and publication use private staging files. `bin/` retains output copies, so a concurrent development build cannot replace publication inputs.
+- The registry receives that generated manifest. No checksum commit is added to the tagged source.
+- Published tags and assets must not be moved, deleted, or replaced. Release corrections under a new version.
+
+If only registry publication fails after the release assets are available, use:
+
+```bash
+scripts/release.sh --resume-publish vX.Y.Z
+```
+
+This downloads and verifies the existing artifacts, signatures, provenance, and manifest before republishing, without rebuilding or signing again. Alternatively, run the current **Retry MCP Registry Publication** workflow with that release's explicit `release_tag`; it checks the existing primary binary against the downloaded manifest before publication. Older releases without a `server.json` asset cannot use these recovery paths.
+
+For a partial upload, retain `bin/` and repair only missing assets using the original files. Never rebuild or replace assets already uploaded. Once all assets are available, resume publication as above.

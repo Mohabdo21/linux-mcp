@@ -3,6 +3,7 @@ SHELL := /bin/bash
 BINARY = linux-mcp
 BUILD_DIR = bin
 VERSION ?= dev
+RELEASE_VERSION ?= $(if $(filter command line,$(origin VERSION)),$(VERSION))
 LD_FLAGS = -X main.Version=$(VERSION)
 
 .PHONY: build build-static test upgrade check release
@@ -36,4 +37,4 @@ demo:
 	vhs scripts/cassette.tape
 
 release:
-	@scripts/release.sh "$(VERSION)"
+	@scripts/release.sh "$(RELEASE_VERSION)"
