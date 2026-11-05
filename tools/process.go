@@ -153,6 +153,7 @@ func GatherTopIOProcesses(
 	ctx context.Context,
 	limit int,
 ) (*TopIOProcessesOutput, error) {
+	limit = clampZero(limit, 10, 50)
 	lines, err := execLines(ctx, "pidstat", "-d", "1", "1")
 	if err != nil {
 		out := &TopIOProcessesOutput{Processes: []IOProcessStat{}}

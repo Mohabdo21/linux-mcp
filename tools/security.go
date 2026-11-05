@@ -290,7 +290,10 @@ func parseAuditdLine(line string) AuditLogEntry {
 		return AuditLogEntry{Type: "unknown", Message: line}
 	}
 	typeEnd := strings.Index(header[typeStart:], " ")
-	msgType := header[typeStart+5 : typeEnd]
+	if typeEnd <= 5 {
+		return AuditLogEntry{Type: "unknown", Message: line}
+	}
+	msgType := header[typeStart+5 : typeStart+typeEnd]
 
 	// Extract timestamp from msg=audit(...)
 	tsStart := strings.Index(header, "audit(")
