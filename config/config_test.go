@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -151,5 +152,49 @@ func TestToolTimeoutFallback(t *testing.T) {
 	d = ToolTimeout("nonexistent_tool", 10*time.Second)
 	if d != 10*time.Second {
 		t.Errorf("expected 10s, got %v", d)
+	}
+}
+
+func TestFailedReloadPreservesConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	initial := `{"log_level":"debug","disabled":["ping_host"],"timeouts":{"get_cpu_info":"9s"}}`
+	if err := os.WriteFile(path, []byte(initial), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := loadAtPath(path); err != nil {
+		t.Fatal(err)
+	}
+	want := Get()
+	for _, data := range []string{
+		`{`,
+		`{"log_level":"trace"}`,
+		`{"timeouts":{"get_cpu_info":"bad"}}`,
+	} {
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := Reload(); err == nil {
+			t.Fatalf("Reload accepted invalid config %q", data)
+		}
+		if got := Get(); !reflect.DeepEqual(got, want) {
+			t.Fatalf(
+				"failed reload changed config: got %+v, want %+v",
+				got,
+				want,
+			)
+		}
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := Reload(); err == nil {
+		t.Fatal("Reload accepted missing config")
+	}
+	if got := Get(); !reflect.DeepEqual(got, want) {
+		t.Fatalf(
+			"missing config replaced previous config: got %+v, want %+v",
+			got,
+			want,
+		)
 	}
 }

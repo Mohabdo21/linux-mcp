@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -45,7 +44,8 @@ func init() {
 
 func main() {
 	if err := config.Load(); err != nil {
-		log.Printf("Config load error (using defaults): %v", err)
+		slog.Error("config load failed", "error", err)
+		os.Exit(1)
 	}
 
 	setupLogging()
