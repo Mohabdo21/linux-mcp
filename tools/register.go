@@ -67,12 +67,12 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetDockerContainerDetails,
-		"Returns a container's state, config, env, mounts, and network settings. Read-only via the Docker API; fatal if the daemon is unreachable or the container is unknown. Use to inspect one container; get_docker_info to list them.",
+		"Returns a container's state, config, environment names, mounts, and network settings. Environment values and raw command arguments are omitted. Read-only via the Docker API; fatal if the daemon is unreachable or the container is unknown. Use to inspect one container; get_docker_info to list them.",
 		HandleGetContainerDetail,
 	),
 	defineTool(
 		config.ToolNameGetDockerContainerLogs,
-		"Returns a container's stdout/stderr log lines. Params: tail (line count) and timestamps. Read-only via the Docker API. Fatal if the daemon is unreachable or the container is unknown. Environment values are redacted.",
+		"Returns a container's stdout/stderr log lines. Params: tail (line count) and timestamps. Read-only via the Docker API. Fatal if the daemon is unreachable or the container is unknown. Log content may contain sensitive data.",
 		HandleGetContainerLogs,
 	),
 	defineTool(
@@ -82,7 +82,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetDockerContainerTop,
-		"Returns the processes running inside a container. Read-only via the Docker API; fatal if the daemon is unreachable or the container is unknown. Use to debug container-level process state.",
+		"Returns container processes with fixed PID, PPID, user, state, and executable-name columns, without command arguments. Custom args are ignored. Read-only via the Docker API; fatal if the daemon is unreachable or the container is unknown. Use to debug container-level process state.",
 		HandleGetContainerTop,
 	),
 	defineTool(
@@ -92,12 +92,12 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetDockerImageHistory,
-		"Returns an image's layer history: commands, sizes, and creation times. Read-only via the Docker API. Use to understand what an image is built from; get_docker_image_details for config and labels.",
+		"Returns an image's layer history: sizes and creation times. Raw build commands are omitted. Read-only via the Docker API. Use to understand what an image is built from; get_docker_image_details for config and labels.",
 		HandleGetImageHistory,
 	),
 	defineTool(
 		config.ToolNameGetDockerImageDetails,
-		"Returns an image's config, env, entrypoint, labels, and layers. Read-only via the Docker API; fatal if the daemon is unreachable or the image is unknown. Use to inspect a single image; get_docker_image_history for build steps.",
+		"Returns an image's config, environment names, labels, and layers. Environment values and raw command arguments are omitted. Read-only via the Docker API; fatal if the daemon is unreachable or the image is unknown. Use to inspect a single image; get_docker_image_history for layer metadata.",
 		HandleGetImageDetail,
 	),
 	defineTool(
@@ -297,7 +297,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetSystemHealthCheck,
-		"Returns a single OK/WARNING/CRITICAL verdict derived from memory, disk (partitions at 80%+), load vs core count, and failed systemd units. Read-only aggregate; sub-failures land in the errors field, never fatal. Use for a first-line pass/fail status; it reports no raw metrics - use get_system_snapshot or the targeted tools for detail.",
+		"Returns an OK/WARNING/CRITICAL verdict derived from memory, disk (partitions at 80%+), load vs core count, and failed systemd units. Returns UNKNOWN when checks are incomplete without an observed warning or critical result. Read-only aggregate; disabled collectors are skipped and omissions or sub-failures land in errors. Use for a first-line status; use get_system_snapshot or targeted tools for detail.",
 		HandleGetSystemHealthCheck,
 	),
 	defineTool(

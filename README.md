@@ -184,13 +184,15 @@ The server can be configured via a JSON file loaded from `~/.config/linux-mcp/co
 }
 ```
 
-| Field       | Description                                               |
-| ----------- | --------------------------------------------------------- |
-| `log_level` | One of `debug`, `info`, `warn`, `error` (default: `info`) |
-| `timeouts`  | Per-tool timeout overrides as Go duration strings         |
-| `disabled`  | List of tool names to disable at startup                  |
+| Field       | Description                                                                   |
+| ----------- | ----------------------------------------------------------------------------- |
+| `log_level` | One of `debug`, `info`, `warn`, `error` (default: `info`)                     |
+| `timeouts`  | Per-tool timeout overrides as Go duration strings                             |
+| `disabled`  | Tool names to disable, including their resource and aggregate collector paths |
 
-The server also handles **SIGHUP** to reload the configuration file at runtime without restarting.
+Invalid configuration prevents startup. The server also handles **SIGHUP** to reload the configuration file at runtime without restarting; a failed reload retains the last valid configuration. Disabled collectors are skipped by aggregate tools and reported in their errors.
+
+Docker diagnostic responses omit environment values and raw command arguments, including image-history commands. Other diagnostic content, such as logs and labels, can still contain sensitive data; grant access only to trusted clients.
 
 ## MCP Registry
 
