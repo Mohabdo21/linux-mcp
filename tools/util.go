@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -187,10 +188,22 @@ func shortID(id string) string {
 	return id
 }
 
+// sensitiveEnvPatterns match anywhere in an upper-cased variable name.
 var sensitiveEnvPatterns = []string{
-	"SECRET", "TOKEN", "PASSWORD", "CREDENTIAL",
-	"API_KEY", "PRIVATE_KEY", "DATABASE_URL",
+	"SECRET", "TOKEN", "PASSWORD", "PASSWD", "PASSPHRASE", "CREDENTIAL",
+	"APIKEY", "API_KEY", "PRIVATE_KEY", "DATABASE_URL",
 }
+
+// sensitiveEnvWords match only a whole underscore-separated word of the
+// name, so AWS_ACCESS_KEY_ID and MYSQL_PWD are caught but KEYMAP and OLDPWD
+// are not.
+var sensitiveEnvWords = map[string]bool{
+	"KEY": true, "PWD": true, "PAT": true, "DSN": true,
+}
+
+// urlUserinfo matches a URL carrying credentials, e.g.
+// redis://user:pass@host or https://token@host.
+var urlUserinfo = regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s@]+@`)
 
 func redactSensitiveEnv(env []string) []string {
 	env = nilToEmpty(env)
@@ -211,7 +224,22 @@ func isSensitiveEnvVar(name string) bool {
 			return true
 		}
 	}
+	// PWD itself is the working directory, not a password.
+	if upper == "PWD" {
+		return false
+	}
+	for word := range strings.SplitSeq(upper, "_") {
+		if sensitiveEnvWords[word] {
+			return true
+		}
+	}
 	return false
+}
+
+// isSensitiveEnv reports whether a variable should be redacted, judging by
+// its name or by credentials embedded in a URL value.
+func isSensitiveEnv(name, value string) bool {
+	return isSensitiveEnvVar(name) || urlUserinfo.MatchString(value)
 }
 
 func requireField(val, name string) error {

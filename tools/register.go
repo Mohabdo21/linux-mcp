@@ -232,7 +232,7 @@ var toolRegistry = []toolDef{
 	),
 	defineTool(
 		config.ToolNameGetEnvironmentVariables,
-		"Returns the server process's environment as a sorted key-value map. search filters by name prefix or substring, case-insensitive. Read-only (os.Environ). Sensitive names (SECRET, TOKEN, PASSWORD, etc.) are redacted to ***. Use to debug PATH, locale, and server configuration.",
+		"Returns the server process's environment as a sorted key-value map. search filters by name prefix or substring, case-insensitive. Read-only (os.Environ). Sensitive names (SECRET, TOKEN, PASSWORD, KEY, etc.) and URLs with embedded credentials are redacted to ***. Use to debug PATH, locale, and server configuration.",
 		HandleGetEnvironmentVariables,
 	),
 	defineTool(
