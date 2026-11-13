@@ -191,7 +191,7 @@ func shortID(id string) string {
 // sensitiveEnvPatterns match anywhere in an upper-cased variable name.
 var sensitiveEnvPatterns = []string{
 	"SECRET", "TOKEN", "PASSWORD", "PASSWD", "PASSPHRASE", "CREDENTIAL",
-	"APIKEY", "DATABASE_URL",
+	"APIKEY", "API_KEY", "PRIVATE_KEY", "DATABASE_URL",
 }
 
 // sensitiveEnvWords match only a whole underscore-separated word of the

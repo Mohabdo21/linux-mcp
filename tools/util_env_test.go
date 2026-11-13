@@ -60,6 +60,8 @@ func TestIsSensitiveEnv(t *testing.T) {
 		{"GH_PAT", "x", true},
 		{"SENTRY_DSN", "x", true},
 		{"OPENAI_APIKEY", "x", true},
+		{"API_KEY1", "x", true},
+		{"PRIVATE_KEYS", "x", true},
 		{"SSH_KEY", "x", true},
 		{"REDIS_URL", "redis://user:pass@host:6379/0", true},
 		{"HTTPS_PROXY", "http://user:pass@proxy:3128", true},
@@ -87,6 +89,8 @@ func TestGatherEnvironmentVariablesRedaction(t *testing.T) {
 	t.Setenv("LINUXMCP_TEST_ACCESS_KEY_ID", "AKIAEXAMPLE")
 	t.Setenv("LINUXMCP_TEST_URL", "redis://user:hunter2@host/0")
 	t.Setenv("LINUXMCP_TEST_PLAIN", "visible")
+	t.Setenv("LINUXMCP_TEST_API_KEY1", "dummy-api-key")
+	t.Setenv("LINUXMCP_TEST_PRIVATE_KEYS", "dummy-private-keys")
 
 	out, err := GatherEnvironmentVariables(t.Context(), "linuxmcp_test_")
 	if err != nil {
@@ -100,6 +104,8 @@ func TestGatherEnvironmentVariablesRedaction(t *testing.T) {
 		"LINUXMCP_TEST_ACCESS_KEY_ID": "***",
 		"LINUXMCP_TEST_URL":           "***",
 		"LINUXMCP_TEST_PLAIN":         "visible",
+		"LINUXMCP_TEST_API_KEY1":      "***",
+		"LINUXMCP_TEST_PRIVATE_KEYS":  "***",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("variables = %v, want %v", got, want)
