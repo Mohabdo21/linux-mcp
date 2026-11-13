@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -67,6 +68,11 @@ func GatherInstalledPackages(
 	ctx context.Context,
 	name string,
 ) (*InstalledPackagesOutput, error) {
+	// No package name starts with a dash, and the package manager would
+	// read one as a command-line option.
+	if strings.HasPrefix(name, "-") {
+		return nil, fmt.Errorf("invalid package name: %q", name)
+	}
 	pm := detectPkgManager()
 	switch pm {
 	case "pacman":

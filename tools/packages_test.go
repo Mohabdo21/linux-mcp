@@ -308,3 +308,23 @@ func TestAvailableUpdatesToolTimeoutIsConfigured(t *testing.T) {
 		t.Errorf("ToolTimeout(get_available_updates) = %v, want 15s", got)
 	}
 }
+
+func TestGatherInstalledPackagesRejectsOptionLikeName(t *testing.T) {
+	for _, pm := range []string{"pacman", "dpkg", "rpm", "apk"} {
+		t.Run(pm, func(t *testing.T) {
+			marker := filepath.Join(t.TempDir(), "called")
+			fakePkgManager(t, pm, `: > "$MARKER"`)
+			t.Setenv("MARKER", marker)
+
+			out, err := GatherInstalledPackages(t.Context(), "--root=/tmp")
+			if err == nil ||
+				!strings.Contains(err.Error(), "invalid package name") {
+				t.Errorf("GatherInstalledPackages() = %+v, %v, "+
+					"want an invalid package name error", out, err)
+			}
+			if _, statErr := os.Stat(marker); statErr == nil {
+				t.Errorf("%s was run with an option-like name", pm)
+			}
+		})
+	}
+}
