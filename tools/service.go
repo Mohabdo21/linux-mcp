@@ -38,7 +38,10 @@ func ExtractField(output, prefix string) string {
 func GatherServiceStatus(
 	ctx context.Context, name string, user bool,
 ) (*ServiceStatusOutput, error) {
-	args := []string{"status", name, "--no-pager", "-l"}
+	if !validServiceStatusName.MatchString(name) {
+		return nil, fmt.Errorf("invalid service name: %q", name)
+	}
+	args := []string{"status", "--no-pager", "-l", "--", name}
 	if user {
 		args = append([]string{"--user"}, args...)
 	}
@@ -128,6 +131,11 @@ func HandleGetSystemdUnits(
 
 var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 
+// Accept escaped and instantiated names, but reject option-like arguments.
+var validServiceStatusName = regexp.MustCompile(
+	`^[a-zA-Z0-9_:.\\][a-zA-Z0-9_:.@\\-]*$`,
+)
+
 func HandleGetServiceStatus(
 	ctx context.Context,
 	_ *mcp.CallToolRequest,
@@ -135,9 +143,6 @@ func HandleGetServiceStatus(
 ) (*mcp.CallToolResult, *ServiceStatusOutput, error) {
 	if err := requireField(input.Name, "name"); err != nil {
 		return nil, nil, err
-	}
-	if !validServiceName.MatchString(input.Name) {
-		return nil, nil, fmt.Errorf("invalid service name: %q", input.Name)
 	}
 	return handleToolCall(
 		ctx,

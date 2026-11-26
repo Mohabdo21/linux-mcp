@@ -248,7 +248,7 @@ func handleReadResource(
 			return r.resolver(ctx, rest)
 		},
 	)
-	if data == nil {
+	if isOutNil(data) {
 		if nerr != nil {
 			return nil, fmt.Errorf("resource unavailable: %w", nerr)
 		}
